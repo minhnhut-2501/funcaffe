@@ -27,11 +27,21 @@ class TestUserSeeder extends Seeder
         // Dọn tài khoản demo cũ (nếu còn) để chỉ giữ đúng 2 tài khoản mong muốn.
         User::where('email', 'user@funcafe.vn')->delete();
 
-        if (!User::where('email', 'nphec4007@gmail.com')->exists()) {
+        // _id cố định = user_id của quán demo (seed-data/cafes.json) để
+        // quán + thực đơn + bàn tự thuộc về tài khoản này.
+        $ownerId = '6a3910511846951d38041ca7';
+        $owner = User::where('email', 'nphec4007@gmail.com')->first();
+
+        // Nếu bản cũ tồn tại nhưng _id không đúng (lần seed trước tạo _id ngẫu nhiên),
+        // xóa đi để tạo lại với _id chuẩn (Mongo không cho đổi _id).
+        if ($owner && (string) $owner->getKey() !== $ownerId) {
+            $owner->delete();
+            $owner = null;
+        }
+
+        if (!$owner) {
             User::create([
-                // _id cố định = user_id của quán demo (seed-data/cafes.json) để
-                // quán + thực đơn + bàn tự thuộc về tài khoản này.
-                '_id' => new ObjectId('6a3910511846951d38041ca7'),
+                '_id' => new ObjectId($ownerId),
                 'full_name' => 'Nguyễn Minh Nhựt',
                 'email' => 'nphec4007@gmail.com',
                 'password' => Hash::make('123456'),
