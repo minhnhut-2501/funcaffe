@@ -23,16 +23,19 @@ class TestUserSeeder extends Seeder
             $this->command->info('Created admin account: admin@funcafe.vn / 123456');
         }
 
-        if (!User::where('email', 'user@funcafe.vn')->exists()) {
+        // Dọn tài khoản demo cũ (nếu còn) để chỉ giữ đúng 2 tài khoản mong muốn.
+        User::where('email', 'user@funcafe.vn')->delete();
+
+        if (!User::where('email', 'nphec4007@gmail.com')->exists()) {
             User::create([
                 'full_name' => 'Nguyễn Minh Nhựt',
-                'email' => 'user@funcafe.vn',
+                'email' => 'nphec4007@gmail.com',
                 'password' => Hash::make('123456'),
                 'phone' => '0901234567',
                 'role' => 'user',
                 'status' => 'active',
             ]);
-            $this->command->info('Created user account: user@funcafe.vn / 123456');
+            $this->command->info('Created user account: nphec4007@gmail.com / 123456');
         }
     }
 }
