@@ -1,0 +1,51 @@
+node_modules
+.next
+dist
+*.tsbuildinfo
+out
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+.env
+.env.local
+.env*.local
+
+*.log
+.DS_Store
+Thumbs.db
+
+# Backend (Laravel)
+backend/vendor/
+backend/.env
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/logs/*
+backend/bootstrap/cache/*
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+*.DS_Store
+Thumbs.db
+
+# Artifacts (old structure cleaned up) — chỉ khớp thư mục ở GỐC repo,
+# tránh nuốt nhầm src/lib, src/scripts...
+/artifacts/
+/attached_assets/
+/lib/
+/scripts/
+pnpm-lock.yaml
+pnpm-workspace.yaml
+replit.md
+tsconfig.base.json
+.npmrc
+.replit
+.replitignore
+.agents/

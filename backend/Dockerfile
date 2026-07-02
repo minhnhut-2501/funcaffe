@@ -1,0 +1,30 @@
+# FunCafe backend — Laravel 13 / PHP 8.3 + MongoDB
+# Dùng cho Render (Web Service, runtime Docker, root directory = backend)
+FROM php:8.3-cli
+
+# Thư viện hệ thống cần cho các extension
+RUN apt-get update && apt-get install -y \
+        git unzip libzip-dev libonig-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# PHP extensions: zip/bcmath/mbstring cho Laravel, mongodb (2.x) cho DB
+RUN docker-php-ext-install zip bcmath mbstring \
+    && pecl install mongodb \
+    && docker-php-ext-enable mongodb
+
+# Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+COPY . .
+
+# Cài dependencies production (ext-mongodb 2.x đã có ở trên nên qua được platform check)
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# Quyền ghi cho Laravel
+RUN chmod -R 775 storage bootstrap/cache
+
+# Render cấp cổng qua $PORT. config:cache chạy lúc RUNTIME để nhận env đã inject.
+EXPOSE 8000
+CMD php artisan config:cache \
+    && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}

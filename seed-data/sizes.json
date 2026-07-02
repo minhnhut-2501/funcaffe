@@ -1,0 +1,5 @@
+[
+  { "_id": { "$oid": "666300000000000000000001" }, "name": "S", "description": "Nhỏ", "sort_order": 1, "is_active": true, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
+  { "_id": { "$oid": "666300000000000000000002" }, "name": "M", "description": "Vừa", "sort_order": 2, "is_active": true, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
+  { "_id": { "$oid": "666300000000000000000003" }, "name": "L", "description": "Lớn", "sort_order": 3, "is_active": true, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } }
+]
