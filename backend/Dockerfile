@@ -6,11 +6,12 @@ FROM php:8.3-cli
 # libssl-dev + pkg-config BẮT BUỘC để ext mongodb build KÈM TLS/SSL,
 # nếu thiếu -> lỗi "SSL not enabled in this build" khi nối Atlas (mongodb+srv).
 RUN apt-get update && apt-get install -y \
-        git unzip libzip-dev libonig-dev libssl-dev pkg-config \
+        git unzip libzip-dev libonig-dev libssl-dev libsqlite3-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions: zip/bcmath/mbstring cho Laravel, mongodb (2.x) cho DB
-RUN docker-php-ext-install zip bcmath mbstring \
+# PHP extensions: zip/bcmath/mbstring cho Laravel, mongodb (2.x) cho DB chính,
+# pdo_sqlite để lưu Sanctum token (model PersonalAccessToken dùng connection sqlite).
+RUN docker-php-ext-install zip bcmath mbstring pdo_sqlite \
     && pecl install mongodb \
     && docker-php-ext-enable mongodb
 
@@ -31,5 +32,7 @@ RUN chmod -R 775 storage bootstrap/cache
 # free tier không có; dùng ';' để serve vẫn chạy dù seed lỗi.
 EXPOSE 8000
 CMD php artisan config:cache \
+    && touch database/database.sqlite \
+    && php artisan migrate --force \
     && php artisan db:seed --class=ProductionSeeder --force ; \
     php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
