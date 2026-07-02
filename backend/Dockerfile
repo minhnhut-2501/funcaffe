@@ -2,9 +2,11 @@
 # Dùng cho Render (Web Service, runtime Docker, root directory = backend)
 FROM php:8.3-cli
 
-# Thư viện hệ thống cần cho các extension
+# Thư viện hệ thống cần cho các extension.
+# libssl-dev + pkg-config BẮT BUỘC để ext mongodb build KÈM TLS/SSL,
+# nếu thiếu -> lỗi "SSL not enabled in this build" khi nối Atlas (mongodb+srv).
 RUN apt-get update && apt-get install -y \
-        git unzip libzip-dev libonig-dev \
+        git unzip libzip-dev libonig-dev libssl-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions: zip/bcmath/mbstring cho Laravel, mongodb (2.x) cho DB
