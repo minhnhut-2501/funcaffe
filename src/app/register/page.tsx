@@ -68,23 +68,25 @@ export default function RegisterPage() {
   return (
     <PublicLayout>
       <div className="bg-paper">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid md:grid-cols-2 gap-10 items-stretch">
-          {/* Panel ảnh thương hiệu */}
-          <AuthAside
-            image="/banners/cafe-counter.jpg"
-            title="Bắt đầu quản lý quán chỉ trong 5 phút"
-            subtitle="Đăng ký nhanh và bắt đầu quản lý quán cafe của bạn ngay hôm nay."
-            points={points}
-          />
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+          {/* Thẻ split hợp nhất: ảnh + form nằm chung 1 khối bo góc, dính liền (không rời rạc) */}
+          <div className="grid md:grid-cols-2 overflow-hidden rounded-3xl border border-line bg-white shadow-xl shadow-bean/10">
+            {/* Panel ảnh thương hiệu (nửa trái) */}
+            <AuthAside
+              image="/banners/cafe-counter.jpg"
+              title="Bắt đầu quản lý quán chỉ trong 5 phút"
+              subtitle="Đăng ký nhanh và bắt đầu quản lý quán cafe của bạn ngay hôm nay."
+              points={points}
+            />
 
-          {/* Form */}
-          <div className="w-full max-w-md mx-auto md:mx-0 md:self-center">
-            <div className="md:hidden mb-6">
-              <h1 className="text-2xl font-bold text-ink">Tạo tài khoản FunCafe</h1>
-              <p className="text-ink/60 text-sm mt-1">Dùng thử miễn phí 7 ngày.</p>
-            </div>
+            {/* Form (nửa phải) */}
+            <div className="p-6 sm:p-8 lg:p-10 flex items-center">
+              <div className="w-full max-w-md mx-auto">
+                <div className="mb-6">
+                  <h1 className="text-2xl font-bold text-ink">Tạo tài khoản</h1>
+                  <p className="text-ink/60 text-sm mt-1">Dùng thử miễn phí 7 ngày, không cần thẻ tín dụng.</p>
+                </div>
 
-            <div className="card-public p-6">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="reg-name" className="label-funcafe">Họ và tên <span className="text-red-500">*</span></label>
@@ -153,8 +155,9 @@ export default function RegisterPage() {
                   {loading ? 'Đang xử lý...' : 'Tạo tài khoản'}
                 </button>
               </form>
-              <div className="mt-4 pt-4 border-t border-line text-center text-sm text-ink/60">
-                Đã có tài khoản? <Link href="/login" className="text-bean font-medium hover:underline">Đăng nhập</Link>
+                <div className="mt-4 pt-4 border-t border-line text-center text-sm text-ink/60">
+                  Đã có tài khoản? <Link href="/login" className="text-bean font-medium hover:underline">Đăng nhập</Link>
+                </div>
               </div>
             </div>
           </div>

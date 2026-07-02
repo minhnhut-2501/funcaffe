@@ -18,7 +18,7 @@ export default function AuthAside({
   points: string[];
 }) {
   return (
-    <div className="relative hidden md:flex flex-col justify-between overflow-hidden rounded-3xl min-h-[560px] p-8 lg:p-10">
+    <div className="relative hidden md:flex flex-col justify-between overflow-hidden h-full min-h-[560px] p-8 lg:p-10">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={image} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" loading="eager" />
       <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-bean/92 via-bean/80 to-bean-dark/85" />
