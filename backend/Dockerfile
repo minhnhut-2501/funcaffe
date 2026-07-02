@@ -25,6 +25,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 RUN chmod -R 775 storage bootstrap/cache
 
 # Render cấp cổng qua $PORT. config:cache chạy lúc RUNTIME để nhận env đã inject.
+# db:seed ProductionSeeder idempotent (chỉ nạp khi rỗng) — thay cho Shell mà
+# free tier không có; dùng ';' để serve vẫn chạy dù seed lỗi.
 EXPOSE 8000
 CMD php artisan config:cache \
-    && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+    && php artisan db:seed --class=ProductionSeeder --force ; \
+    php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
