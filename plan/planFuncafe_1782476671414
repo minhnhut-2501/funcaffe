@@ -1,0 +1,1068 @@
+# MÔ TẢ CHỨC NĂNG DỰ ÁN FUNCAFE
+
+## 1. Tổng quan dự án
+
+FunCafe là website cung cấp dịch vụ quản lý quán cafe dành cho chủ quán tại Việt Nam. Hệ thống hỗ trợ chủ quán quản lý các nghiệp vụ trong quá trình vận hành quán như quản lý thông tin quán, bàn, danh mục món, thực đơn, size, topping, bán hàng theo bàn, order, hóa đơn và doanh thu.
+
+FunCafe được xây dựng theo mô hình website dịch vụ. Người dùng có thể đăng ký tài khoản, sử dụng thử gói Fun Free hoặc đăng ký các gói Pro/Pro Max để sử dụng hệ thống quản lý quán cafe.
+
+Hệ thống gồm 3 khu vực chính:
+
+* Public Website: khu vực giới thiệu dịch vụ FunCafe.
+* User Portal: khu vực quản lý dành cho chủ quán cafe.
+* Admin Portal: khu vực quản trị dành cho quản trị viên hệ thống.
+
+---
+
+# 2. Public Website
+
+Public Website là khu vực dành cho khách truy cập chưa đăng nhập. Khu vực này dùng để giới thiệu hệ thống, trình bày các tính năng chính, hiển thị gói dịch vụ và hỗ trợ người dùng đăng ký/đăng nhập.
+
+## 2.1. Trang chủ
+
+Trang chủ giới thiệu tổng quan về hệ thống FunCafe.
+
+Chức năng chính:
+
+* Hiển thị thông tin giới thiệu hệ thống.
+* Hiển thị các tính năng nổi bật.
+* Hiển thị lợi ích khi sử dụng FunCafe.
+* Hiển thị quy trình sử dụng cơ bản.
+* Hiển thị tóm tắt các gói dịch vụ.
+* Điều hướng đến trang đăng ký, đăng nhập hoặc bảng giá.
+
+## 2.2. Trang Tính năng
+
+Trang Tính năng mô tả các nhóm chức năng chính của FunCafe.
+
+Các nhóm chức năng gồm:
+
+* Quản lý thông tin quán.
+* Quản lý bàn.
+* Quản lý danh mục món.
+* Quản lý thực đơn.
+* Quản lý size.
+* Quản lý topping.
+* Cấu hình topping cho từng món.
+* Bán hàng theo bàn.
+* Quản lý order.
+* Quản lý hóa đơn.
+* Thống kê doanh thu dành cho gói Pro Max.
+
+## 2.3. Trang Gói dịch vụ
+
+Trang Gói dịch vụ hiển thị các gói sử dụng của hệ thống.
+
+Hệ thống có 3 gói:
+
+### Fun Free
+
+Fun Free là gói dùng thử miễn phí.
+
+Đặc điểm:
+
+* Dùng thử miễn phí 7 ngày.
+* Mỗi user chỉ được dùng thử một lần.
+* Cho phép trải nghiệm các chức năng quản lý cơ bản.
+* Phù hợp với người dùng muốn thử hệ thống trước khi đăng ký gói trả phí.
+* Level của gói là 0.
+
+### Pro
+
+Pro là gói dành cho chủ quán cần sử dụng các chức năng quản lý cơ bản.
+
+Chức năng của gói Pro:
+
+* Quản lý thông tin quán.
+* Quản lý bàn.
+* Quản lý danh mục món.
+* Quản lý thực đơn.
+* Quản lý size.
+* Quản lý topping.
+* Cấu hình topping cho món.
+* Bán hàng theo bàn.
+* Quản lý order.
+* Quản lý hóa đơn.
+* In hóa đơn.
+
+Giới hạn:
+
+* Không có chức năng thống kê doanh thu.
+
+Level của gói là 1.
+
+### Pro Max
+
+Pro Max là gói đầy đủ nhất.
+
+Chức năng của gói Pro Max:
+
+* Có toàn bộ chức năng của gói Pro.
+* Có thống kê doanh thu.
+* Có biểu đồ doanh thu.
+* Có thống kê top món bán chạy.
+* Có báo cáo chi tiết.
+
+Level của gói là 2.
+
+## 2.4. Trang Đăng ký
+
+Trang Đăng ký cho phép khách truy cập tạo tài khoản để sử dụng hệ thống.
+
+Form đăng ký gồm:
+
+* Họ tên.
+* Email.
+* Số điện thoại.
+* Mật khẩu.
+* Xác nhận mật khẩu.
+
+Luồng hoạt động:
+
+1. Người dùng nhập thông tin đăng ký.
+2. Hệ thống kiểm tra dữ liệu đầu vào.
+3. Nếu dữ liệu hợp lệ, hệ thống tạo tài khoản mới.
+4. Người dùng đăng nhập vào User Portal.
+
+## 2.5. Trang Đăng nhập
+
+Trang Đăng nhập cho phép user/admin truy cập hệ thống.
+
+Luồng hoạt động:
+
+1. Người dùng nhập email và mật khẩu.
+2. Hệ thống kiểm tra tài khoản.
+3. Nếu tài khoản bị khóa, hệ thống không cho đăng nhập.
+4. Nếu là user, chuyển đến User Portal.
+5. Nếu là admin, chuyển đến Admin Portal.
+
+## 2.6. Trang Liên hệ
+
+Trang Liên hệ cho phép khách truy cập gửi thông tin tư vấn.
+
+Form liên hệ gồm:
+
+* Họ tên.
+* Email.
+* Số điện thoại.
+* Tên quán cafe.
+* Nội dung cần tư vấn.
+
+---
+
+# 3. User Portal
+
+User Portal là khu vực dành cho chủ quán cafe sau khi đăng nhập. Đây là phần chính của hệ thống, hỗ trợ chủ quán quản lý các hoạt động kinh doanh hằng ngày.
+
+Mỗi user chỉ được quản lý một quán cafe.
+
+Các trang chính gồm:
+
+* Tổng quan.
+* Thông tin quán.
+* Quản lý bàn.
+* Danh mục món.
+* Thực đơn.
+* Size.
+* Topping.
+* Cấu hình topping cho món.
+* Bán hàng.
+* Lịch sử order.
+* Hóa đơn.
+* Doanh thu.
+* Gói đang dùng.
+* Đánh giá FunCafe.
+* Hồ sơ cá nhân.
+
+---
+
+## 3.1. Quyền của user chưa có gói
+
+Sau khi đăng ký tài khoản, user chưa có gói vẫn được vào khu vực quản lý để xem thử giao diện.
+
+User chưa có gói được phép:
+
+* Xem danh sách dữ liệu.
+* Tìm kiếm dữ liệu.
+* Lọc dữ liệu.
+* Xem chi tiết dữ liệu.
+* Mở form thêm mới để xem giao diện.
+* Mở form chỉnh sửa để xem giao diện.
+* Xem chi tiết order.
+* Xem chi tiết hóa đơn.
+* Xem giao diện bill.
+
+User chưa có gói không được phép:
+
+* Lưu dữ liệu mới.
+* Cập nhật dữ liệu.
+* Xóa dữ liệu.
+* Tạo order thật.
+* Thêm món vào order thật.
+* Thanh toán order.
+* In hóa đơn.
+* Tải PDF hóa đơn.
+* Lưu cấu hình topping.
+* Lưu thay đổi thông tin quán.
+
+Khi user thực hiện hành động bị khóa, hệ thống hiển thị thông báo yêu cầu kích hoạt Fun Free hoặc đăng ký Pro/Pro Max.
+
+---
+
+# 4. Quản lý gói dịch vụ của user
+
+FunCafe sử dụng mô hình gói dịch vụ để phân quyền chức năng. Mỗi gói có một cấp độ `level` để hệ thống xác định quyền nâng cấp.
+
+| Gói      | Level | Ý nghĩa                  |
+| -------- | ----: | ------------------------ |
+| Fun Free |     0 | Gói dùng thử miễn phí    |
+| Pro      |     1 | Gói quản lý cơ bản       |
+| Pro Max  |     2 | Gói đầy đủ, có doanh thu |
+
+Quy tắc:
+
+* User chưa có gói có thể đăng ký Fun Free, Pro hoặc Pro Max.
+* User đang dùng Fun Free có thể nâng cấp lên Pro hoặc Pro Max.
+* User đang dùng Pro có thể nâng cấp lên Pro Max.
+* User đang dùng Pro Max không thể nâng cấp tiếp, chỉ có thể gia hạn.
+* Không cho hạ gói khi gói hiện tại còn hiệu lực.
+* Mỗi user chỉ được quản lý một quán cafe.
+
+## 4.1. Luồng đăng ký gói mới
+
+Khi user chưa có gói và chọn đăng ký gói mới, hệ thống xử lý như sau:
+
+1. User chọn gói.
+2. User chọn thời hạn.
+3. Hệ thống tạo subscription mới với trạng thái `active`.
+4. Hệ thống cho user sử dụng gói ngay.
+5. Hệ thống tạo giao dịch thanh toán với trạng thái `pending`.
+6. Admin kiểm tra giao dịch sau.
+7. Nếu admin duyệt, giao dịch chuyển sang `paid`.
+8. Nếu admin từ chối, giao dịch chuyển sang `rejected` và subscription bị hủy.
+
+Điểm quan trọng:
+
+* Subscription được kích hoạt ngay để user không bị gián đoạn sử dụng.
+* Trạng thái chờ kiểm tra nằm ở giao dịch thanh toán, không chặn quyền sử dụng ngay lập tức.
+* Nếu là Fun Free, payment có thể được set `paid` ngay vì giá bằng 0.
+
+## 4.2. Luồng nâng cấp gói
+
+Nâng cấp gói xảy ra khi user chọn gói có level cao hơn gói hiện tại.
+
+Ví dụ:
+
+* Fun Free → Pro.
+* Fun Free → Pro Max.
+* Pro → Pro Max.
+
+Luồng xử lý:
+
+1. User đang có subscription `active`.
+2. User chọn gói cao hơn.
+3. Hệ thống kiểm tra level của gói mới.
+4. Nếu gói mới có level cao hơn gói hiện tại, hệ thống cho nâng cấp.
+5. Subscription cũ được chuyển sang `cancelled`.
+6. Subscription mới được tạo với trạng thái `active`.
+7. User được dùng gói mới ngay.
+8. Giao dịch thanh toán được tạo với `payment_status = pending`.
+9. Admin kiểm tra giao dịch sau.
+
+Nếu admin duyệt:
+
+* Payment chuyển sang `paid`.
+* Subscription mới vẫn `active`.
+* `is_pending_review` chuyển thành `false`.
+
+Nếu admin từ chối:
+
+* Payment chuyển sang `rejected`.
+* Subscription mới chuyển sang `cancelled` hoặc `rejected`.
+* Subscription cũ được khôi phục về `active` nếu vẫn còn hạn.
+
+## 4.3. Luồng gia hạn gói
+
+Gia hạn xảy ra khi user chọn lại đúng gói hiện tại.
+
+Ví dụ:
+
+* Pro gia hạn thêm 1 tháng.
+* Pro Max gia hạn thêm 12 tháng.
+
+Luồng xử lý:
+
+1. User chọn cùng gói hiện tại.
+2. User chọn thời hạn gia hạn.
+3. Hệ thống lưu lại `previous_end_date`.
+4. Hệ thống cộng thêm thời hạn mới vào `end_date`.
+5. Subscription vẫn ở trạng thái `active`.
+6. `is_pending_review = true`.
+7. Giao dịch thanh toán được tạo với `payment_status = pending`.
+8. Admin kiểm tra giao dịch sau.
+
+Nếu admin duyệt:
+
+* Payment chuyển sang `paid`.
+* `is_pending_review = false`.
+* Ngày hết hạn mới được giữ nguyên.
+
+Nếu admin từ chối:
+
+* Payment chuyển sang `rejected`.
+* Hệ thống rollback `end_date` về `previous_end_date`.
+* `is_pending_review = false`.
+
+## 4.4. Trang Gói đang dùng
+
+Trang Gói đang dùng cho phép user xem và quản lý gói dịch vụ của mình.
+
+Thông tin hiển thị:
+
+* Tên gói hiện tại.
+* Ngày bắt đầu.
+* Ngày hết hạn.
+* Số ngày còn lại.
+* Trạng thái gói.
+* Trạng thái kiểm tra thanh toán.
+
+Nếu `is_pending_review = true`, hệ thống hiển thị:
+
+```text
+Gói đang được sử dụng. Thanh toán đang chờ admin kiểm tra.
+```
+
+Nếu `is_pending_review = false`, hệ thống hiển thị:
+
+```text
+Gói đang hoạt động.
+```
+
+Chức năng theo từng trường hợp:
+
+### User chưa có gói
+
+* Hiển thị danh sách gói.
+* Cho chọn Fun Free, Pro hoặc Pro Max.
+* Nút thao tác: Đăng ký gói.
+
+### User đang có gói và còn gói cao hơn
+
+* Hiển thị gói hiện tại.
+* Hiển thị nút Nâng cấp gói.
+* Khi bấm nâng cấp, chỉ hiển thị các gói có level cao hơn gói hiện tại.
+
+### User đang ở gói cao nhất
+
+* Hiển thị gói hiện tại.
+* Hiển thị nút Gia hạn gói.
+* Cho chọn thời hạn 1 tháng, 3 tháng hoặc 12 tháng.
+
+---
+
+# 5. Trang Tổng quan User
+
+Trang Tổng quan hiển thị tình trạng hoạt động của quán.
+
+Chức năng:
+
+* Hiển thị gói hiện tại của user.
+* Hiển thị số ngày còn lại của gói.
+* Hiển thị trạng thái thanh toán đang chờ admin kiểm tra nếu có.
+* Hiển thị số bàn đang phục vụ.
+* Hiển thị số order chưa thanh toán.
+* Hiển thị số hóa đơn hôm nay.
+* Hiển thị số món đang bán.
+* Hiển thị các nút thao tác nhanh.
+
+Nếu user dùng Pro Max:
+
+* Hiển thị doanh thu hôm nay.
+* Hiển thị doanh thu tháng này.
+* Hiển thị biểu đồ doanh thu.
+* Hiển thị top món bán chạy.
+
+Nếu user dùng Fun Free hoặc Pro:
+
+* Khu vực doanh thu bị khóa.
+* Hệ thống yêu cầu nâng cấp Pro Max để xem báo cáo.
+
+---
+
+# 6. Trang Thông tin quán
+
+Trang Thông tin quán cho phép user quản lý thông tin quán cafe.
+
+Dữ liệu gồm:
+
+* Tên quán.
+* Địa chỉ.
+* Số điện thoại.
+* Mô tả.
+* Logo.
+* Trạng thái hoạt động.
+
+Quy tắc:
+
+* Mỗi user chỉ được tạo một quán cafe.
+* Nếu user đã có quán, hệ thống không cho tạo thêm.
+* User chỉ được sửa thông tin quán của mình.
+
+---
+
+# 7. Trang Quản lý bàn
+
+Trang Quản lý bàn dùng để quản lý danh sách bàn trong quán.
+
+Dữ liệu bàn gồm:
+
+* Tên bàn.
+* Sức chứa.
+* Thứ tự hiển thị.
+* Trạng thái bàn.
+* Order hiện tại nếu có.
+
+Trạng thái bàn:
+
+* Trống.
+* Đang phục vụ.
+* Đã đặt.
+* Cần dọn.
+
+Chức năng:
+
+* Xem danh sách bàn.
+* Tìm kiếm bàn.
+* Lọc bàn theo trạng thái.
+* Thêm bàn.
+* Sửa bàn.
+* Xóa bàn.
+* Cập nhật trạng thái bàn.
+
+Quy tắc:
+
+* Không được xóa bàn đang có order chưa thanh toán.
+* Nếu bàn đang phục vụ, hệ thống hiển thị order hiện tại của bàn.
+
+---
+
+# 8. Trang Danh mục món
+
+Trang Danh mục món dùng để quản lý nhóm món trong quán.
+
+Dữ liệu gồm:
+
+* Tên danh mục.
+* Mô tả.
+* Trạng thái hoạt động.
+
+Chức năng:
+
+* Xem danh sách danh mục.
+* Tìm kiếm danh mục.
+* Thêm danh mục.
+* Sửa danh mục.
+* Ẩn/hiện danh mục.
+
+Ví dụ:
+
+* Cà phê.
+* Trà sữa.
+* Nước ép.
+* Bánh ngọt.
+
+---
+
+# 9. Trang Thực đơn
+
+Trang Thực đơn dùng để quản lý danh sách món bán trong quán.
+
+Dữ liệu món gồm:
+
+* Tên món.
+* Danh mục.
+* Hình ảnh.
+* Mô tả.
+* Giá mặc định.
+* Có size hay không.
+* Cho phép topping hay không.
+* Trạng thái còn bán.
+* Thứ tự hiển thị.
+
+Chức năng:
+
+* Xem danh sách món.
+* Tìm kiếm món.
+* Lọc theo danh mục.
+* Lọc theo trạng thái.
+* Thêm món mới.
+* Sửa món.
+* Ẩn/hiện món.
+* Cấu hình giá theo size.
+* Cấu hình topping hợp lệ cho món.
+
+Quy tắc:
+
+* Món không có size thì dùng giá mặc định.
+* Món có size thì giá lấy từ bảng giá theo size.
+* Món cho topping thì phải có liên kết với topping hợp lệ.
+
+---
+
+# 10. Trang Size
+
+Trang Size dùng để quản lý danh sách size dùng chung trong hệ thống.
+
+Dữ liệu gồm:
+
+* Tên size.
+* Mô tả.
+* Thứ tự hiển thị.
+* Trạng thái hoạt động.
+
+Ví dụ:
+
+* S - Nhỏ.
+* M - Vừa.
+* L - Lớn.
+
+Size được dùng để tạo giá riêng cho từng món trong collection `item_prices`.
+
+---
+
+# 11. Trang Topping
+
+Trang Topping dùng để quản lý topping trong quán.
+
+Dữ liệu topping gồm:
+
+* Tên topping.
+* Giá topping.
+* Hình ảnh.
+* Trạng thái còn bán.
+
+Chức năng:
+
+* Xem danh sách topping.
+* Tìm kiếm topping.
+* Thêm topping.
+* Sửa topping.
+* Ẩn/hiện topping.
+
+Ví dụ:
+
+* Trân châu trắng.
+* Pudding.
+* Kem cheese.
+* Thạch cafe.
+
+---
+
+# 12. Trang Cấu hình topping cho món
+
+Trang này dùng để xác định món nào được phép chọn topping nào.
+
+Chức năng:
+
+* Chọn món cần cấu hình.
+* Xem danh sách topping.
+* Chọn topping được phép sử dụng cho món.
+* Lưu cấu hình.
+
+Quy tắc:
+
+* Không phải món nào cũng được chọn topping.
+* Khi bán hàng, hệ thống chỉ hiển thị topping hợp lệ với món đang chọn.
+* Quan hệ món - topping được lưu trong collection `item_toppings`.
+
+---
+
+# 13. Chức năng Bán hàng
+
+Trang Bán hàng là chức năng quan trọng của User Portal. Trang này dùng để tạo order, thêm món và thanh toán cho khách tại quán.
+
+Màn hình bán hàng gồm 3 khu vực chính:
+
+1. Danh sách bàn.
+2. Danh sách món.
+3. Order hiện tại.
+
+## 13.1. Khu vực bàn
+
+Chức năng:
+
+* Xem danh sách bàn.
+* Tìm kiếm bàn.
+* Lọc bàn theo trạng thái.
+* Chọn bàn để tạo order.
+* Chọn bàn đang phục vụ để tiếp tục order.
+
+Luồng xử lý:
+
+* Nếu chọn bàn trống, hệ thống tạo order mới.
+* Nếu chọn bàn đang phục vụ, hệ thống load order chưa thanh toán.
+* Nếu bàn có order hiện tại, hệ thống hiển thị order tương ứng.
+
+## 13.2. Khu vực thực đơn
+
+Chức năng:
+
+* Xem danh sách món đang bán.
+* Tìm kiếm món.
+* Lọc theo danh mục.
+* Xem giá món.
+* Xem món có size/topping hay không.
+* Thêm món vào order.
+
+Quy tắc:
+
+* Món hết bán không được thêm vào order.
+* Nếu chưa chọn bàn, hệ thống yêu cầu chọn bàn trước.
+* Nếu món không có size/topping, có thể thêm nhanh.
+* Nếu món có size/topping, mở modal chọn món.
+
+## 13.3. Modal chọn món
+
+Modal chọn món hiển thị khi món có size hoặc topping.
+
+Thông tin gồm:
+
+* Ảnh món.
+* Tên món.
+* Mô tả.
+* Chọn size nếu có.
+* Chọn topping nếu được phép.
+* Chọn số lượng.
+* Ghi chú.
+* Tổng tạm tính.
+
+Quy tắc:
+
+* Món có size bắt buộc chọn size.
+* Topping hiển thị theo cấu hình món - topping.
+* Mỗi topping có giá riêng.
+* Có thể chọn nhiều topping cho một món.
+
+## 13.4. Order hiện tại
+
+Order hiện tại hiển thị các món đã thêm vào bàn đang chọn.
+
+Thông tin gồm:
+
+* Mã order.
+* Bàn.
+* Trạng thái order.
+* Danh sách món.
+* Size nếu có.
+* Topping nếu có.
+* Số lượng.
+* Đơn giá.
+* Tổng topping.
+* Tổng từng dòng.
+* Tổng thanh toán.
+
+Quy tắc:
+
+* Cùng món nhưng khác size, topping hoặc ghi chú thì tách thành dòng riêng.
+* Cùng món, cùng size, cùng topping và cùng ghi chú thì có thể cộng số lượng.
+
+## 13.5. Quy tắc tính tiền
+
+Món không có size:
+
+```text
+unit_price = items.base_price
+```
+
+Món có size:
+
+```text
+unit_price = item_prices.price
+```
+
+Tiền món chính:
+
+```text
+order_details.subtotal = unit_price * quantity
+```
+
+Tiền topping:
+
+```text
+order_detail_toppings.subtotal = price_at_time * topping_quantity * order_detail.quantity
+```
+
+Tổng topping của dòng:
+
+```text
+order_details.topping_total = sum(order_detail_toppings.subtotal)
+```
+
+Tổng dòng món:
+
+```text
+order_details.total_price = order_details.subtotal + order_details.topping_total
+```
+
+Tổng order:
+
+```text
+orders.subtotal = sum(order_details.total_price)
+orders.total_amount = orders.subtotal - discount_amount + tax_amount
+```
+
+Backend phải tự tính toàn bộ giá tiền, không tin giá frontend gửi lên.
+
+## 13.6. Thanh toán order
+
+Khi user bấm Thanh toán, hệ thống mở modal thanh toán.
+
+Phương thức thanh toán:
+
+* Tiền mặt.
+* Chuyển khoản.
+* QR Code.
+* Ví điện tử.
+
+Sau khi thanh toán:
+
+* Order chuyển sang trạng thái đã thanh toán.
+* Hệ thống tạo hóa đơn.
+* Hóa đơn lưu snapshot món, topping, bàn và thông tin quán.
+* Bàn chuyển về trạng thái trống hoặc cần dọn.
+* Hệ thống hiển thị modal thanh toán thành công.
+
+---
+
+# 14. Trang Lịch sử order
+
+Trang Lịch sử order dùng để xem lại các order đã tạo.
+
+Chức năng:
+
+* Xem danh sách order.
+* Tìm kiếm theo mã order.
+* Lọc theo trạng thái.
+* Lọc theo bàn.
+* Lọc theo ngày.
+* Xem chi tiết order.
+* Tiếp tục order chưa thanh toán.
+* Thanh toán order chưa thanh toán.
+* Xem hóa đơn nếu order đã thanh toán.
+
+---
+
+# 15. Trang Hóa đơn
+
+Trang Hóa đơn dùng để quản lý các hóa đơn sau thanh toán.
+
+Chức năng:
+
+* Xem danh sách hóa đơn.
+* Tìm kiếm hóa đơn.
+* Lọc theo ngày thanh toán.
+* Lọc theo phương thức thanh toán.
+* Xem chi tiết bill.
+* In hóa đơn.
+* Lưu PDF thông qua chức năng in của trình duyệt.
+
+Thông tin bill gồm:
+
+* Tên quán.
+* Địa chỉ.
+* Số điện thoại.
+* Mã hóa đơn.
+* Mã order.
+* Bàn.
+* Thời gian thanh toán.
+* Phương thức thanh toán.
+* Danh sách món.
+* Size.
+* Topping.
+* Số lượng.
+* Đơn giá.
+* Thành tiền.
+* Tổng tiền.
+* Lời cảm ơn.
+
+Lưu ý:
+
+* Hóa đơn chỉ phục vụ nghiệp vụ bán hàng của quán.
+* Hóa đơn không chứa link đánh giá dịch vụ FunCafe.
+* Đánh giá FunCafe là chức năng riêng của user/chủ quán.
+
+---
+
+# 16. Trang Doanh thu
+
+Trang Doanh thu chỉ mở đầy đủ cho user dùng gói Pro Max.
+
+Chức năng:
+
+* Xem doanh thu hôm nay.
+* Xem doanh thu tháng này.
+* Xem tổng số hóa đơn.
+* Xem giá trị trung bình mỗi hóa đơn.
+* Xem biểu đồ doanh thu.
+* Xem top món bán chạy.
+* Lọc dữ liệu theo ngày/tháng/năm.
+* Xem tỷ lệ phương thức thanh toán.
+
+Nếu user dùng Fun Free hoặc Pro:
+
+* Trang doanh thu bị khóa.
+* Hệ thống yêu cầu nâng cấp Pro Max.
+
+---
+
+# 17. Trang Đánh giá FunCafe
+
+Trang Đánh giá FunCafe dùng để user/chủ quán gửi nhận xét về chất lượng dịch vụ của hệ thống FunCafe.
+
+Đánh giá này là phản hồi của user đối với nền tảng FunCafe, không phải đánh giá của khách hàng về hóa đơn bán hàng.
+
+Nội dung đánh giá gồm:
+
+* Số sao tổng thể.
+* Tiêu đề đánh giá.
+* Nội dung góp ý.
+* Đánh giá chất lượng dịch vụ.
+* Đánh giá hỗ trợ.
+* Đánh giá giao diện.
+* Đánh giá tốc độ/độ ổn định.
+
+Quy tắc:
+
+* Chỉ user đã đăng nhập mới được đánh giá.
+* Đánh giá gắn với tài khoản user.
+* Có thể lưu thêm quán và gói user đang sử dụng tại thời điểm đánh giá.
+* Admin có thể xem danh sách đánh giá.
+* Admin có thể ẩn/hiện đánh giá nếu cần.
+* Các đánh giá phù hợp có thể được hiển thị trên Public Website như phản hồi khách hàng.
+
+---
+
+# 18. Admin Portal
+
+Admin Portal là khu vực dành cho quản trị viên hệ thống.
+
+Các chức năng chính:
+
+* Tổng quan admin.
+* Quản lý user.
+* Quản lý gói dịch vụ.
+* Quản lý thời hạn gói.
+* Quản lý thanh toán gói.
+* Doanh thu hệ thống.
+* Quản lý đánh giá FunCafe.
+
+## 18.1. Trang Tổng quan Admin
+
+Hiển thị tổng quan hệ thống:
+
+* Tổng số user.
+* Tổng số quán.
+* Số user đang dùng gói.
+* Số giao dịch chờ xác nhận.
+* Doanh thu tháng này.
+* Biểu đồ doanh thu gói.
+* Tỷ lệ user theo từng gói.
+
+## 18.2. Quản lý user
+
+Chức năng:
+
+* Xem danh sách user.
+* Tìm kiếm user.
+* Lọc theo trạng thái.
+* Lọc theo gói đang dùng.
+* Xem gói hiện tại của user.
+* Khóa tài khoản.
+* Mở khóa tài khoản.
+
+Quy tắc:
+
+* User bị khóa không được đăng nhập.
+* Admin có thể mở khóa khi cần.
+
+## 18.3. Quản lý gói dịch vụ
+
+Chức năng:
+
+* Xem danh sách gói.
+* Sửa thông tin gói.
+* Bật/tắt gói.
+* Xem quyền doanh thu của gói.
+* Xem danh sách tính năng của gói.
+
+Quy tắc:
+
+* Hệ thống có 3 gói chính: Fun Free, Pro, Pro Max.
+* Giá không sửa trực tiếp trong collection packages.
+* Giá được quản lý ở time_subscriptions.
+* Level dùng để xác định quyền nâng cấp.
+
+## 18.4. Quản lý thời hạn gói
+
+Chức năng:
+
+* Xem danh sách thời hạn.
+* Thêm thời hạn.
+* Sửa thời hạn.
+* Bật/tắt thời hạn.
+* Cấu hình giá theo thời gian.
+
+Ví dụ:
+
+* Fun Free: 7 ngày - 0đ.
+* Pro: 1 tháng, 3 tháng, 12 tháng.
+* Pro Max: 1 tháng, 3 tháng, 12 tháng.
+
+## 18.5. Quản lý thanh toán gói
+
+Trang quản lý thanh toán gói dùng để admin kiểm tra các giao dịch mua gói, nâng cấp gói hoặc gia hạn gói.
+
+Thông tin hiển thị:
+
+* User thanh toán.
+* Gói đăng ký.
+* Loại giao dịch.
+* Số tiền.
+* Phương thức thanh toán.
+* Trạng thái thanh toán.
+* Thời gian tạo giao dịch.
+* Ghi chú.
+
+Loại giao dịch:
+
+| Giá trị   | Ý nghĩa         |
+| --------- | --------------- |
+| `new`     | Đăng ký gói mới |
+| `upgrade` | Nâng cấp gói    |
+| `renew`   | Gia hạn gói     |
+
+Trạng thái thanh toán:
+
+| Giá trị    | Ý nghĩa             |
+| ---------- | ------------------- |
+| `pending`  | Chờ admin kiểm tra  |
+| `paid`     | Đã thanh toán       |
+| `failed`   | Thanh toán thất bại |
+| `rejected` | Bị admin từ chối    |
+
+Chức năng:
+
+* Xem danh sách giao dịch.
+* Lọc theo trạng thái.
+* Lọc theo loại giao dịch.
+* Duyệt giao dịch.
+* Từ chối giao dịch.
+
+Quy tắc:
+
+* Doanh thu hệ thống chỉ tính các giao dịch có `payment_status = paid`.
+* Giao dịch `pending` chưa được tính vào doanh thu.
+* User vẫn được sử dụng gói trong thời gian giao dịch đang chờ admin kiểm tra.
+
+## 18.6. Doanh thu hệ thống
+
+Chức năng:
+
+* Xem tổng doanh thu bán gói.
+* Xem doanh thu tháng này.
+* Xem số giao dịch thành công.
+* Xem gói bán chạy.
+* Xem biểu đồ doanh thu.
+* Lọc doanh thu theo thời gian.
+
+Quy tắc:
+
+* Chỉ tính giao dịch gói đã thanh toán.
+* Chỉ tính `payment_status = paid`.
+
+## 18.7. Quản lý đánh giá FunCafe
+
+Chức năng:
+
+* Xem danh sách đánh giá của user.
+* Lọc theo số sao.
+* Lọc theo trạng thái.
+* Xem nội dung góp ý.
+* Ẩn/hiện đánh giá.
+
+---
+
+# 19. Nhóm dữ liệu chính của hệ thống
+
+## 19.1. Nhóm tài khoản và gói dịch vụ
+
+* users
+* packages
+* time_subscriptions
+* subscriptions
+* package_payments
+
+## 19.2. Nhóm quản lý quán
+
+* cafes
+* tables
+* categories
+* items
+* sizes
+* item_prices
+* toppings
+* item_toppings
+
+## 19.3. Nhóm bán hàng
+
+* orders
+* order_details
+* order_detail_toppings
+* invoices
+
+## 19.4. Nhóm đánh giá dịch vụ FunCafe
+
+* reviews
+
+---
+
+# 20. Tóm tắt vai trò
+
+## Khách truy cập
+
+* Xem trang chủ.
+* Xem tính năng.
+* Xem bảng giá.
+* Đăng ký.
+* Đăng nhập.
+* Gửi liên hệ.
+
+## User / Chủ quán
+
+* Quản lý thông tin quán.
+* Quản lý bàn.
+* Quản lý danh mục.
+* Quản lý món.
+* Quản lý size.
+* Quản lý topping.
+* Cấu hình topping cho món.
+* Bán hàng theo bàn.
+* Quản lý order.
+* Thanh toán.
+* Quản lý hóa đơn.
+* Xem doanh thu nếu dùng Pro Max.
+* Đánh giá dịch vụ FunCafe.
+* Quản lý gói đang dùng.
+* Nâng cấp gói.
+* Gia hạn gói.
+* Quản lý hồ sơ cá nhân.
+
+## Admin
+
+* Quản lý user.
+* Quản lý gói.
+* Quản lý thời hạn gói.
+* Quản lý thanh toán gói.
+* Duyệt/từ chối giao dịch thanh toán gói.
+* Xem doanh thu hệ thống.
+* Quản lý đánh giá FunCafe.

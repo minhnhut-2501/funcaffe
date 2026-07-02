@@ -1,0 +1,276 @@
+@import "tailwindcss";
+
+@theme {
+  /* ============================================================
+     FunCafe — Warm Cafe palette (đồng bộ Public + Portal)
+     surfaces ấm (paper/sand/line) · chữ slate/ink · accent nâu bean
+     ============================================================ */
+
+  /* Thang cafe-* (tương thích ngược ~600 chỗ đang dùng)
+     Đã remap: accent nâu → xanh dương, neutral ấm → slate mát */
+  --color-cafe-900: #0F172A; /* ink — heading mạnh nhất (slate-950) */
+  --color-cafe-800: #1E293B; /* slate đậm — heading (slate-800) */
+  --color-cafe-700: #2563EB; /* accent chính xanh dương (nút, link, active) */
+  --color-cafe-600: #475569; /* slate — body text (slate-600) */
+  --color-cafe-500: #64748B; /* slate muted — phụ (slate-500) */
+  --color-cafe-400: #94A3B8; /* slate nhạt — icon, placeholder (slate-400) */
+  --color-cafe-300: #CBD5E1; /* viền đậm / chữ disabled (slate-300) */
+  --color-cafe-200: #E2E8F0; /* line — viền (slate-200) */
+  --color-cafe-100: #F1F5F9; /* bề mặt nhạt / hover (slate-100) */
+  --color-cafe-50: #F8FAFC;  /* paper — nền trang (slate-50) */
+  --color-cream: #F8FAFC;
+  --color-warm: #FBFCFE;
+
+  /* Palette thương hiệu (dùng chung Public + Portal) — xanh dương KiotViet-style */
+  --color-paper: #F8FAFC;       /* nền trang (slate-50) */
+  --color-sand: #F1F5F9;        /* bề mặt phụ / header bảng / hover (slate-100) */
+  --color-ink: #1F2933;         /* heading + body chính */
+  --color-slate: #475569;       /* body phụ (slate-600) */
+  --color-bean: #2563EB;        /* accent chính (blue-600) */
+  --color-bean-dark: #1D4ED8;   /* nhấn đậm / hover (blue-700) */
+  --color-bean-tint: #EFF4FF;   /* nền nhạt của accent (active/hover mảng) */
+  --color-ink-deep: #0F172A;    /* nền tối trung tính cho footer (slate-950) */
+  --color-gold: #D6A85A;        /* điểm nhấn ấm (sao đánh giá) */
+  --color-gold-deep: #B5852F;   /* gold đậm đạt contrast cho chữ */
+  --color-pine: #2F6F5E;        /* xanh lá — trạng thái tích cực */
+  --color-line: #E2E8F0;        /* đường kẻ (slate-200) */
+
+  --font-sans: 'Be Vietnam Pro', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Bán kính nhất quán */
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.5rem;
+
+  /* Elevation nhuốm slate mát (không đen thuần) */
+  --shadow-soft: 0 1px 2px -1px rgba(15, 23, 42, 0.10), 0 1px 3px -1px rgba(15, 23, 42, 0.07);
+  --shadow-card: 0 6px 22px -12px rgba(15, 23, 42, 0.18), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
+  --shadow-raise: 0 12px 30px -16px rgba(15, 23, 42, 0.24);
+  --shadow-lift: 0 20px 44px -24px rgba(30, 58, 138, 0.28);
+  --shadow-pop: 0 28px 70px -24px rgba(15, 23, 42, 0.38);
+
+  /* Thang z-index ngữ nghĩa */
+  --z-dropdown: 40;
+  --z-sticky: 30;
+  --z-drawer: 45;
+  --z-backdrop: 50;
+  --z-modal: 60;
+  --z-toast: 70;
+
+  /* Easing */
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
+    text-rendering: optimizeLegibility;
+  }
+  * {
+    @apply border-line;
+  }
+  /* Focus rõ ràng cho điều hướng bàn phím (a11y) */
+  :focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--color-bean) 70%, white);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  /* Scrollbar ấm, mảnh */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-cafe-300) transparent;
+  }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-cafe-300);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: var(--color-cafe-400); }
+  h1, h2, h3, h4 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+}
+
+@layer components {
+  /* ===================== Surfaces ===================== */
+  .card {
+    @apply bg-white rounded-2xl border border-line shadow-soft;
+  }
+  /* Tương thích ngược: card-funcafe = card có padding */
+  .card-funcafe {
+    @apply bg-white rounded-2xl border border-line shadow-card p-5 sm:p-6;
+  }
+  .card-interactive {
+    @apply bg-white rounded-2xl border border-line shadow-soft transition-all duration-200;
+  }
+  .card-interactive:hover {
+    @apply border-cafe-300 shadow-card -translate-y-0.5;
+  }
+
+  /* ===================== Buttons ===================== */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-bean text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-soft transition-all duration-150 hover:bg-bean-dark active:scale-[.985] disabled:opacity-55 disabled:pointer-events-none;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-white text-bean border border-line px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 hover:bg-bean-tint hover:border-cafe-300 active:scale-[.985] disabled:opacity-55 disabled:pointer-events-none;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 bg-transparent text-slate px-3 py-2 rounded-xl text-sm font-medium transition-colors duration-150 hover:bg-sand hover:text-bean active:scale-[.985];
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-soft transition-all duration-150 hover:bg-red-700 active:scale-[.985] disabled:opacity-55 disabled:pointer-events-none;
+  }
+
+  /* ===================== Form controls ===================== */
+  .input-funcafe {
+    @apply w-full border border-line rounded-xl px-3.5 py-2.5 text-sm text-ink bg-white placeholder-cafe-400 transition-colors duration-150 hover:border-cafe-300 focus:outline-none focus:ring-2 focus:ring-bean/35 focus:border-bean;
+  }
+  .label-funcafe {
+    @apply block text-sm font-medium text-ink/80 mb-1.5;
+  }
+
+  /* ===================== Sidebar ===================== */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150;
+  }
+  .sidebar-item-active {
+    @apply bg-bean text-white shadow-soft;
+  }
+  .sidebar-item-inactive {
+    @apply text-ink/65 hover:bg-bean-tint hover:text-bean;
+  }
+
+  /* ===================== Badges / status pills ===================== */
+  .badge {
+    @apply inline-flex items-center whitespace-nowrap gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-active   { @apply inline-flex items-center whitespace-nowrap gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pine/12 text-pine; }
+  .badge-inactive { @apply inline-flex items-center whitespace-nowrap gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cafe-100 text-cafe-500; }
+  .badge-pending  { @apply inline-flex items-center whitespace-nowrap gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gold/18 text-gold-deep; }
+  .badge-free     { @apply inline-flex items-center whitespace-nowrap gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700; }
+  .badge-pro      { @apply inline-flex items-center whitespace-nowrap gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-bean-tint text-bean; }
+  .badge-promax   { @apply inline-flex items-center whitespace-nowrap gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-bean text-white; }
+
+  /* ===================== Segmented control (filter pills) ===================== */
+  .segmented {
+    @apply inline-flex items-center gap-1 rounded-xl bg-sand border border-line p-1;
+  }
+  .seg-item {
+    @apply px-3 py-1.5 rounded-lg text-sm font-medium text-slate transition-all duration-150 hover:text-bean;
+  }
+  .seg-item-active {
+    @apply bg-white text-bean shadow-soft;
+  }
+
+  /* ===================== Public Website utilities ===================== */
+  .btn-cafe {
+    @apply inline-flex items-center justify-center gap-2 bg-bean hover:bg-bean-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors;
+  }
+  .btn-cafe-outline {
+    @apply inline-flex items-center justify-center gap-2 bg-white hover:bg-paper text-bean border border-line px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors;
+  }
+  .card-public {
+    @apply bg-white rounded-2xl border border-line shadow-card;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-bean;
+  }
+  .chip-pine {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-pine/10 px-3 py-1 text-xs font-medium text-pine;
+  }
+}
+
+@layer utilities {
+  /* ---- Landing motion + surfaces (CSS-only) ---- */
+  .hero-glow {
+    background:
+      radial-gradient(60% 70% at 78% 22%, rgba(37,99,235,0.14), transparent 60%),
+      radial-gradient(55% 65% at 12% 8%, rgba(37,99,235,0.07), transparent 55%),
+      #F8FAFC;
+  }
+  .btn-cafe, .btn-cafe-outline {
+    @apply active:translate-y-px;
+  }
+  /* Soft tactile lift on interactive surfaces */
+  .lift {
+    @apply transition-transform transition-shadow duration-300;
+    transition-timing-function: var(--ease-out-expo);
+  }
+  .lift:hover {
+    @apply -translate-y-1;
+    box-shadow: var(--shadow-lift);
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* Lớp phủ nâu thương hiệu lên ảnh banner (WCAG AA) */
+  .photo-tint::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(115% 125% at 50% 48%, rgba(2,6,23,0.58) 0%, rgba(2,6,23,0.34) 55%, rgba(2,6,23,0.46) 100%),
+      linear-gradient(100deg, rgba(15,23,42,0.86) 0%, rgba(15,23,42,0.60) 60%, rgba(30,58,138,0.42) 100%);
+  }
+  .banner-title {
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.70), 0 2px 10px rgba(0,0,0,0.55), 0 0 30px rgba(0,0,0,0.45);
+  }
+  .banner-sub {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.55);
+  }
+
+  /* Nền kem có texture chấm rất nhạt */
+  .bg-paper-textured {
+    background-color: #F8FAFC;
+    background-image: radial-gradient(rgba(37,99,235,0.06) 1px, transparent 1.4px);
+    background-size: 22px 22px;
+  }
+
+  /* Modal entrance */
+  @keyframes funcafe-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes funcafe-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .anim-fade { animation: funcafe-fade 0.18s ease-out both; }
+  .anim-pop  { animation: funcafe-pop 0.22s var(--ease-out-expo) both; }
+
+  /* Scroll-reveal entrance, toggled by IntersectionObserver via .is-in */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.6s var(--ease-out-expo), transform 0.6s var(--ease-out-expo);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .lift { transition: none !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 16px; }
+  .no-print { display: none !important; }
+}

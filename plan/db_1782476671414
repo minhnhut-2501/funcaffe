@@ -1,0 +1,803 @@
+# MÔ TẢ DATABASE / ERD FUNCAFE
+
+## 1. Tổng quan database
+
+Database của hệ thống FunCafe dùng để lưu toàn bộ dữ liệu liên quan đến tài khoản, gói dịch vụ, quán cafe, bàn, món, size, topping, order, hóa đơn và đánh giá dịch vụ FunCafe.
+
+Tên database:
+
+```text
+funcafe
+```
+
+Danh sách collection chuẩn:
+
+```text
+users
+packages
+time_subscriptions
+subscriptions
+package_payments
+cafes
+tables
+categories
+items
+sizes
+item_prices
+toppings
+item_toppings
+orders
+order_details
+order_detail_toppings
+invoices
+reviews
+```
+
+Không dùng collection:
+
+```text
+menu_items
+```
+
+Vì hệ thống đã dùng collection `items` để lưu món.
+
+---
+
+# 2. Collection users
+
+## Mô tả
+
+Collection `users` lưu thông tin tài khoản user và admin.
+
+## Cấu trúc
+
+| Field                 | Kiểu dữ liệu | Ràng buộc        | Ghi chú               |
+| --------------------- | ------------ | ---------------- | --------------------- |
+| `_id`                 | ObjectId     | Primary Key      | ID tài khoản          |
+| `full_name`           | String       | Not null         | Họ tên                |
+| `email`               | String       | Not null, unique | Email đăng nhập       |
+| `password`            | String       | Not null         | Mật khẩu đã mã hóa    |
+| `phone`               | String       | Nullable         | Số điện thoại         |
+| `avatar`              | String       | Nullable         | Ảnh đại diện          |
+| `role`                | String       | user/admin       | Vai trò tài khoản     |
+| `status`              | String       | active/locked    | Trạng thái tài khoản  |
+| `has_used_free_trial` | Boolean      | Default false    | Đã dùng Fun Free chưa |
+| `created_at`          | Date         | Default now      | Ngày tạo              |
+| `updated_at`          | Date         | Default now      | Ngày cập nhật         |
+
+## Quy tắc
+
+* Email không được trùng.
+* User bị khóa không được đăng nhập.
+* Mật khẩu phải được hash trước khi lưu.
+* Một user chỉ được quản lý một quán cafe.
+* Admin có quyền quản lý hệ thống.
+
+---
+
+# 3. Collection packages
+
+## Mô tả
+
+Collection `packages` lưu thông tin các gói dịch vụ của hệ thống FunCafe.
+
+Hệ thống có 3 gói chính:
+
+* Fun Free.
+* Pro.
+* Pro Max.
+
+## Cấu trúc chuẩn
+
+| Field                | Kiểu dữ liệu | Ràng buộc       | Ghi chú                             |
+| -------------------- | ------------ | --------------- | ----------------------------------- |
+| `_id`                | ObjectId     | Primary Key     | ID gói                              |
+| `name`               | String       | Not null        | Tên gói                             |
+| `type`               | String       | free/pro/promax | Loại gói                            |
+| `code`               | String       | Unique          | Mã gói                              |
+| `level`              | Number       | Not null        | Cấp độ gói dùng để so sánh nâng cấp |
+| `description`        | String       | Nullable        | Mô tả                               |
+| `is_trial`           | Boolean      | Default false   | Có phải gói dùng thử không          |
+| `has_revenue_report` | Boolean      | Default false   | Có quyền xem doanh thu không        |
+| `features`           | Array        | Nullable        | Danh sách tính năng                 |
+| `status`             | String       | active/inactive | Trạng thái                          |
+| `created_at`         | Date         | Default now     | Ngày tạo                            |
+| `updated_at`         | Date         | Default now     | Ngày cập nhật                       |
+
+## Quy ước level
+
+| Gói      | Type   | Level |
+| -------- | ------ | ----: |
+| Fun Free | free   |     0 |
+| Pro      | pro    |     1 |
+| Pro Max  | promax |     2 |
+
+## Không dùng các field cũ
+
+Không dùng:
+
+```text
+price
+duration_days
+max_cafes
+has_revenue
+price_1_month
+price_3_month
+price_12_month
+```
+
+Lý do:
+
+* Giá gói được quản lý ở `time_subscriptions`.
+* Mỗi user chỉ quản lý một quán nên không dùng `max_cafes`.
+* Quyền doanh thu dùng `has_revenue_report`.
+* So sánh nâng cấp gói dùng field `level`.
+
+---
+
+# 4. Collection time_subscriptions
+
+## Mô tả
+
+Collection `time_subscriptions` lưu thời hạn và giá của từng gói dịch vụ.
+
+## Cấu trúc
+
+| Field            | Kiểu dữ liệu | Ràng buộc       | Ghi chú                   |
+| ---------------- | ------------ | --------------- | ------------------------- |
+| `_id`            | ObjectId     | Primary Key     | ID thời hạn               |
+| `package_id`     | ObjectId     | Foreign Key     | Tham chiếu `packages._id` |
+| `duration_value` | Number       | Not null        | Giá trị thời hạn          |
+| `duration_unit`  | String       | day/month       | Đơn vị thời hạn           |
+| `price`          | Number       | Default 0       | Giá tiền                  |
+| `label`          | String       | Not null        | Nhãn hiển thị             |
+| `status`         | String       | active/inactive | Trạng thái                |
+| `created_at`     | Date         | Default now     | Ngày tạo                  |
+| `updated_at`     | Date         | Default now     | Ngày cập nhật             |
+
+## Dữ liệu mẫu
+
+| Gói      | Thời hạn |     Giá |
+| -------- | -------: | ------: |
+| Fun Free |   7 ngày |       0 |
+| Pro      |  1 tháng |  199000 |
+| Pro      |  3 tháng |  549000 |
+| Pro      | 12 tháng | 1990000 |
+| Pro Max  |  1 tháng |  499000 |
+| Pro Max  |  3 tháng | 1399000 |
+| Pro Max  | 12 tháng | 4990000 |
+
+## Quy tắc
+
+* Một gói có nhiều thời hạn.
+* Giá gói được lấy từ `time_subscriptions`.
+* Không chỉnh giá trực tiếp trong `packages`.
+
+---
+
+# 5. Collection subscriptions
+
+## Mô tả
+
+Collection `subscriptions` lưu thông tin gói mà user đang sử dụng hoặc đã từng đăng ký.
+
+## Cấu trúc chuẩn
+
+| Field                      | Kiểu dữ liệu | Ràng buộc                         | Ghi chú                           |
+| -------------------------- | ------------ | --------------------------------- | --------------------------------- |
+| `_id`                      | ObjectId     | Primary Key                       | ID subscription                   |
+| `user_id`                  | ObjectId     | Foreign Key                       | Tham chiếu `users._id`            |
+| `package_id`               | ObjectId     | Foreign Key                       | Tham chiếu `packages._id`         |
+| `time_subscription_id`     | ObjectId     | Nullable                          | Thời hạn gói                      |
+| `package_name_snapshot`    | String       | Not null                          | Tên gói tại thời điểm đăng ký     |
+| `package_code_snapshot`    | String       | Not null                          | Mã gói tại thời điểm đăng ký      |
+| `start_date`               | Date         | Nullable                          | Ngày bắt đầu                      |
+| `end_date`                 | Date         | Nullable                          | Ngày hết hạn                      |
+| `status`                   | String       | active/expired/cancelled/rejected | Trạng thái gói                    |
+| `subtotal`                 | Number       | Default 0                         | Tạm tính                          |
+| `total_amount`             | Number       | Default 0                         | Tổng tiền                         |
+| `action_type`              | String       | new/renew/upgrade                 | Loại thao tác đăng ký             |
+| `previous_subscription_id` | ObjectId     | Nullable                          | Subscription cũ nếu là nâng cấp   |
+| `is_pending_review`        | Boolean      | Default false                     | Giao dịch đang chờ admin kiểm tra |
+| `created_at`               | Date         | Default now                       | Ngày tạo                          |
+| `updated_at`               | Date         | Default now                       | Ngày cập nhật                     |
+
+## Ý nghĩa các field mới
+
+| Field                      | Ý nghĩa                                                            |
+| -------------------------- | ------------------------------------------------------------------ |
+| `action_type`              | Xác định đây là đăng ký mới, gia hạn hay nâng cấp                  |
+| `previous_subscription_id` | Dùng để khôi phục gói cũ nếu admin từ chối giao dịch nâng cấp      |
+| `is_pending_review`        | Cho biết user đang dùng gói nhưng giao dịch vẫn chờ admin kiểm tra |
+
+## Quy tắc
+
+* Subscription được tạo `active` ngay để user không bị gián đoạn.
+* Nếu payment còn `pending`, subscription có `is_pending_review = true`.
+* Nếu admin duyệt payment, `is_pending_review = false`.
+* Nếu admin từ chối giao dịch nâng cấp, subscription mới bị hủy và subscription cũ có thể được khôi phục.
+* Nếu gia hạn bị từ chối, `end_date` được rollback về ngày hết hạn cũ.
+
+---
+
+# 6. Collection package_payments
+
+## Mô tả
+
+Collection `package_payments` lưu giao dịch thanh toán gói dịch vụ.
+
+## Cấu trúc chuẩn
+
+| Field                      | Kiểu dữ liệu | Ràng buộc                           | Ghi chú                             |
+| -------------------------- | ------------ | ----------------------------------- | ----------------------------------- |
+| `_id`                      | ObjectId     | Primary Key                         | ID giao dịch                        |
+| `user_id`                  | ObjectId     | Foreign Key                         | User thanh toán                     |
+| `package_id`               | ObjectId     | Foreign Key                         | Gói đăng ký                         |
+| `time_subscription_id`     | ObjectId     | Nullable                            | Thời hạn gói                        |
+| `subscription_id`          | ObjectId     | Nullable                            | Subscription liên quan              |
+| `transaction_code`         | String       | Nullable                            | Mã giao dịch                        |
+| `amount`                   | Number       | Default 0                           | Số tiền thanh toán                  |
+| `payment_method`           | String       | cash/bank_transfer/qr_code/e_wallet | Phương thức                         |
+| `payment_status`           | String       | pending/paid/failed/rejected        | Trạng thái thanh toán               |
+| `note`                     | String       | Nullable                            | Ghi chú                             |
+| `paid_at`                  | Date         | Nullable                            | Thời gian admin xác nhận thanh toán |
+| `action_type`              | String       | new/renew/upgrade                   | Loại giao dịch                      |
+| `previous_subscription_id` | ObjectId     | Nullable                            | Subscription cũ nếu nâng cấp        |
+| `previous_end_date`        | Date         | Nullable                            | Ngày hết hạn cũ nếu gia hạn         |
+| `created_at`               | Date         | Default now                         | Ngày tạo                            |
+| `updated_at`               | Date         | Default now                         | Ngày cập nhật                       |
+
+## Ý nghĩa các field mới
+
+| Field                      | Ý nghĩa                                                |
+| -------------------------- | ------------------------------------------------------ |
+| `action_type`              | Phân biệt giao dịch đăng ký mới, nâng cấp hoặc gia hạn |
+| `previous_subscription_id` | Dùng khi cần rollback giao dịch nâng cấp               |
+| `previous_end_date`        | Dùng khi cần rollback giao dịch gia hạn                |
+
+## Quy tắc
+
+* User mua gói trả phí thì payment tạo với `payment_status = pending`.
+* User được dùng gói ngay dù payment đang pending.
+* Admin duyệt thì `payment_status = paid`.
+* Admin từ chối thì `payment_status = rejected`.
+* Doanh thu chỉ tính payment có `payment_status = paid`.
+* Không cho user tạo nhiều payment `pending` cùng lúc để tránh trùng giao dịch.
+
+---
+
+# 7. Collection cafes
+
+## Mô tả
+
+Collection `cafes` lưu thông tin quán cafe của user.
+
+## Cấu trúc
+
+| Field         | Kiểu dữ liệu | Ràng buộc            | Ghi chú       |
+| ------------- | ------------ | -------------------- | ------------- |
+| `_id`         | ObjectId     | Primary Key          | ID quán       |
+| `user_id`     | ObjectId     | Foreign Key          | Chủ quán      |
+| `name`        | String       | Not null             | Tên quán      |
+| `address`     | String       | Nullable             | Địa chỉ       |
+| `phone`       | String       | Nullable             | Số điện thoại |
+| `description` | String       | Nullable             | Mô tả         |
+| `logo`        | String       | Nullable             | Logo          |
+| `status`      | String       | open/closed/inactive | Trạng thái    |
+| `created_at`  | Date         | Default now          | Ngày tạo      |
+| `updated_at`  | Date         | Default now          | Ngày cập nhật |
+
+## Quy tắc
+
+* Một user chỉ có một quán.
+* User chỉ được quản lý dữ liệu của quán mình.
+
+---
+
+# 8. Collection tables
+
+## Mô tả
+
+Collection `tables` lưu danh sách bàn trong quán.
+
+## Cấu trúc
+
+| Field              | Kiểu dữ liệu | Ràng buộc                       | Ghi chú                |
+| ------------------ | ------------ | ------------------------------- | ---------------------- |
+| `_id`              | ObjectId     | Primary Key                     | ID bàn                 |
+| `cafe_id`          | ObjectId     | Foreign Key                     | Tham chiếu `cafes._id` |
+| `name`             | String       | Not null                        | Tên bàn                |
+| `capacity`         | Number       | Default 1                       | Sức chứa               |
+| `display_order`    | Number       | Default 0                       | Thứ tự                 |
+| `status`           | String       | empty/serving/reserved/cleaning | Trạng thái             |
+| `current_order_id` | ObjectId     | Nullable                        | Order hiện tại         |
+| `created_at`       | Date         | Default now                     | Ngày tạo               |
+| `updated_at`       | Date         | Default now                     | Ngày cập nhật          |
+
+## Quy tắc
+
+* Bàn đang phục vụ có `current_order_id`.
+* Không xóa bàn đang có order chưa thanh toán.
+
+---
+
+# 9. Collection categories
+
+## Mô tả
+
+Collection `categories` lưu danh mục món.
+
+## Cấu trúc
+
+| Field         | Kiểu dữ liệu | Ràng buộc    | Ghi chú                |
+| ------------- | ------------ | ------------ | ---------------------- |
+| `_id`         | ObjectId     | Primary Key  | ID danh mục            |
+| `cafe_id`     | ObjectId     | Foreign Key  | Tham chiếu `cafes._id` |
+| `name`        | String       | Not null     | Tên danh mục           |
+| `description` | String       | Nullable     | Mô tả                  |
+| `is_active`   | Boolean      | Default true | Trạng thái             |
+| `created_at`  | Date         | Default now  | Ngày tạo               |
+| `updated_at`  | Date         | Default now  | Ngày cập nhật          |
+
+## Quy tắc
+
+* Một quán có nhiều danh mục.
+* Một danh mục có nhiều món.
+* Danh mục bị tắt không nên hiển thị ở trang bán hàng.
+
+---
+
+# 10. Collection items
+
+## Mô tả
+
+Collection `items` lưu món trong thực đơn.
+
+## Cấu trúc
+
+| Field           | Kiểu dữ liệu | Ràng buộc     | Ghi chú                     |
+| --------------- | ------------ | ------------- | --------------------------- |
+| `_id`           | ObjectId     | Primary Key   | ID món                      |
+| `cafe_id`       | ObjectId     | Foreign Key   | Tham chiếu `cafes._id`      |
+| `category_id`   | ObjectId     | Foreign Key   | Tham chiếu `categories._id` |
+| `name`          | String       | Not null      | Tên món                     |
+| `description`   | String       | Nullable      | Mô tả                       |
+| `image`         | String       | Nullable      | Hình ảnh                    |
+| `base_price`    | Number       | Default 0     | Giá mặc định                |
+| `has_size`      | Boolean      | Default false | Có size hay không           |
+| `allow_topping` | Boolean      | Default false | Cho topping hay không       |
+| `is_available`  | Boolean      | Default true  | Còn bán                     |
+| `display_order` | Number       | Default 0     | Thứ tự                      |
+| `created_at`    | Date         | Default now   | Ngày tạo                    |
+| `updated_at`    | Date         | Default now   | Ngày cập nhật               |
+
+## Quy tắc
+
+* Món không size dùng `base_price`.
+* Món có size dùng giá trong `item_prices`.
+* Món cho topping thì cấu hình qua `item_toppings`.
+
+---
+
+# 11. Collection sizes
+
+## Mô tả
+
+Collection `sizes` lưu size dùng chung.
+
+## Cấu trúc
+
+| Field         | Kiểu dữ liệu | Ràng buộc    | Ghi chú       |
+| ------------- | ------------ | ------------ | ------------- |
+| `_id`         | ObjectId     | Primary Key  | ID size       |
+| `name`        | String       | Not null     | Tên size      |
+| `description` | String       | Nullable     | Mô tả         |
+| `sort_order`  | Number       | Default 0    | Thứ tự        |
+| `is_active`   | Boolean      | Default true | Trạng thái    |
+| `created_at`  | Date         | Default now  | Ngày tạo      |
+| `updated_at`  | Date         | Default now  | Ngày cập nhật |
+
+## Ví dụ
+
+* S - Nhỏ.
+* M - Vừa.
+* L - Lớn.
+
+---
+
+# 12. Collection item_prices
+
+## Mô tả
+
+Collection `item_prices` lưu giá món theo size.
+
+## Cấu trúc
+
+| Field        | Kiểu dữ liệu | Ràng buộc    | Ghi chú                |
+| ------------ | ------------ | ------------ | ---------------------- |
+| `_id`        | ObjectId     | Primary Key  | ID giá                 |
+| `item_id`    | ObjectId     | Foreign Key  | Tham chiếu `items._id` |
+| `size_id`    | ObjectId     | Foreign Key  | Tham chiếu `sizes._id` |
+| `price`      | Number       | Not null     | Giá                    |
+| `is_active`  | Boolean      | Default true | Trạng thái             |
+| `created_at` | Date         | Default now  | Ngày tạo               |
+| `updated_at` | Date         | Default now  | Ngày cập nhật          |
+
+## Quy tắc
+
+* Chỉ tạo `item_prices` cho món có `has_size = true`.
+* Một món có thể có nhiều giá theo size.
+* Một size có thể được dùng cho nhiều món.
+* Khi bán hàng, frontend gửi `item_price_id` để backend lấy đúng giá.
+
+---
+
+# 13. Collection toppings
+
+## Mô tả
+
+Collection `toppings` lưu topping của quán.
+
+## Cấu trúc
+
+| Field          | Kiểu dữ liệu | Ràng buộc    | Ghi chú                |
+| -------------- | ------------ | ------------ | ---------------------- |
+| `_id`          | ObjectId     | Primary Key  | ID topping             |
+| `cafe_id`      | ObjectId     | Foreign Key  | Tham chiếu `cafes._id` |
+| `name`         | String       | Not null     | Tên topping            |
+| `price`        | Number       | Default 0    | Giá                    |
+| `image`        | String       | Nullable     | Hình ảnh               |
+| `is_available` | Boolean      | Default true | Còn bán                |
+| `created_at`   | Date         | Default now  | Ngày tạo               |
+| `updated_at`   | Date         | Default now  | Ngày cập nhật          |
+
+## Ví dụ
+
+* Trân châu trắng.
+* Pudding.
+* Kem cheese.
+* Thạch cafe.
+
+---
+
+# 14. Collection item_toppings
+
+## Mô tả
+
+Collection `item_toppings` lưu quan hệ món - topping.
+
+## Cấu trúc
+
+| Field        | Kiểu dữ liệu | Ràng buộc   | Ghi chú                   |
+| ------------ | ------------ | ----------- | ------------------------- |
+| `_id`        | ObjectId     | Primary Key | ID                        |
+| `item_id`    | ObjectId     | Foreign Key | Tham chiếu `items._id`    |
+| `topping_id` | ObjectId     | Foreign Key | Tham chiếu `toppings._id` |
+| `created_at` | Date         | Default now | Ngày tạo                  |
+| `updated_at` | Date         | Default now | Ngày cập nhật             |
+
+## Quy tắc
+
+* Một món có nhiều topping.
+* Một topping có thể dùng cho nhiều món.
+* Không tạo trùng `item_id + topping_id`.
+* Nếu món `allow_topping = false` thì không cần dữ liệu trong collection này.
+
+---
+
+# 15. Collection orders
+
+## Mô tả
+
+Collection `orders` lưu thông tin tổng của order.
+
+## Cấu trúc
+
+| Field             | Kiểu dữ liệu | Ràng buộc             | Ghi chú                 |
+| ----------------- | ------------ | --------------------- | ----------------------- |
+| `_id`             | ObjectId     | Primary Key           | ID order                |
+| `cafe_id`         | ObjectId     | Foreign Key           | Tham chiếu `cafes._id`  |
+| `table_id`        | ObjectId     | Foreign Key           | Tham chiếu `tables._id` |
+| `code`            | String       | Unique                | Mã order                |
+| `status`          | String       | active/paid/cancelled | Trạng thái              |
+| `subtotal`        | Number       | Default 0             | Tạm tính                |
+| `discount_amount` | Number       | Default 0             | Giảm giá                |
+| `tax_amount`      | Number       | Default 0             | Thuế                    |
+| `total_amount`    | Number       | Default 0             | Tổng tiền               |
+| `note`            | String       | Nullable              | Ghi chú                 |
+| `created_at`      | Date         | Default now           | Ngày tạo                |
+| `paid_at`         | Date         | Nullable              | Ngày thanh toán         |
+| `updated_at`      | Date         | Default now           | Ngày cập nhật           |
+
+## Quy tắc
+
+* Order mới có trạng thái `active`.
+* Khi thanh toán, order chuyển sang `paid`.
+* Khi hủy, order chuyển sang `cancelled`.
+* Một order có nhiều dòng món trong `order_details`.
+
+---
+
+# 16. Collection order_details
+
+## Mô tả
+
+Collection `order_details` lưu từng dòng món trong order.
+
+## Cấu trúc
+
+| Field                | Kiểu dữ liệu | Ràng buộc   | Ghi chú                 |
+| -------------------- | ------------ | ----------- | ----------------------- |
+| `_id`                | ObjectId     | Primary Key | ID dòng                 |
+| `order_id`           | ObjectId     | Foreign Key | Tham chiếu `orders._id` |
+| `item_id`            | ObjectId     | Foreign Key | Tham chiếu `items._id`  |
+| `item_price_id`      | ObjectId     | Nullable    | Giá size nếu có         |
+| `item_name_snapshot` | String       | Not null    | Tên món lúc bán         |
+| `size_name_snapshot` | String       | Nullable    | Tên size lúc bán        |
+| `quantity`           | Number       | Not null    | Số lượng                |
+| `unit_price`         | Number       | Not null    | Đơn giá                 |
+| `subtotal`           | Number       | Default 0   | Tiền món chính          |
+| `topping_total`      | Number       | Default 0   | Tổng topping            |
+| `total_price`        | Number       | Default 0   | Tổng dòng               |
+| `note`               | String       | Nullable    | Ghi chú                 |
+| `created_at`         | Date         | Default now | Ngày tạo                |
+| `updated_at`         | Date         | Default now | Ngày cập nhật           |
+
+## Quy tắc
+
+* Nếu món không có size thì `item_price_id = null`.
+* Nếu món có size thì `item_price_id` tham chiếu đến `item_prices._id`.
+* `unit_price` là giá món hoặc giá size tại thời điểm bán.
+* `item_name_snapshot` và `size_name_snapshot` giúp hóa đơn không bị thay đổi khi dữ liệu món thay đổi sau này.
+
+---
+
+# 17. Collection order_detail_toppings
+
+## Mô tả
+
+Collection `order_detail_toppings` lưu topping được chọn cho từng dòng món.
+
+## Cấu trúc
+
+| Field                   | Kiểu dữ liệu | Ràng buộc   | Ghi chú                        |
+| ----------------------- | ------------ | ----------- | ------------------------------ |
+| `_id`                   | ObjectId     | Primary Key | ID                             |
+| `order_detail_id`       | ObjectId     | Foreign Key | Tham chiếu `order_details._id` |
+| `topping_id`            | ObjectId     | Foreign Key | Tham chiếu `toppings._id`      |
+| `topping_name_snapshot` | String       | Not null    | Tên topping lúc bán            |
+| `quantity`              | Number       | Default 1   | Số lượng topping               |
+| `price_at_time`         | Number       | Not null    | Giá lúc bán                    |
+| `subtotal`              | Number       | Default 0   | Thành tiền                     |
+| `created_at`            | Date         | Default now | Ngày tạo                       |
+| `updated_at`            | Date         | Default now | Ngày cập nhật                  |
+
+## Quy tắc
+
+* Một dòng món có thể có nhiều topping.
+* Giá topping phải lưu snapshot tại thời điểm bán.
+* Không tính lại hóa đơn cũ theo giá topping mới.
+
+---
+
+# 18. Collection invoices
+
+## Mô tả
+
+Collection `invoices` lưu hóa đơn sau khi order thanh toán.
+
+Hóa đơn chỉ phục vụ nghiệp vụ bán hàng của quán cafe. Hóa đơn không chứa link đánh giá dịch vụ FunCafe.
+
+## Cấu trúc
+
+| Field             | Kiểu dữ liệu | Ràng buộc                           | Ghi chú                       |
+| ----------------- | ------------ | ----------------------------------- | ----------------------------- |
+| `_id`             | ObjectId     | Primary Key                         | ID hóa đơn                    |
+| `invoice_code`    | String       | Unique                              | Mã hóa đơn                    |
+| `order_id`        | ObjectId     | Foreign Key                         | Tham chiếu `orders._id`       |
+| `cafe_id`         | ObjectId     | Foreign Key                         | Tham chiếu `cafes._id`        |
+| `table_id`        | ObjectId     | Foreign Key                         | Tham chiếu `tables._id`       |
+| `cafe_snapshot`   | Object       | Not null                            | Thông tin quán lúc thanh toán |
+| `table_snapshot`  | Object       | Not null                            | Thông tin bàn lúc thanh toán  |
+| `items`           | Array        | Not null                            | Snapshot danh sách món        |
+| `subtotal`        | Number       | Default 0                           | Tạm tính                      |
+| `discount_amount` | Number       | Default 0                           | Giảm giá                      |
+| `tax_amount`      | Number       | Default 0                           | Thuế                          |
+| `total_amount`    | Number       | Default 0                           | Tổng tiền                     |
+| `payment_method`  | String       | cash/bank_transfer/qr_code/e_wallet | Phương thức                   |
+| `payment_status`  | String       | paid/refunded                       | Trạng thái                    |
+| `paid_at`         | Date         | Not null                            | Ngày thanh toán               |
+| `created_at`      | Date         | Default now                         | Ngày tạo                      |
+| `updated_at`      | Date         | Default now                         | Ngày cập nhật                 |
+
+## Không dùng
+
+Không có các field:
+
+```text
+review_code
+review_url
+has_review
+```
+
+Vì đánh giá FunCafe không gắn với hóa đơn bán hàng.
+
+---
+
+# 19. Collection reviews
+
+## Mô tả
+
+Collection `reviews` lưu đánh giá của user/chủ quán đối với chất lượng dịch vụ của hệ thống FunCafe.
+
+Đây không phải đánh giá hóa đơn hoặc đánh giá món của khách hàng tại quán.
+
+## Cấu trúc
+
+| Field                | Kiểu dữ liệu | Ràng buộc      | Ghi chú                              |
+| -------------------- | ------------ | -------------- | ------------------------------------ |
+| `_id`                | ObjectId     | Primary Key    | ID đánh giá                          |
+| `user_id`            | ObjectId     | Foreign Key    | User đánh giá FunCafe                |
+| `cafe_id`            | ObjectId     | Nullable       | Quán của user tại thời điểm đánh giá |
+| `package_id`         | ObjectId     | Nullable       | Gói user đang dùng khi đánh giá      |
+| `rating`             | Number       | 1-5            | Đánh giá tổng thể                    |
+| `title`              | String       | Nullable       | Tiêu đề đánh giá                     |
+| `comment`            | String       | Nullable       | Nội dung góp ý                       |
+| `service_rating`     | Number       | 1-5            | Chất lượng dịch vụ                   |
+| `support_rating`     | Number       | 1-5            | Chất lượng hỗ trợ                    |
+| `ui_rating`          | Number       | 1-5            | Giao diện                            |
+| `performance_rating` | Number       | 1-5            | Tốc độ/độ ổn định                    |
+| `status`             | String       | visible/hidden | Trạng thái hiển thị                  |
+| `created_at`         | Date         | Default now    | Ngày tạo                             |
+| `updated_at`         | Date         | Default now    | Ngày cập nhật                        |
+
+## Quy tắc
+
+* Chỉ user đã đăng nhập mới được đánh giá FunCafe.
+* Đánh giá thuộc về user.
+* Admin có thể xem danh sách đánh giá.
+* Admin có thể ẩn/hiện đánh giá.
+* Đánh giá phù hợp có thể hiển thị trên Public Website.
+
+---
+
+# 20. Quan hệ ERD chính
+
+| Quan hệ                                   | Mô tả                                                                             |
+| ----------------------------------------- | --------------------------------------------------------------------------------- |
+| users 1 - 1 cafes                         | Một user quản lý một quán                                                         |
+| users 1 - N subscriptions                 | Một user có nhiều lịch sử đăng ký                                                 |
+| packages 1 - N time_subscriptions         | Một gói có nhiều thời hạn                                                         |
+| packages 1 - N subscriptions              | Một gói có thể có nhiều subscription                                              |
+| users 1 - N package_payments              | Một user có nhiều giao dịch                                                       |
+| subscriptions 1 - N package_payments      | Một subscription có thể có nhiều giao dịch liên quan                              |
+| subscriptions 1 - N subscriptions         | Subscription mới có thể tham chiếu subscription cũ qua `previous_subscription_id` |
+| cafes 1 - N tables                        | Một quán có nhiều bàn                                                             |
+| cafes 1 - N categories                    | Một quán có nhiều danh mục                                                        |
+| cafes 1 - N items                         | Một quán có nhiều món                                                             |
+| categories 1 - N items                    | Một danh mục có nhiều món                                                         |
+| items 1 - N item_prices                   | Một món có nhiều giá theo size                                                    |
+| sizes 1 - N item_prices                   | Một size dùng cho nhiều món                                                       |
+| cafes 1 - N toppings                      | Một quán có nhiều topping                                                         |
+| items N - N toppings                      | Qua collection item_toppings                                                      |
+| tables 1 - N orders                       | Một bàn có nhiều order                                                            |
+| orders 1 - N order_details                | Một order có nhiều dòng món                                                       |
+| order_details 1 - N order_detail_toppings | Một dòng món có nhiều topping                                                     |
+| orders 1 - 1 invoices                     | Một order thanh toán tạo một hóa đơn                                              |
+| users 1 - N reviews                       | Một user có thể gửi nhiều đánh giá FunCafe                                        |
+| cafes 1 - N reviews                       | Một quán có thể có nhiều đánh giá liên quan                                       |
+| packages 1 - N reviews                    | Một gói có thể có nhiều đánh giá liên quan                                        |
+
+---
+
+# 21. Quan hệ nâng cấp và gia hạn gói
+
+## 21.1. Quan hệ nâng cấp
+
+```text
+subscription mới.previous_subscription_id → subscription cũ._id
+```
+
+Dùng để:
+
+* Biết subscription mới được nâng cấp từ subscription nào.
+* Khôi phục subscription cũ nếu admin từ chối giao dịch nâng cấp.
+
+## 21.2. Quan hệ gia hạn
+
+```text
+package_payments.previous_end_date
+```
+
+Dùng để:
+
+* Lưu ngày hết hạn cũ trước khi gia hạn.
+* Rollback `end_date` nếu admin từ chối giao dịch gia hạn.
+
+---
+
+# 22. Quy tắc nghiệp vụ gói dịch vụ
+
+## 22.1. Đăng ký mới
+
+Nếu user chưa có subscription active:
+
+* Tạo subscription `active`.
+* `action_type = new`.
+* `is_pending_review = true`.
+* Tạo package_payment `pending`.
+
+Riêng Fun Free:
+
+* Có thể set payment `paid` vì giá bằng 0.
+* `is_pending_review = false`.
+* `has_used_free_trial = true`.
+
+## 22.2. Nâng cấp
+
+Nếu gói mới có `level` cao hơn gói hiện tại:
+
+* Subscription cũ chuyển `cancelled`.
+* Tạo subscription mới `active`.
+* `action_type = upgrade`.
+* `previous_subscription_id = subscription cũ`.
+* `is_pending_review = true`.
+* Tạo package_payment `pending`.
+
+Nếu admin từ chối nâng cấp:
+
+* Subscription mới chuyển `cancelled` hoặc `rejected`.
+* Subscription cũ được khôi phục về `active` nếu còn hạn.
+
+## 22.3. Gia hạn
+
+Nếu gói mới có `level` bằng gói hiện tại:
+
+* Giữ subscription hiện tại.
+* Lưu `previous_end_date`.
+* Cộng thêm thời hạn mới vào `end_date`.
+* `action_type = renew`.
+* `is_pending_review = true`.
+* Tạo package_payment `pending`.
+
+Nếu admin từ chối gia hạn:
+
+* Rollback `end_date` về `previous_end_date`.
+* `is_pending_review = false`.
+
+## 22.4. Không cho hạ gói
+
+Nếu gói mới có `level` thấp hơn gói hiện tại:
+
+* Không cho thực hiện.
+* Trả lỗi: Không thể hạ gói khi gói hiện tại còn hiệu lực.
+
+---
+
+# 23. Quy tắc tính tiền order
+
+```text
+order_details.subtotal = unit_price * quantity
+```
+
+```text
+order_detail_toppings.subtotal = price_at_time * topping_quantity * order_detail.quantity
+```
+
+```text
+order_details.topping_total = sum(order_detail_toppings.subtotal)
+```
+
+```text
+order_details.total_price = order_details.subtotal + order_details.topping_total
+```
+
+```text
+orders.subtotal = sum(order_details.total_price)
+```
+
+```text
+orders.total_amount = orders.subtotal - discount_amount + tax_amount
+```
+
+Backend phải tự tính giá, không tin giá từ frontend gửi lên.

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Bash(php -l app/Http/Controllers/SubscriptionController.php)",
+      "Bash(php db_fix_level.php)",
+      "Bash(php db_check3.php)",
+      "Bash(unzip -o _fixed.docx word/document.xml -d _v)",
+      "Bash(node \"C:/Users/anh90/AppData/Local/Temp/claude/c--FunCafe/acd737fb-f2ff-40e3-a398-464406efa42e/scratchpad/shoot.mjs\")"
+    ]
+  },
+  "skipDangerousModePermissionPrompt": true
+}
