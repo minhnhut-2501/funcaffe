@@ -210,15 +210,20 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="bg-bean-dark text-white">
-        <div className="max-w-4xl mx-auto px-4 py-16 md:py-20 text-center">
+      {/* CTA — panel bo tròn nổi trên nền sáng, tách bạch với footer (đồng bộ trang chủ) */}
+      <section className="bg-paper">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
           <Reveal>
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">Vẫn phân vân chọn gói nào?</h2>
-            <p className="text-white/70 mb-7 max-w-xl mx-auto">Cứ bắt đầu với bản dùng thử miễn phí 7 ngày, nâng cấp bất cứ lúc nào.</p>
-            <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-white text-bean hover:bg-paper active:translate-y-px px-7 py-3 rounded-lg text-base font-semibold transition-colors">
-              Dùng thử miễn phí
-            </Link>
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-bean to-bean-dark px-6 py-14 md:py-16 text-center shadow-xl shadow-bean/25">
+              <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[36rem] rounded-full bg-white/10 blur-3xl" />
+              <div className="relative">
+                <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Vẫn phân vân chọn gói nào?</h2>
+                <p className="text-white/75 mb-7 max-w-xl mx-auto">Cứ bắt đầu với bản dùng thử miễn phí 7 ngày, nâng cấp bất cứ lúc nào.</p>
+                <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-white text-bean hover:bg-paper active:translate-y-px px-7 py-3 rounded-xl text-base font-semibold transition-colors shadow-lg shadow-black/10">
+                  Dùng thử miễn phí
+                </Link>
+              </div>
+            </div>
           </Reveal>
         </div>
       </section>
