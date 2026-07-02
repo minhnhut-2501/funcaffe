@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use MongoDB\BSON\ObjectId;
 
 class TestUserSeeder extends Seeder
 {
@@ -28,6 +29,9 @@ class TestUserSeeder extends Seeder
 
         if (!User::where('email', 'nphec4007@gmail.com')->exists()) {
             User::create([
+                // _id cố định = user_id của quán demo (seed-data/cafes.json) để
+                // quán + thực đơn + bàn tự thuộc về tài khoản này.
+                '_id' => new ObjectId('6a3910511846951d38041ca7'),
                 'full_name' => 'Nguyễn Minh Nhựt',
                 'email' => 'nphec4007@gmail.com',
                 'password' => Hash::make('123456'),
