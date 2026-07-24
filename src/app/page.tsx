@@ -4,10 +4,12 @@ import PublicLayout from '@/components/layouts/PublicLayout';
 import Reveal from '@/components/public/Reveal';
 import Banner from '@/components/public/Banner';
 import ReviewsCarousel from '@/components/public/ReviewsCarousel';
+import CtaPanel from '@/components/public/CtaPanel';
+import AppShot from '@/components/public/AppShot';
 import Link from 'next/link';
 import {
   PencilLine, HelpCircle, Layers, Calculator,
-  Check, ArrowRight, UserPlus, Store, ListPlus, Play,
+  Check, ArrowRight, UserPlus, Store, ListPlus, Play, Sparkles,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { packageService, timeSubscriptionService } from '@/services';
@@ -34,7 +36,7 @@ const showcases = [
   {
     tag: 'Thực đơn · size · topping',
     title: 'Thực đơn rõ ràng, dễ chọn',
-    desc: 'Món theo danh mục, có ảnh, giá theo size và topping. Nhân viên mới nhìn là chọn được ngay, không sợ nhầm.',
+    desc: 'Món theo danh mục, có ảnh, giá theo size và topping. Người dùng mới nhìn là chọn được ngay, không sợ nhầm.',
     points: ['Món có ảnh, chia danh mục', 'Nhiều size và topping cho mỗi món', 'Tìm món tức thì khi quán đông'],
     img: '/product/pos-menu.png', label: 'FunCafe · Thực đơn',
     float: null, glow: 'bg-gold/12',
@@ -54,6 +56,12 @@ const steps = [
   { icon: Store, title: 'Thiết lập thông tin quán', desc: 'Nhập tên quán, địa chỉ và thông tin cơ bản.' },
   { icon: ListPlus, title: 'Thêm bàn và thực đơn', desc: 'Tạo danh sách bàn, danh mục món, size và topping.' },
   { icon: Play, title: 'Bắt đầu bán hàng', desc: 'Chọn bàn, lên order và thanh toán cho khách.' },
+];
+
+const aiPoints = [
+  'Hỏi nhanh: doanh thu hôm nay, còn bao nhiêu bàn trống',
+  'Gợi ý combo và khuyến mãi dựa trên món quán đang bán',
+  'Tự phân tích doanh thu, chỉ ra món bán chạy và giờ cao điểm',
 ];
 
 // Số liệu trấn an hiển thị trên banner ảnh (không phải số kỹ thuật bịa).
@@ -108,7 +116,7 @@ export default function HomePage() {
             </Reveal>
             <Reveal as="p" delay={140} className="banner-sub text-white/90 text-lg md:text-xl leading-relaxed mb-8 max-w-xl">
               Gom bàn, thực đơn, order, hóa đơn và doanh thu về một màn hình —
-              đơn giản, dễ dùng cho cả nhân viên mới.
+              đơn giản, dễ dùng cho cả người dùng mới.
             </Reveal>
             <Reveal as="div" delay={210} className="flex flex-col sm:flex-row gap-3">
               <Link href="/register" className="btn-cafe px-6 py-3 text-base shadow-lg shadow-black/20">Dùng thử miễn phí</Link>
@@ -131,7 +139,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20 grid lg:grid-cols-[0.85fr_1.15fr] gap-10 lg:gap-16">
           <Reveal className="lg:sticky lg:top-28 lg:self-start">
             <h2 className="text-2xl md:text-3xl font-bold text-ink mb-3 leading-snug">Những việc khiến chủ quán mất thời gian</h2>
-            <p className="text-ink/60 leading-relaxed">Khi quán đông khách, vài việc nhỏ hằng ngày dễ trở thành rắc rối.</p>
+            <p className="text-ink/70 leading-relaxed">Khi quán đông khách, vài việc nhỏ hằng ngày dễ trở thành rắc rối.</p>
           </Reveal>
           <div className="divide-y divide-line border-y border-line">
             {problems.map((p, i) => (
@@ -147,7 +155,8 @@ export default function HomePage() {
       </section>
 
       {/* 3. Xem sản phẩm thật — ảnh chụp giao diện FunCafe, bố cục zigzag (Cho thấy, đừng kể) */}
-      <section className="bg-paper-textured">
+      {/* overflow-x-clip: quầng sáng -inset-6 quanh ảnh tràn 8px ra ngoài màn 390px */}
+      <section className="bg-paper-textured overflow-x-clip">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
           <Reveal className="max-w-2xl mb-12 md:mb-16">
             <span className="chip-pine mb-3">Xem tận mắt</span>
@@ -175,7 +184,7 @@ export default function HomePage() {
                   </Reveal>
                   <Reveal delay={120} className={`relative ${flip ? 'lg:order-1' : ''}`}>
                     <div aria-hidden className={`absolute -inset-6 rounded-[2.5rem] blur-3xl ${s.glow}`} />
-                    <AppWindow src={s.img} alt={s.title} label={s.label} className={flip ? 'rotate-[-1deg]' : 'rotate-[1deg]'} />
+                    <AppShot src={s.img} alt={s.title} label={s.label} className={flip ? 'rotate-[-1deg]' : 'rotate-[1deg]'} />
                     {s.float && (
                       <div className={`absolute -bottom-6 z-20 w-[30%] max-w-[150px] rounded-xl border border-line bg-white overflow-hidden ${flip ? '-right-4 rotate-[5deg]' : '-left-4 rotate-[-5deg]'} hidden sm:block`}
                         style={{ boxShadow: '0 22px 48px -20px rgba(15,23,42,0.45)' }}>
@@ -187,6 +196,51 @@ export default function HomePage() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* 3.5 Trợ lý AI — điểm khác biệt của gói Pro Max, nối tiếp phần khoe sản phẩm
+          (vẫn là "cho thấy" chức năng) trước khi chuyển sang hướng dẫn 4 bước.
+          Ảnh là hội thoại THẬT với dữ liệu thật của quán. */}
+      <section className="bg-bean-tint border-y border-bean/15 overflow-x-clip">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20 grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+          <Reveal>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-bean px-3 py-1 text-xs font-semibold text-white">
+              <Sparkles className="w-3.5 h-3.5" aria-hidden /> Chỉ có ở gói Pro Max
+            </span>
+            <h2 className="text-2xl md:text-3xl font-bold text-ink mt-4 mb-3 leading-snug">
+              Hỏi trợ lý AI như hỏi một quản lý quán
+            </h2>
+            <p className="text-ink/75 leading-relaxed mb-6 max-w-md">
+              Trợ lý đọc được dữ liệu thật của quán bạn — bàn, thực đơn, hóa đơn, doanh thu —
+              nên trả lời bằng chính con số và tên món của quán, không phải câu trả lời chung chung.
+            </p>
+            <ul className="space-y-2.5 mb-7">
+              {aiPoints.map((p) => (
+                <li key={p} className="flex items-start gap-2.5 text-ink/80">
+                  <span className="mt-1 w-5 h-5 rounded-full bg-bean/15 text-bean grid place-items-center shrink-0">
+                    <Check className="w-3 h-3" />
+                  </span>
+                  <span className="text-sm leading-relaxed">{p}</span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-bean font-semibold hover:underline text-sm">
+              Xem gói Pro Max <ArrowRight className="w-4 h-4" />
+            </Link>
+          </Reveal>
+
+          <Reveal delay={120} className="relative flex justify-center lg:justify-end">
+            <div aria-hidden className="absolute -inset-8 rounded-[3rem] bg-bean/10 blur-3xl" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/product/ai-chat.png"
+              alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý ba combo đồ uống kèm giá cho buổi chiều vắng khách"
+              className="relative w-full max-w-[340px] rounded-2xl border border-line bg-white"
+              style={{ boxShadow: '0 34px 80px -34px rgba(15,23,42,0.45)' }}
+              loading="lazy"
+            />
+          </Reveal>
         </div>
       </section>
 
@@ -208,7 +262,7 @@ export default function HomePage() {
                   <s.icon className="w-4 h-4 text-bean" />
                   <h3 className="font-semibold text-ink">{s.title}</h3>
                 </div>
-                <p className="text-ink/60 text-sm leading-relaxed">{s.desc}</p>
+                <p className="text-ink/70 text-sm leading-relaxed">{s.desc}</p>
               </Reveal>
             ))}
           </div>
@@ -276,7 +330,7 @@ export default function HomePage() {
                   <h3 className="font-bold text-ink mb-1">{pkg.name}</h3>
                   <div className="flex items-baseline gap-1 mb-4">
                     <span className="text-2xl font-bold text-bean">{priceLabel}</span>
-                    <span className="text-xs text-ink/50">{period}</span>
+                    <span className="text-xs text-ink/70">{period}</span>
                   </div>
                   <ul className="space-y-2">
                     {pkg.features.slice(0, 4).map((f) => (
@@ -309,39 +363,11 @@ export default function HomePage() {
       </section>
 
       {/* 7. CTA — panel bo tròn nổi trên nền sáng, tách bạch hẳn với footer tối */}
-      <section className="bg-paper">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
-          <Reveal>
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-bean to-bean-dark px-6 py-14 md:py-16 text-center shadow-xl shadow-bean/25">
-              <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[36rem] rounded-full bg-white/10 blur-3xl" />
-              <div className="relative">
-                <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Muốn thử quản lý quán cafe bằng FunCafe?</h2>
-                <p className="text-white/75 mb-7 max-w-xl mx-auto">Tạo tài khoản và dùng thử để xem có hợp với quán của bạn không.</p>
-                <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-white text-bean hover:bg-paper active:translate-y-px px-7 py-3 rounded-xl text-base font-semibold transition-colors shadow-lg shadow-black/10">
-                  Dùng thử miễn phí
-                </Link>
-                <p className="text-white/70 text-sm mt-4">7 ngày miễn phí · Không cần thẻ tín dụng</p>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <CtaPanel
+        title="Muốn thử quản lý quán cafe bằng FunCafe?"
+        subtitle="Tạo tài khoản và dùng thử để xem có hợp với quán của bạn không."
+        note="7 ngày miễn phí · Không cần thẻ tín dụng"
+      />
     </PublicLayout>
-  );
-}
-
-/** Khung "cửa sổ app" bao ảnh chụp giao diện thật — thay cho mô phỏng bằng div. */
-function AppWindow({ src, alt, label, className = '' }: { src: string; alt: string; label?: string; className?: string }) {
-  return (
-    <div className={`relative z-10 rounded-2xl border border-line bg-white overflow-hidden ${className}`}
-      style={{ boxShadow: '0 34px 80px -34px rgba(15,23,42,0.45)' }}>
-      <div className="flex items-center gap-1.5 px-3.5 h-8 bg-sand border-b border-line">
-        <span className="w-2.5 h-2.5 rounded-full bg-red-300" />
-        <span className="w-2.5 h-2.5 rounded-full bg-gold" />
-        <span className="w-2.5 h-2.5 rounded-full bg-pine/60" />
-        {label && <span className="ml-2 text-[10px] text-ink/45 font-medium truncate">{label}</span>}
-      </div>
-      <img src={src} alt={alt} className="block w-full" loading="lazy" />
-    </div>
   );
 }

@@ -11,6 +11,18 @@ export function formatCurrency(amount: number): string {
   return formatted + '\u00a0₫';
 }
 
+/** Nhóm hàng nghìn bằng dấu chấm (không kèm ký hiệu tiền) — dùng cho ô nhập giá. */
+export function formatThousands(amount: number): string {
+  if (!Number.isFinite(amount) || amount === 0) return '';
+  return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/** Lấy số nguyên từ chuỗi người dùng gõ (bỏ mọi ký tự không phải chữ số). */
+export function parseThousands(value: string): number {
+  const digits = value.replace(/\D/g, '');
+  return digits ? parseInt(digits, 10) : 0;
+}
+
 function parseDateStr(dateStr: string): { d: number; m: number; y: number; h: number; min: number } {
   const iso = dateStr.replace(' ', 'T');
   const dt = new Date(iso);
@@ -37,6 +49,9 @@ export function formatDateTime(dateStr: string): string {
 export function formatPaymentMethod(method: string): string {
   const map: Record<string, string> = {
     cash: 'Tiền mặt',
+    vietqr: 'VietQR',
+    vnpay: 'VNPay',
+    cancel: 'Hủy gói',
     bank_transfer: 'Chuyển khoản',
     transfer: 'Chuyển khoản',
     qr_code: 'QR Code',
@@ -58,8 +73,6 @@ export function formatTableStatus(status: string): string {
   const map: Record<string, string> = {
     empty: 'Trống',
     serving: 'Đang phục vụ',
-    reserved: 'Đã đặt',
-    cleaning: 'Cần dọn',
   };
   return map[status] ?? status;
 }

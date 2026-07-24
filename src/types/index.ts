@@ -1,6 +1,6 @@
 export type UserPackageType = 'none' | 'free' | 'pro' | 'promax';
 
-export type TableStatus = 'empty' | 'serving' | 'reserved' | 'cleaning';
+export type TableStatus = 'empty' | 'serving';
 export type OrderStatus = 'active' | 'paid' | 'cancelled';
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'qr_code' | 'e_wallet' | 'vietqr' | 'vnpay';
 export type InvoiceStatus = 'paid' | 'refunded';
@@ -11,8 +11,9 @@ export type DurationMonths = 1 | 3 | 12;
 export type UserStatus = 'active' | 'locked';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'rejected';
 export type ActionType = 'new' | 'renew' | 'upgrade';
-// #4: Trạng thái hoàn tiền khi nâng cấp gói
-export type RefundStatus = 'none' | 'pending' | 'approved' | 'rejected';
+// Nâng cấp gói giữa kỳ: phần còn lại của gói cũ được CẤN TRỪ thẳng vào giá gói mới.
+// Không có luồng hoàn tiền mặt chờ duyệt -> chỉ 2 trạng thái.
+export type CreditStatus = 'none' | 'applied';
 
 export interface MenuItemSize {
   id: string;
@@ -119,6 +120,11 @@ export interface Invoice {
   status: InvoiceStatus;
   createdAt: string;
   paidAt: string;
+  cashReceived?: number;
+  changeAmount?: number;
+  // C4: hoàn tiền hóa đơn
+  refundedAt?: string;
+  refundReason?: string;
 }
 
 export interface CafeInfo {
@@ -147,6 +153,7 @@ export interface Package {
   maxTables?: number | null;     // null = không giới hạn
   maxMenuItems?: number | null;  // null = không giới hạn
   canUseAI?: boolean;
+  vatRate?: number;              // % VAT áp khi mua gói (0 với gói trial)
 }
 
 export interface TimeSubscription {
@@ -166,13 +173,27 @@ export interface UserSubscription {
   endDate: string;
   daysLeft: number;
   isPendingReview?: boolean;
-  // #4: Khoản hoàn tiền của lần nâng cấp gần nhất (nếu có)
-  refundAmount?: number;
-  refundStatus?: RefundStatus;
+  // Khoản cấn trừ của lần nâng cấp gần nhất (nếu có)
+  creditAmount?: number;
+  creditStatus?: CreditStatus;
+  // ĐA QUÁN: gói này thuộc quán nào (id). Undefined nếu chưa có gói.
+  cafeId?: string;
   // Giới hạn & quyền lấy từ gói (Infinity = không giới hạn). Do admin cấu hình.
   maxTables?: number;
   maxMenuItems?: number;
   canUseAI?: boolean;
+}
+
+/** Một quán của người dùng, kèm gói đang chạy — dùng ở màn chi tiết người dùng (admin). */
+export interface UserCafeSummary {
+  id: string;
+  name: string;
+  address: string;
+  /** Quán không xóa được, chỉ đổi trạng thái. */
+  status: 'open' | 'closed' | 'inactive';
+  packageType: UserPackageType;
+  packageName: string;
+  packageEndDate?: string;
 }
 
 export interface User {
@@ -187,6 +208,15 @@ export interface User {
   cafeName?: string;
   hasUsedFreeTrial?: boolean;
   createdAt: string;
+  // Chỉ có ở API quản trị (/admin/users)
+  cafes?: UserCafeSummary[];
+  cafeCount?: number;
+  /** Số quán đang có gói còn hạn. */
+  activePackageCount?: number;
+  /** Số giao dịch mua gói ĐÃ THANH TOÁN (không tính pending/failed). */
+  paymentCount?: number;
+  totalPaid?: number;
+  lastPaymentAt?: string;
 }
 
 export interface Payment {
@@ -204,11 +234,9 @@ export interface Payment {
   confirmedAt?: string;
   note?: string;
   actionType?: ActionType;
-  // #4: Hoàn tiền phần thời gian còn lại của gói cũ khi nâng cấp
-  refundAmount?: number;
-  refundStatus?: RefundStatus;
-  refundNote?: string;
-  refundedAt?: string;
+  // Cấn trừ phần thời gian còn lại của gói cũ khi nâng cấp
+  creditAmount?: number;
+  creditStatus?: CreditStatus;
 }
 
 // Lịch sử thanh toán gói của chính user (trang Gói dịch vụ)
@@ -222,8 +250,8 @@ export interface MyPayment {
   actionType?: ActionType;
   createdAt: string;
   paidAt?: string;
-  refundAmount?: number;
-  refundStatus?: RefundStatus;
+  creditAmount?: number;
+  creditStatus?: CreditStatus;
 }
 
 export interface Review {

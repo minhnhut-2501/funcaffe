@@ -4,22 +4,23 @@ import { usePathname, useRouter } from 'next/navigation';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Coffee, LayoutDashboard, Store, Grid3X3, UtensilsCrossed,
-  CupSoda, Settings, ShoppingCart, Receipt,
+  CupSoda, ShoppingCart, Receipt,
   BarChart3, CreditCard, User, LogOut, Menu, X, Bell, Clock, PanelLeft,
+  ChevronDown, Check, Plus,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { invoiceService, authService, hasCafe } from '@/services';
+import { isSubscriptionExpired } from '@/lib/permission';
+import { invoiceService, authService } from '@/services';
+import AiChatWidget from '@/components/user/AiChatWidget';
 
 const navGroups: { title: string; items: { href: string; label: string; icon: typeof Coffee }[] }[] = [
   {
     title: 'Vận hành',
     items: [
       { href: '/user/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-      { href: '/user/cafe', label: 'Thông tin quán', icon: Store },
       { href: '/user/tables', label: 'Quản lý bàn', icon: Grid3X3 },
       { href: '/user/menu', label: 'Thực đơn', icon: UtensilsCrossed },
       { href: '/user/toppings', label: 'Topping', icon: CupSoda },
-      { href: '/user/item-toppings', label: 'Cấu hình topping', icon: Settings },
     ],
   },
   {
@@ -39,6 +40,7 @@ const navGroups: { title: string; items: { href: string; label: string; icon: ty
   {
     title: 'Tài khoản',
     items: [
+      { href: '/user/cafe', label: 'Quản lý quán', icon: Store },
       { href: '/user/profile', label: 'Hồ sơ cá nhân', icon: User },
     ],
   },
@@ -92,7 +94,9 @@ function Sidebar({ collapsed, mobileOpen, onClose, onToggle }: { collapsed: bool
           <div className="flex items-center justify-between gap-2">
             <PackageBadge type={sub.packageType} />
             {sub.packageType !== 'none' && (
-              <span className="text-[11px] text-cafe-500 font-medium">{sub.daysLeft} ngày còn lại</span>
+              <span className={`text-[11px] font-medium ${isSubscriptionExpired(sub) ? 'text-red-600' : 'text-cafe-500'}`}>
+                {isSubscriptionExpired(sub) ? 'Đã hết hạn' : `${sub.daysLeft} ngày còn lại`}
+              </span>
             )}
           </div>
           {sub.packageType === 'none' && (
@@ -148,8 +152,52 @@ function Sidebar({ collapsed, mobileOpen, onClose, onToggle }: { collapsed: bool
   );
 }
 
+// ĐA QUÁN: dropdown chuyển quán đang quản lý + lối tắt thêm quán.
+function CafeSwitcher() {
+  const { cafes, activeCafeId, setActiveCafe } = useAuth();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+  const active = cafes.find((c) => c.id === activeCafeId);
+  if (cafes.length === 0) return null;
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 h-9 px-3 rounded-lg border border-line bg-white hover:bg-sand transition-colors max-w-[9rem] sm:max-w-[14rem]">
+        <Store className="w-4 h-4 text-bean shrink-0" />
+        <span className="text-sm font-semibold text-ink truncate">{active?.name ?? 'Chọn quán'}</span>
+        <ChevronDown className="w-4 h-4 text-cafe-400 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-2 w-72 bg-white rounded-2xl border border-line shadow-pop z-40 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-line text-[11px] font-semibold uppercase tracking-wider text-cafe-400">Quán của bạn</div>
+          <div className="max-h-72 overflow-y-auto py-1">
+            {cafes.map((c) => (
+              <button
+                key={c.id}
+                onClick={async () => { await setActiveCafe(c.id); setOpen(false); }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-sand transition-colors ${c.id === activeCafeId ? 'bg-sand/60' : ''}`}
+              >
+                <Store className="w-4 h-4 text-bean shrink-0" />
+                <span className="flex-1 text-sm text-ink truncate">{c.name}</span>
+                {c.id === activeCafeId && <Check className="w-4 h-4 text-pine shrink-0" />}
+              </button>
+            ))}
+          </div>
+          <Link href="/user/cafe" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-3 border-t border-line text-sm font-semibold text-bean hover:bg-sand transition-colors">
+            <Plus className="w-4 h-4" /> Thêm quán
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
-  const { user } = useAuth();
+  const { user, activeCafeId } = useAuth();
   const sub = user?.subscription;
   const pathname = usePathname();
   const current = navGroups
@@ -167,9 +215,11 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
       const todayInvoices = (invoices ?? []).filter(inv => new Date(inv.createdAt).toDateString() === today);
       if (todayInvoices.length > 0) {
         setNotifs([{ id: 'inv-today', type: 'invoice', message: `Hôm nay có ${todayInvoices.length} hóa đơn mới`, href: '/user/invoices' }]);
+      } else {
+        setNotifs([]);
       }
     }).catch(() => {});
-  }, []);
+  }, [activeCafeId]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -185,9 +235,12 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         <Menu className="w-5 h-5" />
       </button>
 
+      {/* ĐA QUÁN: chọn quán đang quản lý */}
+      <CafeSwitcher />
+
       {/* Breadcrumb trang hiện tại — lấp khoảng trống trái topbar + định hướng */}
       {current && (
-        <nav aria-label="Vị trí" className="hidden sm:flex items-center gap-2 min-w-0">
+        <nav aria-label="Vị trí" className="hidden lg:flex items-center gap-2 min-w-0">
           <current.icon className="w-4 h-4 text-bean shrink-0" />
           <span className="text-sm text-cafe-400">{current.group}</span>
           <span className="text-cafe-300" aria-hidden>/</span>
@@ -236,7 +289,9 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
               <div className="flex items-center gap-1 justify-end mt-0.5">
                 <PackageBadge type={sub.packageType} />
                 {sub.packageType !== 'none' && (
-                  <span className="text-[11px] text-cafe-400">· {sub.daysLeft} ngày</span>
+                  <span className={`text-[11px] ${isSubscriptionExpired(sub) ? 'text-red-500' : 'text-cafe-400'}`}>
+                    · {isSubscriptionExpired(sub) ? 'Đã hết hạn' : `${sub.daysLeft} ngày`}
+                  </span>
                 )}
               </div>
             )}
@@ -255,21 +310,32 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, isLoading, cafes, activeCafeId } = useAuth();
   const hasPackage = user?.subscription.packageType !== 'none';
+  const expired = isSubscriptionExpired(user?.subscription);
+
+  // ROUTE GUARD: khu vực /user/* yêu cầu đăng nhập với role 'user'.
+  // Chưa đăng nhập -> /login; admin -> về dashboard admin.
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) { router.replace('/login'); return; }
+    if (user.role === 'admin') router.replace('/admin/dashboard');
+  }, [isLoading, user, router]);
 
   // đóng drawer mobile khi đổi trang
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
+  // ĐA QUÁN: nếu user chưa có quán nào -> ép sang trang Quản lý quán để tạo quán đầu tiên.
   const [cafeReady, setCafeReady] = useState<boolean | null>(null);
   useEffect(() => {
+    if (isLoading || !user) return;
     if (pathname === '/user/cafe' || pathname === '/user/subscription') { setCafeReady(true); return; }
-    hasCafe().then(exists => {
-      if (!exists) { router.replace('/user/cafe'); return; }
-      setCafeReady(true);
-    });
-  }, [pathname, router]);
+    if (cafes.length === 0) { router.replace('/user/cafe'); return; }
+    setCafeReady(true);
+  }, [pathname, router, isLoading, user, cafes]);
 
+  // Chặn render khi chưa xác thực xong hoặc không đủ quyền (đang redirect)
+  if (isLoading || !user || user.role !== 'user') return null;
   if (cafeReady === null) return null;
 
   return (
@@ -289,8 +355,21 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
             </Link>
           </div>
         )}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
+        {hasPackage && expired && (
+          <div className="bg-red-50 border-b border-red-200 px-4 sm:px-6 py-2.5 flex items-center justify-between flex-wrap gap-2">
+            <p className="text-sm text-red-700">
+              Gói của bạn đã hết hạn — đang ở <span className="font-semibold">chế độ chỉ xem</span>. Bạn vẫn xem được dữ liệu và doanh thu; hãy gia hạn để thêm/sửa/bán hàng.
+            </p>
+            <Link href="/user/subscription" className="text-xs font-semibold bg-red-600 text-white px-3 py-1.5 rounded-full hover:bg-red-700 transition-colors">
+              Gia hạn ngay
+            </Link>
+          </div>
+        )}
+        {/* ĐA QUÁN: đổi quán -> remount toàn bộ trang để mọi useApi nạp lại dữ liệu quán mới
+            (tránh việc trang vẫn hiển thị dữ liệu quán cũ tới khi F5). */}
+        <main key={activeCafeId ?? 'no-cafe'} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
+      <AiChatWidget />
     </div>
   );
 }

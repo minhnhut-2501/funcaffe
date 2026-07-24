@@ -113,7 +113,7 @@ export default function ReviewsCarousel() {
               <Avatar name={r.name} src={r.avatar} size={44} />
               <div className="min-w-0">
                 <p className="font-medium text-ink text-sm truncate">{r.name}</p>
-                {r.cafe && <p className="text-ink/50 text-xs truncate">{r.cafe}</p>}
+                {r.cafe && <p className="text-ink/70 text-xs truncate">{r.cafe}</p>}
               </div>
             </div>
           </article>

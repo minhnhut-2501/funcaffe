@@ -1,10 +1,13 @@
 'use client';
 import PublicLayout from '@/components/layouts/PublicLayout';
 import Reveal from '@/components/public/Reveal';
+import FunCafeReviewSection from '@/components/user/FunCafeReviewSection';
+import CtaPanel from '@/components/public/CtaPanel';
+import AppShot from '@/components/public/AppShot';
 import Link from 'next/link';
 import {
   Store, Grid3X3, UtensilsCrossed, ShoppingCart, Receipt, BarChart3, CreditCard,
-  ArrowRight, HelpCircle, LifeBuoy,
+  HelpCircle, LifeBuoy,
 } from 'lucide-react';
 
 type Section = {
@@ -88,7 +91,7 @@ const sections: Section[] = [
     id: 'doanh-thu',
     icon: BarChart3,
     title: '6. Doanh thu & báo cáo',
-    intro: 'Theo dõi doanh thu theo ngày/tháng/năm và món bán chạy (gói Pro trở lên).',
+    intro: 'Theo dõi doanh thu theo ngày/tháng/năm và món bán chạy.',
     steps: [
       'Mở mục “Doanh thu” để xem tổng quan và biểu đồ.',
       'Lọc theo khoảng ngày hoặc đổi chế độ xem ngày/tháng/năm.',
@@ -131,7 +134,7 @@ export default function SupportPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 grid lg:grid-cols-[260px_1fr] gap-10 lg:gap-14">
         {/* ToC */}
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink/40 mb-3">Mục lục</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink/70 mb-3">Mục lục</p>
           <nav className="space-y-1">
             {sections.map((s) => (
               <a key={s.id} href={`#${s.id}`}
@@ -143,7 +146,7 @@ export default function SupportPage() {
           </nav>
           <div className="mt-6 rounded-2xl bg-white border border-line p-4 shadow-sm">
             <p className="text-sm font-semibold text-ink mb-1 flex items-center gap-1.5"><HelpCircle className="w-4 h-4 text-bean" />Cần thêm trợ giúp?</p>
-            <p className="text-xs text-ink/60 mb-3">Đội ngũ FunCafe sẵn sàng hỗ trợ bạn.</p>
+            <p className="text-xs text-ink/70 mb-3">Đội ngũ FunCafe sẵn sàng hỗ trợ bạn.</p>
             <Link href="/contact" className="btn-cafe-outline w-full text-sm py-2">Liên hệ ngay</Link>
           </div>
         </aside>
@@ -160,44 +163,40 @@ export default function SupportPage() {
               </div>
               <p className="text-ink/70 leading-relaxed mb-6 max-w-2xl">{s.intro}</p>
 
-              <ol className="space-y-3 mb-6">
-                {s.steps.map((step, idx) => (
-                  <li key={idx} className="flex gap-3.5">
-                    <span className="w-7 h-7 rounded-full bg-bean text-white grid place-items-center text-sm font-bold shrink-0">{idx + 1}</span>
-                    <p className="text-ink/80 leading-relaxed pt-0.5">{step}</p>
-                  </li>
-                ))}
-              </ol>
+              {/* Mục có ảnh: các bước bên trái, ảnh bên phải — trước đây ảnh nằm dưới
+                  và bị giới hạn max-w-xl nên cả cột phải trống hoác trên màn rộng. */}
+              <div className={s.img ? 'grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] xl:items-start' : ''}>
+                <ol className="space-y-3">
+                  {s.steps.map((step, idx) => (
+                    <li key={idx} className="flex gap-3.5">
+                      <span className="w-7 h-7 rounded-full bg-bean text-white grid place-items-center text-sm font-bold shrink-0">{idx + 1}</span>
+                      <p className="text-ink/80 leading-relaxed pt-0.5">{step}</p>
+                    </li>
+                  ))}
+                </ol>
 
-              {s.img && (
-                <div className="relative max-w-xl">
-                  <div aria-hidden className="absolute -inset-4 rounded-[2rem] bg-gold/8 blur-2xl" />
-                  <div className="relative rounded-2xl border border-line bg-white overflow-hidden" style={{ boxShadow: '0 24px 60px -30px rgba(15,23,42,0.35)' }}>
-                    <div className="flex items-center gap-1.5 px-3.5 h-8 bg-sand border-b border-line">
-                      <span className="w-2.5 h-2.5 rounded-full bg-red-300" />
-                      <span className="w-2.5 h-2.5 rounded-full bg-gold" />
-                      <span className="w-2.5 h-2.5 rounded-full bg-pine/60" />
-                      {s.imgLabel && <span className="ml-2 text-[10px] text-ink/45 font-medium truncate">{s.imgLabel}</span>}
-                    </div>
-                    <img src={s.img} alt={s.imgLabel ?? s.title} className="block w-full" loading="lazy" />
+                {s.img && (
+                  <div className="relative min-w-0">
+                    <div aria-hidden className="absolute -inset-4 rounded-[2rem] bg-bean/8 blur-2xl" />
+                    <AppShot src={s.img} alt={s.imgLabel ?? s.title} label={s.imgLabel} maxH="max-h-[26rem]" />
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {i < sections.length - 1 && <div className="mt-14 md:mt-20 border-t border-line" />}
             </Reveal>
           ))}
 
-          {/* CTA cuối */}
-          <div className="rounded-2xl bg-bean text-white p-6 sm:p-8 text-center">
-            <h3 className="text-xl font-bold mb-2">Sẵn sàng bắt đầu?</h3>
-            <p className="text-white/75 text-sm mb-5 max-w-md mx-auto">Tạo tài khoản và làm theo hướng dẫn — chỉ vài phút là quán bạn bán được hàng.</p>
-            <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-white text-bean hover:bg-paper px-6 py-3 rounded-xl text-sm font-semibold transition-colors">
-              Dùng thử miễn phí <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+          {/* Đánh giá FunCafe — chủ quán góp ý về sản phẩm (dời từ trang gói sang) */}
+          <FunCafeReviewSection />
         </div>
       </div>
+
+      {/* CTA cuối — dùng chung một kiểu với các trang public khác */}
+      <CtaPanel
+        title="Sẵn sàng bắt đầu?"
+        subtitle="Tạo tài khoản và làm theo hướng dẫn — chỉ vài phút là quán bạn bán được hàng."
+      />
     </PublicLayout>
   );
 }

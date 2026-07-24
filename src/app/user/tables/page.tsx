@@ -10,7 +10,7 @@ import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge, { tableStatusTone } from '@/components/user/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
 import { tableService } from '@/services';
-import { canEdit, packageLimits } from '@/lib/permission';
+import { canManage, packageLimits } from '@/lib/permission';
 import { formatTableStatus } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import type { CafeTable, TableStatus } from '@/types';
@@ -20,20 +20,16 @@ const statusOptions: { value: TableStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
   { value: 'empty', label: 'Trống' },
   { value: 'serving', label: 'Đang phục vụ' },
-  { value: 'reserved', label: 'Đã đặt' },
-  { value: 'cleaning', label: 'Cần dọn' },
 ];
 
 const formStatusOptions: { value: TableStatus; label: string }[] = [
   { value: 'empty', label: 'Trống' },
-  { value: 'reserved', label: 'Đã đặt' },
-  { value: 'cleaning', label: 'Cần dọn' },
+  { value: 'serving', label: 'Đang phục vụ' },
 ];
 
 export default function TablesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const pkg = user?.subscription.packageType ?? 'none';
   const [tables, setTables] = useState<CafeTable[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<TableStatus | 'all'>('all');
@@ -66,7 +62,8 @@ export default function TablesPage() {
   // Giới hạn theo gói (Pro: tối đa 10 bàn; Free/Pro Max: không giới hạn).
   // Chỉ áp cho gói có quyền chỉnh sửa & có trần hữu hạn (Pro) — bỏ qua 'none'.
   const limits = packageLimits(user?.subscription);
-  const hasTableCap = canEdit(pkg) && Number.isFinite(limits.maxTables);
+  const managable = canManage(user?.subscription);
+  const hasTableCap = managable && Number.isFinite(limits.maxTables);
   const atTableLimit = hasTableCap && tables.length >= limits.maxTables;
 
   const resetFilters = () => { setSearch(''); setFilterStatus('all'); };
@@ -120,8 +117,8 @@ export default function TablesPage() {
                 {tables.length}/{limits.maxTables} bàn
               </span>
             )}
-            <button onClick={openAdd} disabled={atTableLimit}
-              title={atTableLimit ? `Gói Pro tối đa ${limits.maxTables} bàn — nâng cấp Pro Max để không giới hạn` : undefined}
+            <button onClick={openAdd} disabled={atTableLimit || !managable}
+              title={!managable ? 'Gói đã hết hạn — chỉ có thể xem' : atTableLimit ? `Gói Pro tối đa ${limits.maxTables} bàn — nâng cấp Pro Max để không giới hạn` : undefined}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"><Plus className="w-4 h-4" />Thêm bàn</button>
           </div>
         }
@@ -183,7 +180,7 @@ export default function TablesPage() {
                   <div className="flex items-center gap-1 justify-end">
                     <button onClick={() => setViewTarget(t)} title="Xem" className="p-2 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Eye className="w-4 h-4" /></button>
                     <button onClick={() => openEdit(t)} title="Sửa" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                    {canEdit(pkg) ? (
+                    {managable ? (
                       <button onClick={() => setDeleteTarget(t)} title="Xóa" className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                     ) : (
                       <LockedButton variant="danger" className="p-2 text-xs"><Trash2 className="w-3.5 h-3.5" /></LockedButton>
@@ -193,7 +190,11 @@ export default function TablesPage() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={5}><EmptyState icon={Grid3X3} title="Không tìm thấy bàn nào" description="Thử đổi bộ lọc hoặc thêm bàn mới." /></td></tr>
+              <tr><td colSpan={5}>
+                {tables.length === 0
+                  ? <EmptyState icon={Grid3X3} title="Bạn chưa thêm bàn nào" description="Thêm bàn đầu tiên để bắt đầu theo dõi trạng thái phục vụ." />
+                  : <EmptyState icon={Grid3X3} title="Không tìm thấy bàn nào" description="Thử đổi bộ lọc hoặc từ khóa tìm kiếm." />}
+              </td></tr>
             )}
           </tbody>
         </table>
@@ -230,7 +231,7 @@ export default function TablesPage() {
           </div>
           <div className="flex gap-2 pt-2">
             <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Hủy</button>
-            {canEdit(pkg) ? (
+            {managable ? (
               <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Đang lưu...' : editTarget ? 'Cập nhật' : 'Lưu'}</button>
             ) : (
               <LockedButton className="flex-1">{editTarget ? 'Cập nhật' : 'Lưu'}</LockedButton>

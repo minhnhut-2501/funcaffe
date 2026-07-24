@@ -53,15 +53,6 @@ class CategoryController extends Controller
         return response()->json($category);
     }
 
-    public function destroy(Cafe $cafe, Category $category)
-    {
-        $this->authorizeCafe($cafe);
-
-        if ($category->cafe_id !== $cafe->id) {
-            return response()->json(['message' => 'Not found'], 404);
-        }
-
-        $category->delete();
-        return response()->json(['message' => 'Deleted']);
-    }
+    // destroy() đã bị GỠ BỎ có chủ đích: xóa danh mục sẽ bỏ rơi các món bên
+    // trong (categoryId trỏ tới danh mục đã chết) — chỉ ẨN qua is_active.
 }

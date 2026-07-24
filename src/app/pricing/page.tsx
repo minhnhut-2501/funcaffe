@@ -2,7 +2,7 @@
 import PublicLayout from '@/components/layouts/PublicLayout';
 import Reveal from '@/components/public/Reveal';
 import Banner from '@/components/public/Banner';
-import ReviewsCarousel from '@/components/public/ReviewsCarousel';
+import CtaPanel from '@/components/public/CtaPanel';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
@@ -10,26 +10,18 @@ import { packageService, timeSubscriptionService } from '@/services';
 import { formatCurrency } from '@/lib/format';
 import type { Package, DurationMonths, TimeSubscription } from '@/types';
 
-const durations: { value: DurationMonths; label: string; note: string }[] = [
-  { value: 1,  label: '1 tháng',  note: '' },
-  { value: 3,  label: '3 tháng',  note: 'Tiết kiệm 16%' },
-  { value: 12, label: '12 tháng', note: 'Tiết kiệm 37%' },
+const durationValues: { value: DurationMonths; label: string }[] = [
+  { value: 1,  label: '1 tháng' },
+  { value: 3,  label: '3 tháng' },
+  { value: 12, label: '12 tháng' },
 ];
 
 type CompareCell = boolean | string;
-const compareFeatures: { label: string; free: CompareCell; pro: CompareCell; promax: CompareCell }[] = [
-  { label: 'Quản lý thông tin quán', free: true,             pro: true,       promax: true },
-  { label: 'Số bàn tối đa',          free: 'Không giới hạn', pro: '10 bàn',   promax: 'Không giới hạn' },
-  { label: 'Số món trong thực đơn',  free: 'Không giới hạn', pro: '15 món',   promax: 'Không giới hạn' },
-  { label: 'Bán hàng theo bàn (POS)', free: true,            pro: true,       promax: true },
-  { label: 'Quản lý order',          free: true,             pro: true,       promax: true },
-  { label: 'Quản lý hóa đơn',        free: true,             pro: true,       promax: true },
-  { label: 'Quản lý size & topping', free: true,             pro: true,       promax: true },
-  { label: 'In & xuất PDF hóa đơn',  free: true,             pro: true,       promax: true },
-  { label: 'Thống kê & biểu đồ doanh thu', free: true,       pro: true,       promax: true },
-  { label: 'Top món bán chạy & báo cáo',   free: true,       pro: true,       promax: true },
-  { label: 'Trợ lý AI (sắp ra mắt)', free: false,            pro: false,      promax: true },
-];
+
+// C1: giới hạn bàn/món đọc từ cấu hình gói (admin chỉnh được) — không hardcode.
+function limitLabel(v: number | null | undefined, unit: string): string {
+  return v == null || !Number.isFinite(v) ? 'Không giới hạn' : `${v} ${unit}`;
+}
 
 function getPrice(pkg: Package, timeSubs: TimeSubscription[], dur: DurationMonths): number {
   if (pkg.isTrial) return 0;
@@ -59,6 +51,36 @@ export default function PricingPage() {
   const promaxPkg = packages.find(p => p.type === 'promax');
 
   const periodLabel = `/${dur === 1 ? 'tháng' : `${dur} tháng`}`;
+
+  // C1: % tiết kiệm tự tính từ giá thật (so gói dài hạn với giá 1 tháng x số tháng)
+  const savingsNote = (d: DurationMonths): string => {
+    if (d === 1) return '';
+    const refPkg = promaxPkg ?? proPkg;
+    if (!refPkg) return '';
+    const subs = timeSubsMap[refPkg.id] ?? [];
+    const p1 = getPrice(refPkg, subs, 1);
+    const pd = getPrice(refPkg, subs, d);
+    if (p1 <= 0 || pd <= 0) return '';
+    const pct = Math.round((1 - pd / (p1 * d)) * 100);
+    return pct > 0 ? `Tiết kiệm ${pct}%` : '';
+  };
+
+  // C1: bảng so sánh đọc giới hạn từ cấu hình gói do admin chỉnh
+  const compareFeatures: { label: string; free: CompareCell; pro: CompareCell; promax: CompareCell }[] = [
+    { label: 'Quản lý thông tin quán', free: true, pro: true, promax: true },
+    { label: 'Số bàn tối đa',
+      free: limitLabel(freePkg?.maxTables, 'bàn'), pro: limitLabel(proPkg?.maxTables ?? 10, 'bàn'), promax: limitLabel(promaxPkg?.maxTables, 'bàn') },
+    { label: 'Số món trong thực đơn',
+      free: limitLabel(freePkg?.maxMenuItems, 'món'), pro: limitLabel(proPkg?.maxMenuItems ?? 15, 'món'), promax: limitLabel(promaxPkg?.maxMenuItems, 'món') },
+    { label: 'Bán hàng theo bàn (POS)', free: true, pro: true, promax: true },
+    { label: 'Quản lý order',          free: true, pro: true, promax: true },
+    { label: 'Quản lý hóa đơn',        free: true, pro: true, promax: true },
+    { label: 'Quản lý size & topping', free: true, pro: true, promax: true },
+    { label: 'In & xuất PDF hóa đơn',  free: true, pro: true, promax: true },
+    { label: 'Thống kê & biểu đồ doanh thu', free: true, pro: true, promax: true },
+    { label: 'Top món bán chạy & báo cáo',   free: true, pro: true, promax: true },
+    { label: 'Trợ lý AI & phân tích doanh thu', free: false, pro: proPkg?.canUseAI ?? false, promax: promaxPkg?.canUseAI ?? true },
+  ];
 
   const cards = [
     {
@@ -109,48 +131,72 @@ export default function PricingPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
         {/* Chọn thời hạn */}
         <Reveal className="flex justify-center mb-12">
-          <div className="inline-flex bg-white border border-line rounded-xl p-1 gap-1 shadow-sm">
-            {durations.map((d) => (
-              <button
-                key={d.value}
-                onClick={() => setDur(d.value)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  dur === d.value ? 'bg-bean text-white shadow-sm' : 'text-ink/70 hover:text-bean'
-                }`}
-              >
-                {d.label}
-                {d.note && (
-                  <span className={`ml-1.5 text-xs ${dur === d.value ? 'text-white/80' : 'text-pine'}`}>{d.note}</span>
-                )}
-              </button>
-            ))}
+          {/* Trên điện thoại: 3 cột đều nhau, nhãn và mức tiết kiệm xuống dòng riêng
+              (trước đây cụm "Tiết kiệm 7%" bị ngắt giữa chữ ở màn 390px). */}
+          <div
+            role="group"
+            aria-label="Chọn thời hạn thanh toán"
+            className="grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-white p-1 shadow-sm sm:inline-flex sm:w-auto"
+          >
+            {durationValues.map((d) => {
+              const note = savingsNote(d.value);
+              const active = dur === d.value;
+              return (
+                <button
+                  key={d.value}
+                  type="button"
+                  onClick={() => setDur(d.value)}
+                  aria-pressed={active}
+                  className={`flex min-h-11 flex-col items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-all sm:flex-row sm:gap-1.5 sm:px-4 ${
+                    active ? 'bg-bean text-white shadow-sm' : 'text-ink/70 hover:text-bean'
+                  }`}
+                >
+                  <span className="whitespace-nowrap">{d.label}</span>
+                  {note && (
+                    <span className={`whitespace-nowrap text-xs ${active ? 'text-white/90' : 'text-pine'}`}>{note}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </Reveal>
 
         {/* 3 gói */}
-        <div className="grid sm:grid-cols-3 gap-5 mb-20 items-start">
+        <p className="text-center text-xs text-ink/70 -mt-8 mb-8">
+          Giá niêm yết chưa bao gồm {(proPkg?.vatRate ?? promaxPkg?.vatRate ?? 10)}% thuế VAT — thuế được cộng khi thanh toán.
+        </p>
+        <div className="grid sm:grid-cols-3 gap-5 mb-20 items-stretch">
           {cards.map((p, i) => (
             <Reveal
               key={p.key}
               delay={i * 80}
-              className={`relative rounded-2xl border p-6 bg-white flex flex-col lift ${
-                p.highlight ? 'border-bean ring-1 ring-bean/30 sm:-mt-4 sm:mb-4 shadow-md' : 'border-line'
+              className={`relative rounded-2xl border bg-white flex flex-col h-full p-6 pt-7 transition-shadow ${
+                p.highlight
+                  ? 'border-bean ring-2 ring-bean/30 shadow-xl shadow-bean/10'
+                  : 'border-line shadow-sm hover:shadow-md'
               }`}
             >
               {p.highlight && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center rounded-full bg-bean px-3 py-1 text-xs font-medium text-white whitespace-nowrap">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center rounded-full bg-bean px-3.5 py-1 text-xs font-semibold text-white whitespace-nowrap shadow-sm shadow-bean/30">
                   Phổ biến nhất
                 </span>
               )}
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-lg font-bold text-ink">{p.name}</h3>
-                <span className="chip">{p.badge}</span>
+
+              {/* Tên gói — to, đậm, nổi bật */}
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <h3 className="text-2xl font-extrabold text-ink tracking-tight">{p.name}</h3>
+                <span className="chip shrink-0">{p.badge}</span>
               </div>
-              <p className="text-ink/55 text-sm mb-5">{p.desc}</p>
-              <div className="mb-5">
-                <span className="text-3xl font-bold text-bean">{p.price}</span>
-                <span className="text-sm text-ink/50"> {p.period}</span>
+              <p className="text-ink/70 text-sm mb-5 min-h-[2.5rem]">{p.desc}</p>
+
+              {/* Khối giá — nền nổi bật để mức giá bắt mắt */}
+              <div className={`rounded-xl px-5 py-4 mb-6 ${p.highlight ? 'bg-bean text-white' : 'bg-paper border border-line'}`}>
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className={`text-4xl font-extrabold tracking-tight ${p.highlight ? 'text-white' : 'text-bean'}`}>{p.price}</span>
+                  <span className={`text-sm font-medium ${p.highlight ? 'text-white/90' : 'text-ink/70'}`}>{p.period}</span>
+                </div>
               </div>
+
               <ul className="space-y-2.5 mb-6 flex-1">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-ink/70">
@@ -158,7 +204,8 @@ export default function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/register" className={p.highlight ? 'btn-cafe w-full' : 'btn-cafe-outline w-full'}>
+
+              <Link href="/register" className={`${p.highlight ? 'btn-cafe' : 'btn-cafe-outline'} w-full mt-auto`}>
                 {p.key === 'free' ? 'Dùng thử miễn phí' : 'Đăng ký'}
               </Link>
             </Reveal>
@@ -187,8 +234,8 @@ export default function PricingPage() {
                         {typeof row[k] === 'string'
                           ? <span className="text-ink/80 font-medium">{row[k]}</span>
                           : row[k]
-                            ? <Check className="w-4 h-4 text-pine mx-auto" />
-                            : <X className="w-4 h-4 text-ink/20 mx-auto" />}
+                            ? <Check role="img" aria-label="Có" className="w-4 h-4 text-pine mx-auto" />
+                            : <X role="img" aria-label="Không có" className="w-4 h-4 text-ink/45 mx-auto" />}
                       </td>
                     ))}
                   </tr>
@@ -199,34 +246,14 @@ export default function PricingPage() {
         </Reveal>
       </div>
 
-      {/* Review carousel */}
-      <section className="bg-paper-textured border-t border-line">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
-          <Reveal className="max-w-2xl mb-10">
-            <h2 className="text-2xl md:text-3xl font-bold text-ink mb-3">Các quán đã chọn FunCafe</h2>
-            <p className="text-ink/60">Lướt qua để xem họ nói gì sau khi dùng.</p>
-          </Reveal>
-          <ReviewsCarousel />
-        </div>
-      </section>
+      {/* Đánh giá chỉ hiển thị ở trang chủ — để đây nữa thì lặp y hệt, làm trang giá dài vô ích */}
 
-      {/* CTA — panel bo tròn nổi trên nền sáng, tách bạch với footer (đồng bộ trang chủ) */}
-      <section className="bg-paper">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
-          <Reveal>
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-bean to-bean-dark px-6 py-14 md:py-16 text-center shadow-xl shadow-bean/25">
-              <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[36rem] rounded-full bg-white/10 blur-3xl" />
-              <div className="relative">
-                <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Vẫn phân vân chọn gói nào?</h2>
-                <p className="text-white/75 mb-7 max-w-xl mx-auto">Cứ bắt đầu với bản dùng thử miễn phí 7 ngày, nâng cấp bất cứ lúc nào.</p>
-                <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-white text-bean hover:bg-paper active:translate-y-px px-7 py-3 rounded-xl text-base font-semibold transition-colors shadow-lg shadow-black/10">
-                  Dùng thử miễn phí
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <CtaPanel
+        title="Vẫn phân vân chọn gói nào?"
+        subtitle="Cứ bắt đầu với bản dùng thử miễn phí 7 ngày, nâng cấp bất cứ lúc nào."
+        secondaryLabel="Hỏi tư vấn"
+        secondaryHref="/contact"
+      />
     </PublicLayout>
   );
 }

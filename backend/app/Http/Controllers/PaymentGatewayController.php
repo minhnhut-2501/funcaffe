@@ -57,6 +57,12 @@ class PaymentGatewayController extends Controller
             return redirect()->away($resultBase . '?status=success&code=00');
         }
 
+        // Người dùng hủy (code 24) hoặc thanh toán thất bại: từ chối giao dịch và
+        // rollback subscription để nó KHÔNG lọt vào hàng chờ duyệt của admin.
+        $this->atomic(function () use ($payment) {
+            $this->activator->rejectAndRollback($payment);
+        });
+
         return redirect()->away($resultBase . '?status=fail&code=' . urlencode((string) $code));
     }
 
@@ -98,7 +104,9 @@ class PaymentGatewayController extends Controller
             return response()->json(['RspCode' => '00', 'Message' => 'Confirm Success']);
         }
 
-        $payment->update(['payment_status' => 'rejected']);
+        $this->atomic(function () use ($payment) {
+            $this->activator->rejectAndRollback($payment);
+        });
         return response()->json(['RspCode' => '00', 'Message' => 'Confirm Success']);
     }
 }

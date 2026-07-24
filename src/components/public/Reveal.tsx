@@ -1,11 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useEffect, useRef, useState } from 'react';
 
 /**
  * Scroll-reveal wrapper cho trang Public.
- * Dùng IntersectionObserver (không dùng scroll listener) và tự thoái lui về
- * trạng thái hiển thị ngay khi người dùng bật prefers-reduced-motion.
+ *
+ * QUAN TRỌNG: mặc định là HIỆN. Chỉ khi JS chạy được và phần tử đang nằm dưới
+ * màn hình thì mới ẩn đi để chạy hiệu ứng (ẩn trong useLayoutEffect nên không
+ * bị nháy). Trước đây mặc định là ẩn (opacity 0) — nghĩa là bot thu thập dữ liệu,
+ * tab ẩn hoặc lúc JS lỗi sẽ thấy section TRẮNG TRƠN.
+ *
+ * Dùng IntersectionObserver (không dùng scroll listener) và tôn trọng
+ * prefers-reduced-motion.
  */
 export default function Reveal({
   children,
@@ -21,16 +27,22 @@ export default function Reveal({
   id?: string;
 }) {
   const ref = useRef<HTMLElement>(null);
-  const [shown, setShown] = useState(false);
+  const [shown, setShown] = useState(true);
+  const [armed, setArmed] = useState(false);
+
+  // Chạy TRƯỚC khi vẽ: chỉ ẩn phần tử còn nằm dưới màn hình.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (el.getBoundingClientRect().top < window.innerHeight * 0.9) return;
+    setShown(false);
+    setArmed(true);
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) {
-      setShown(true);
-      return;
-    }
+    if (!el || !armed) return;
     const io = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
@@ -42,7 +54,7 @@ export default function Reveal({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [armed]);
 
   const Comp = Tag as React.ElementType;
   return (

@@ -12,11 +12,22 @@ class Cafe extends Model
         'user_id', 'name', 'address', 'phone', 'description', 'status', 'logo',
         // Tài khoản ngân hàng nhận tiền (VietQR) cho luồng khách trả tiền cho chủ quán
         'bank_bin', 'bank_account_number', 'bank_account_name',
+        // Đa quán: mỗi quán được dùng thử Fun Free 1 lần (trial theo QUÁN, không theo tài khoản)
+        'has_used_free_trial',
+    ];
+
+    protected $casts = [
+        'has_used_free_trial' => 'boolean',
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class, 'cafe_id');
     }
 
     public function categories()

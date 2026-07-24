@@ -27,7 +27,7 @@ class TestUserSeeder extends Seeder
         // Dọn tài khoản demo cũ (nếu còn) để chỉ giữ đúng 2 tài khoản mong muốn.
         User::where('email', 'user@funcafe.vn')->delete();
 
-        // _id cố định = user_id của quán demo (seed-data/cafes.json) để
+        // _id cố định = user_id của quán demo (seeders/data/cafes.json) để
         // quán + thực đơn + bàn tự thuộc về tài khoản này.
         $ownerId = '6a3910511846951d38041ca7';
         $owner = User::where('email', 'nphec4007@gmail.com')->first();

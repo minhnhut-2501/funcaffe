@@ -27,8 +27,6 @@ const toneDot: Record<Tone, string> = {
 export const tableStatusTone: Record<TableStatus, Tone> = {
   empty: 'success',
   serving: 'warning',
-  reserved: 'info',
-  cleaning: 'neutral',
 };
 
 /** Map trạng thái order → tone màu. */

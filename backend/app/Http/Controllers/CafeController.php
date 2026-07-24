@@ -68,19 +68,8 @@ class CafeController extends Controller
         return response()->json($cafe);
     }
 
-    // BUG-09 FIX: Thêm method destroy bị thiếu
-    public function destroy(Request $request, Cafe $cafe)
-    {
-        if ($cafe->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
-        $hasActiveOrders = $cafe->orders()->where('status', 'active')->exists();
-        if ($hasActiveOrders) {
-            return response()->json(['message' => 'Không thể xóa quán đang có order chưa thanh toán.'], 400);
-        }
-
-        $cafe->delete();
-        return response()->json(['message' => 'Đã xóa quán thành công.']);
-    }
+    // KHÔNG có destroy(): quán là gốc của bàn, danh mục, món, topping, order, hóa đơn
+    // và các gói đã mua. MongoDB không xóa dây chuyền nên xóa quán chỉ để lại một đống
+    // dữ liệu mồ côi và làm mất luôn lịch sử doanh thu. Ngừng kinh doanh thì đặt
+    // status = 'inactive' — dữ liệu còn nguyên để tra cứu, quán biến mất khỏi vận hành.
 }
