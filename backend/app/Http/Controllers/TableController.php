@@ -31,7 +31,7 @@ class TableController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
-            'status' => 'sometimes|string|in:empty,serving,reserved,cleaning',
+            'status' => 'sometimes|string|in:empty,serving',
             'display_order' => 'nullable|integer|min:0',
         ]);
 
@@ -50,7 +50,7 @@ class TableController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'capacity' => 'sometimes|integer|min:1',
-            'status' => 'sometimes|string|in:empty,serving,reserved,cleaning',
+            'status' => 'sometimes|string|in:empty,serving',
             'display_order' => 'nullable|integer|min:0',
         ]);
 

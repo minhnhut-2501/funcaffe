@@ -5,6 +5,7 @@ import LockedBox from '@/components/ui/LockedBox';
 import StatCard from '@/components/ui/StatCard';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import SectionCard from '@/components/user/SectionCard';
+import RevenueAiInsights from '@/components/user/RevenueAiInsights';
 import { FilterBar } from '@/components/user/FilterBar';
 import { useAuth } from '@/context/AuthContext';
 import { invoiceService } from '@/services';
@@ -75,7 +76,9 @@ const thisMonth = today.getMonth() + 1;
 
 export default function RevenuePage() {
   const { user } = useAuth();
-  const { data: invoices, loading, error } = useApi(() => invoiceService.list());
+  const { data: rawInvoices, loading, error } = useApi(() => invoiceService.list());
+  // C4: hóa đơn ĐÃ HOÀN TIỀN bị loại khỏi mọi thống kê doanh thu
+  const invoices = useMemo(() => (rawInvoices ?? []).filter(i => i.status === 'paid'), [rawInvoices]);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [viewMode, setViewMode] = useState('day');
@@ -108,7 +111,7 @@ export default function RevenuePage() {
       <div>
         <PageHeader title="Doanh thu" />
         <LockedBox title="Bạn chưa đăng ký gói dịch vụ"
-          description="Đăng ký gói Pro trở lên (hoặc dùng thử Fun Free 7 ngày) để xem biểu đồ doanh thu theo ngày/tháng, top món bán chạy và báo cáo chi tiết." />
+          description="Đăng ký gói dịch vụ (kể cả dùng thử Fun Free 7 ngày) để xem biểu đồ doanh thu theo ngày/tháng, top món bán chạy và báo cáo chi tiết." />
       </div>
     );
   }
@@ -116,7 +119,7 @@ export default function RevenuePage() {
   if (loading) {
     return (
       <div>
-        <PageHeader title="Doanh thu" description="Thống kê doanh thu chi tiết (gói Pro trở lên)" />
+        <PageHeader title="Doanh thu" description="Thống kê doanh thu chi tiết" />
         <LoadingSkeleton variant="table" rows={5} cols={4} />
       </div>
     );
@@ -125,7 +128,7 @@ export default function RevenuePage() {
   if (error) {
     return (
       <div>
-        <PageHeader title="Doanh thu" description="Thống kê doanh thu chi tiết (gói Pro trở lên)" />
+        <PageHeader title="Doanh thu" description="Thống kê doanh thu chi tiết" />
         <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-xl p-4">
           <AlertCircle className="w-5 h-5" />
           <span>Không thể tải dữ liệu doanh thu.</span>
@@ -136,7 +139,7 @@ export default function RevenuePage() {
 
   return (
     <div>
-      <PageHeader title="Doanh thu" description="Thống kê doanh thu chi tiết (gói Pro trở lên)"
+      <PageHeader title="Doanh thu" description="Thống kê doanh thu chi tiết"
         actions={
           <button onClick={() => {
             const headers = ['Mã hóa đơn', 'Bàn', 'Phương thức', 'Số tiền', 'Ngày tạo'];
@@ -155,6 +158,9 @@ export default function RevenuePage() {
         <StatCard label="Tổng hóa đơn" value={invoices?.length ?? 0} icon={Receipt} color="blue" />
         <StatCard label="Trung bình/hóa đơn" value={formatCurrency(invoices && invoices.length > 0 ? Math.round(totalRevenue / invoices.length) : 0)} icon={BarChart3} color="yellow" />
       </div>
+
+      {/* Phân tích doanh thu bằng AI (gói Pro Max) */}
+      <RevenueAiInsights />
 
       {/* Bộ lọc chỉ áp cho biểu đồ doanh thu & top món bán chạy bên dưới */}
       <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-cafe-600">

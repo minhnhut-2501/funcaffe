@@ -5,14 +5,18 @@ import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { userService } from '@/services';
 import { useToast } from '@/hooks/use-toast';
-import { formatDate, formatPackageName } from '@/lib/format';
+import { formatCurrency, formatDate, formatPackageName } from '@/lib/format';
 import { getPackageBadgeClass } from '@/lib/permission';
-import type { User } from '@/types';
-import { Eye, Lock, Unlock, Users as UsersIcon } from 'lucide-react';
+import type { User, UserCafeSummary } from '@/types';
+import { Eye, Lock, Unlock, Store, Users as UsersIcon } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
-import StatusBadge from '@/components/user/StatusBadge';
+import StatusBadge, { type Tone } from '@/components/user/StatusBadge';
+
+type CafeStatus = UserCafeSummary['status'];
+const CAFE_LABEL: Record<CafeStatus, string> = { open: 'Đang mở cửa', closed: 'Đã đóng cửa', inactive: 'Ngừng hoạt động' };
+const CAFE_TONE: Record<CafeStatus, Tone> = { open: 'success', closed: 'neutral', inactive: 'danger' };
 
 export default function AdminUsersPage() {
   const { toast } = useToast();
@@ -90,7 +94,13 @@ export default function AdminUsersPage() {
               <tr key={u.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3 font-semibold text-ink">{u.fullName}</td>
                 <td className="px-4 py-3 text-cafe-600">{u.email}</td>
-                <td className="px-4 py-3 text-cafe-500">{u.cafeName ?? '—'}</td>
+                {/* Cột này trước chỉ hiện quán ĐẦU TIÊN nên người có nhiều quán trông như chỉ có một. */}
+                <td className="px-4 py-3 text-cafe-500">
+                  {u.cafeName ?? '—'}
+                  {(u.cafeCount ?? 0) > 1 && (
+                    <span className="ml-1.5 text-xs text-bean font-semibold">+{(u.cafeCount ?? 1) - 1} quán</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <span className={getPackageBadgeClass(u.packageType)}>{formatPackageName(u.packageType)}</span>
                 </td>
@@ -121,32 +131,84 @@ export default function AdminUsersPage() {
       </div>
       )}
 
-      <Modal open={!!viewUser} onClose={() => setViewUser(null)} title="Chi tiết người dùng">
+      <Modal open={!!viewUser} onClose={() => setViewUser(null)} title="Chi tiết người dùng" size="xl">
         {viewUser && (
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-bean-tint rounded-full flex items-center justify-center text-bean font-bold text-xl ring-2 ring-white shadow-soft">
+          <div className="space-y-5 text-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-bean-tint rounded-full flex items-center justify-center text-bean font-bold text-xl ring-2 ring-white shadow-soft shrink-0">
                 {viewUser.fullName.charAt(0)}
               </div>
-              <div className="flex flex-col items-start gap-1">
-                <p className="font-bold text-ink">{viewUser.fullName}</p>
+              <div className="flex flex-col items-start gap-1 min-w-0">
+                <p className="font-bold text-ink truncate">{viewUser.fullName}</p>
                 <StatusBadge tone={viewUser.status === 'active' ? 'success' : 'neutral'}>
                   {viewUser.status === 'active' ? 'Hoạt động' : 'Bị khóa'}
                 </StatusBadge>
               </div>
             </div>
-            {[
-              { label: 'Email', value: viewUser.email },
-              { label: 'Điện thoại', value: viewUser.phone },
-              { label: 'Tên quán', value: viewUser.cafeName ?? '—' },
-              { label: 'Gói dịch vụ', value: formatPackageName(viewUser.packageType) },
-              { label: 'Ngày đăng ký', value: formatDate(viewUser.createdAt) },
-            ].map(r => (
-              <div key={r.label} className="flex gap-3 py-1.5 border-b border-line last:border-0">
-                <span className="text-cafe-500 w-28 shrink-0">{r.label}:</span>
-                <span className="text-ink font-medium">{r.value}</span>
-              </div>
-            ))}
+
+            {/* Bốn con số trả lời ngay "người này là khách cỡ nào" */}
+            {/* 2 cột: số tiền dài (vd "12.566.800 ₫") cần chỗ, ép 4 cột là bị cắt cụt */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Số quán', value: String(viewUser.cafeCount ?? viewUser.cafes?.length ?? 0) },
+                { label: 'Quán còn gói', value: String(viewUser.activePackageCount ?? 0) },
+                { label: 'Số giao dịch', value: String(viewUser.paymentCount ?? 0) },
+                { label: 'Tổng đã thanh toán', value: formatCurrency(viewUser.totalPaid ?? 0) },
+              ].map(s => (
+                <div key={s.label} className="rounded-xl border border-line bg-sand/50 px-3.5 py-2.5 min-w-0">
+                  <p className="text-xs text-cafe-500 mb-0.5 whitespace-nowrap">{s.label}</p>
+                  <p className="font-bold text-ink tabular-nums text-lg">{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {[
+                // Email chiếm trọn hàng: ép vào nửa cột thì địa chỉ dài bị ngắt giữa chừng
+                { label: 'Email', value: viewUser.email, wide: true },
+                { label: 'Điện thoại', value: viewUser.phone || '—' },
+                { label: 'Ngày đăng ký', value: formatDate(viewUser.createdAt) },
+                { label: 'Thanh toán gần nhất', value: viewUser.lastPaymentAt ? formatDate(viewUser.lastPaymentAt) : 'Chưa có' },
+                { label: 'Đã dùng thử Fun Free', value: viewUser.hasUsedFreeTrial ? 'Rồi' : 'Chưa' },
+              ].map(r => (
+                <div key={r.label} className={`min-w-0 ${r.wide ? 'col-span-2' : ''}`}>
+                  <dt className="text-xs text-cafe-500 mb-0.5">{r.label}</dt>
+                  <dd className="text-ink font-medium break-words">{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div>
+              <p className="label-funcafe flex items-center gap-1.5">
+                <Store className="w-4 h-4 text-bean" />
+                Quán đang quản lý ({viewUser.cafes?.length ?? 0})
+              </p>
+              {!viewUser.cafes?.length ? (
+                <p className="text-cafe-500 rounded-xl border border-line bg-sand/50 px-4 py-3">
+                  Tài khoản này chưa mở quán nào.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {viewUser.cafes.map(c => (
+                    <li key={c.id} className="rounded-xl border border-line p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-ink truncate">{c.name}</p>
+                          {c.address && <p className="text-xs text-cafe-500 truncate">{c.address}</p>}
+                        </div>
+                        <StatusBadge tone={CAFE_TONE[c.status]}>{CAFE_LABEL[c.status]}</StatusBadge>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className={getPackageBadgeClass(c.packageType)}>{formatPackageName(c.packageType)}</span>
+                        {c.packageEndDate && c.packageType !== 'none' && (
+                          <span className="text-xs text-cafe-500">còn hạn tới {formatDate(c.packageEndDate)}</span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
       </Modal>

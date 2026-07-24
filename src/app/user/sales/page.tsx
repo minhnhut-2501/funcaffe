@@ -6,13 +6,16 @@ import { tableService, menuService, categoryService, toppingService, orderServic
 import type { CafeTable, MenuItem, MenuItemSize, Topping, Order, OrderItem, CafeInfo } from '@/types';
 import { buildVietQrImageUrl } from '@/lib/banks';
 import Link from 'next/link';
-import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, Receipt } from 'lucide-react';
+import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, Receipt, Banknote } from 'lucide-react';
+import { VietQrMark } from '@/components/ui/PaymentLogos';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import TableTile from '@/components/user/TableTile';
 import MenuCard from '@/components/user/MenuCard';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
+import { canManage } from '@/lib/permission';
 
 interface CartItem {
   id: string;
@@ -35,12 +38,21 @@ function calcCartItem(c: CartItem): number {
   return calcItemBase(c) + calcItemTopping(c);
 }
 
+// Hai dòng giỏ được coi là trùng khi cùng món, cùng size, cùng ghi chú và cùng topping (id + số lượng)
+function isSameCartLine(a: CartItem, b: CartItem): boolean {
+  if (a.item.id !== b.item.id) return false;
+  if ((a.size?.id ?? '') !== (b.size?.id ?? '')) return false;
+  if ((a.note ?? '').trim() !== (b.note ?? '').trim()) return false;
+  if (a.toppings.length !== b.toppings.length) return false;
+  const norm = (list: CartItem['toppings']) =>
+    list.map(t => `${t.topping.id}:${t.quantity}`).sort().join('|');
+  return norm(a.toppings) === norm(b.toppings);
+}
+
 const tableStatusFilter = [
   { value: 'all', label: 'Tất cả' },
   { value: 'empty', label: 'Trống' },
   { value: 'serving', label: 'Đang phục vụ' },
-  { value: 'reserved', label: 'Đã đặt' },
-  { value: 'cleaning', label: 'Cần dọn' },
 ];
 
 export default function SalesPage() {
@@ -56,10 +68,12 @@ export default function SalesPage() {
   const [optionModal, setOptionModal] = useState<{ item: MenuItem } | null>(null);
   const [editCartItemId, setEditCartItemId] = useState<string | null>(null);
   const [paymentModal, setPaymentModal] = useState(false);
-  const [successModal, setSuccessModal] = useState<{ code: string; total: number } | null>(null);
+  const [successModal, setSuccessModal] = useState<{ code: string; total: number; method: string; cashGiven?: number; change?: number } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [cashGiven, setCashGiven] = useState('');
   const { toast } = useToast();
+  const { user } = useAuth();
+  const managable = canManage(user?.subscription);
   const [loading, setLoading] = useState(true);
   const [clearConfirm, setClearConfirm] = useState(false);
   const [savingItem, setSavingItem] = useState(false);
@@ -126,10 +140,13 @@ export default function SalesPage() {
     setLoading(true);
     Promise.all([
       tableService.list().then(setTables),
-      menuService.list().then(setMenuItems),
       categoryService.list().then(setCategories),
       toppingService.list().then(setAllToppings),
-      orderService.list().then(allOrders => {
+      // Thực đơn phải về CÙNG LÚC với order: order chỉ lưu snapshot tên/giá,
+      // muốn có ảnh món cho phiếu order thì phải tra ngược từ thực đơn theo itemId.
+      Promise.all([menuService.list(), orderService.list()]).then(([menu, allOrders]) => {
+        setMenuItems(menu);
+        const menuById = new Map(menu.map(m => [m.id, m]));
         const active = allOrders.filter(o => o.status === 'active');
         setActiveOrders(active);
         const draftMap: Record<string, string> = {};
@@ -142,8 +159,8 @@ export default function SalesPage() {
               id: oi.itemId,
               name: oi.itemNameSnapshot,
               basePrice: oi.unitPrice,
-              categoryId: '',
-              imageUrl: undefined,
+              categoryId: menuById.get(oi.itemId)?.categoryId ?? '',
+              imageUrl: menuById.get(oi.itemId)?.imageUrl,
               description: undefined,
               hasSize: !!oi.sizeId,
               sizes: oi.sizeId ? [{ id: oi.sizeId, name: oi.sizeNameSnapshot ?? '', price: oi.unitPrice, isActive: true }] : [],
@@ -181,6 +198,10 @@ export default function SalesPage() {
   const cartTotal = baseSubtotal + toppingSubtotal - discount;
 
   const openOption = (item: MenuItem) => {
+    if (!managable) {
+      showToast('Gói đã hết hạn — chỉ có thể xem. Vui lòng gia hạn để bán hàng.');
+      return;
+    }
     if (!selectedTable) {
       showToast('Vui lòng chọn bàn trước khi thêm món.');
       return;
@@ -235,9 +256,14 @@ export default function SalesPage() {
         }, []),
       note: optForm.note,
     };
+    const cur = carts[selectedTable.id] ?? [];
+    // Khi thêm mới, nếu đã có dòng trùng khớp hoàn toàn thì cộng dồn số lượng thay vì tách riêng
+    const mergeTarget = editCartItemId ? undefined : cur.find(c => isSameCartLine(c, newItem));
     const updatedCart = editCartItemId
-      ? (() => { const cur = carts[selectedTable.id] ?? []; return cur.map(c => c.id === editCartItemId ? newItem : c); })()
-      : [...(carts[selectedTable.id] ?? []), newItem];
+      ? cur.map(c => c.id === editCartItemId ? newItem : c)
+      : mergeTarget
+        ? cur.map(c => c.id === mergeTarget.id ? { ...c, quantity: c.quantity + newItem.quantity } : c)
+        : [...cur, newItem];
     const newBaseSubtotal = updatedCart.reduce((s, c) => s + calcItemBase(c), 0);
     const newToppingSubtotal = updatedCart.reduce((s, c) => s + calcItemTopping(c), 0);
     const newTotal = newBaseSubtotal + newToppingSubtotal;
@@ -272,12 +298,8 @@ export default function SalesPage() {
           t.id === selectedTable.id ? { ...t, status: 'serving' as const, currentOrderId: created.id } : t
         ));
       }
-      if (editCartItemId) {
-        setCart(prev => prev.map(c => c.id === editCartItemId ? newItem : c));
-        setEditCartItemId(null);
-      } else {
-        setCart(prev => [...prev, newItem]);
-      }
+      setCart(updatedCart);
+      if (editCartItemId) setEditCartItemId(null);
       setOptionModal(null);
     } catch {
       showToast('Không thể lưu order, vui lòng thử lại');
@@ -354,9 +376,11 @@ export default function SalesPage() {
       if (selectedTable) {
         const existingId = draftOrderIds[selectedTable.id];
         if (existingId) {
-          try { await orderService.update(existingId, { tableId: selectedTable.id, items: [], subtotal: 0, discountAmount: 0, totalAmount: 0 }); } catch {}
+          try { await orderService.cancel(existingId); } catch {}
           setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
           setActiveOrders(prev => prev.filter(o => o.id !== existingId));
+          // Hủy order -> bàn về trống
+          setTables(prev => prev.map(t => t.id === selectedTable.id ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t));
         }
         clearCartForTable(selectedTable.id);
       }
@@ -368,6 +392,14 @@ export default function SalesPage() {
 
   const handlePayment = async () => {
     if (!selectedTable || cart.length === 0) return;
+
+    const cashReceived = paymentMethod === 'cash' ? Number(cashGiven.replace(/\D/g, '')) : 0;
+    // Khách đưa thiếu tiền -> không cho xác nhận (backend cũng chặn 422)
+    if (paymentMethod === 'cash' && cashReceived > 0 && cashReceived < cartTotal) {
+      showToast(`Tiền khách đưa chưa đủ, còn thiếu ${formatCurrency(cartTotal - cashReceived)}.`);
+      return;
+    }
+
     setProcessing(true);
     try {
       const orderId = draftOrderIds[selectedTable.id];
@@ -376,15 +408,17 @@ export default function SalesPage() {
       const payResult = await orderService.pay(orderId, {
         payment_method: paymentMethod,
         discount_amount: discount,
+        ...(paymentMethod === 'cash' && cashReceived > 0 ? { cash_received: cashReceived } : {}),
       });
 
-      const invoiceCode = payResult?.invoice?.invoice_code
-        ?? payResult?.invoice?.invoiceCode
+      // Order nay tự mang mã phiếu (invoice_code) sau khi thanh toán — bỏ bảng invoices.
+      const invoiceCode = payResult?.invoice_code
+        ?? payResult?.code
         ?? selectedTable.name;
 
-      // Backend đặt bàn về 'cleaning' (cần dọn) sau thanh toán — đồng bộ đúng trạng thái
+      // Thanh toán xong bàn về TRỐNG (backend cũng đặt 'empty') — đồng bộ đúng trạng thái
       setTables(prev => prev.map(t =>
-        t.id === selectedTable.id ? { ...t, status: 'cleaning' as const, currentOrderId: undefined } : t
+        t.id === selectedTable.id ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t
       ));
       setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
       setActiveOrders(prev => prev.filter(o => o.id !== orderId));
@@ -392,7 +426,13 @@ export default function SalesPage() {
       setSelectedTable(null);
       setPaymentModal(false);
       setCashGiven('');
-      setSuccessModal({ code: invoiceCode, total: cartTotal });
+      setSuccessModal({
+        code: invoiceCode,
+        total: cartTotal,
+        method: paymentMethod,
+        cashGiven: paymentMethod === 'cash' && cashReceived > 0 ? cashReceived : undefined,
+        change: paymentMethod === 'cash' && cashReceived > cartTotal ? cashReceived - cartTotal : undefined,
+      });
     } catch {
       showToast('Thanh toán thất bại, vui lòng thử lại');
     } finally {
@@ -430,7 +470,7 @@ export default function SalesPage() {
             {filteredTables.map(t => (
               <TableTile key={t.id} table={t} selected={selectedTable?.id === t.id} onClick={() => setSelectedTable(t)} />
             ))}
-            {filteredTables.length === 0 && <p className="col-span-2 text-xs text-cafe-400 text-center py-6">Không có bàn</p>}
+            {filteredTables.length === 0 && <p className="col-span-2 text-xs text-cafe-400 text-center py-6">{tables.length === 0 ? 'Bạn chưa thêm bàn nào' : 'Không tìm thấy bàn'}</p>}
           </div>
         </div>
 
@@ -442,7 +482,7 @@ export default function SalesPage() {
             <div className="flex gap-1.5 flex-wrap">
               <button onClick={() => setCatFilter('all')}
                 className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${catFilter === 'all' ? 'bg-bean text-white' : 'bg-sand text-slate hover:bg-bean-tint hover:text-bean'}`}>Tất cả</button>
-              {categories.map(cat => (
+              {categories.filter(cat => cat.isActive).map(cat => (
                 <button key={cat.id} onClick={() => setCatFilter(cat.id)}
                   className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${catFilter === cat.id ? 'bg-bean text-white' : 'bg-sand text-slate hover:bg-bean-tint hover:text-bean'}`}>{cat.name}</button>
               ))}
@@ -460,7 +500,7 @@ export default function SalesPage() {
               {filteredMenu.map(item => (
                 <MenuCard key={item.id} item={item} onClick={() => openOption(item)} />
               ))}
-              {filteredMenu.length === 0 && <div className="col-span-3 text-center text-cafe-300 text-sm py-12">Không có món nào</div>}
+              {filteredMenu.length === 0 && <div className="col-span-3 text-center text-cafe-300 text-sm py-12">{menuItems.length === 0 ? 'Bạn chưa thêm món nào' : 'Không tìm thấy món'}</div>}
             </div>
           </div>
         </div>
@@ -489,11 +529,20 @@ export default function SalesPage() {
               {cart.map(c => (
                 <div key={c.id} className="bg-sand/70 rounded-xl p-2.5 border border-line/60">
                   <div className="flex items-start justify-between gap-1">
-                    <button onClick={() => openEditOption(c)} className="flex-1 min-w-0 text-left cursor-pointer">
-                      <p className="text-xs font-bold text-ink leading-snug hover:text-bean">{c.item.name}</p>
-                      {c.size && <p className="text-xs text-cafe-500">Size {c.size.name} — {formatCurrency(c.size.price)}</p>}
-                      {c.toppings.map(t => <p key={t.topping.id} className="text-xs text-cafe-400">+ {t.topping.name} ({formatCurrency(t.topping.price)})</p>)}
-                      {c.note && <p className="text-xs text-cafe-400 italic mt-0.5">"{c.note}"</p>}
+                    {/* Ảnh món giúp nhân viên soát lại phiếu bằng mắt khi order nhiều dòng.
+                        Dùng <span> thay <p> vì thẻ này nằm trong <button> (p không hợp lệ trong button). */}
+                    <button onClick={() => openEditOption(c)} className="group flex-1 min-w-0 flex items-start gap-2 text-left cursor-pointer">
+                      <span className="w-10 h-10 rounded-lg bg-white border border-line overflow-hidden shrink-0 grid place-items-center">
+                        {c.item.imageUrl
+                          ? <img src={c.item.imageUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          : <span aria-hidden className="text-base text-bean/40">☕</span>}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-bold text-ink leading-snug group-hover:text-bean">{c.item.name}</span>
+                        {c.size && <span className="block text-xs text-cafe-500">Size {c.size.name} — {formatCurrency(c.size.price)}</span>}
+                        {c.toppings.map(t => <span key={t.topping.id} className="block text-xs text-cafe-400">+ {t.topping.name} ({formatCurrency(t.topping.price)})</span>)}
+                        {c.note && <span className="block text-xs text-cafe-400 italic mt-0.5">&ldquo;{c.note}&rdquo;</span>}
+                      </span>
                     </button>
                     <button onClick={() => removeCartItem(c.id)} className="text-cafe-300 hover:text-red-500 p-0.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
                   </div>
@@ -522,10 +571,18 @@ export default function SalesPage() {
                 <span>Tổng thanh toán</span>
                 <span className="text-bean text-base">{formatCurrency(cartTotal)}</span>
               </div>
-              <button onClick={() => setPaymentModal(true)} className="btn-primary w-full py-2.5 mt-1">
-                <CreditCard className="w-4 h-4" />Thanh toán
-              </button>
-              <button onClick={handleCancelOrder} className="btn-ghost w-full text-red-600 hover:bg-red-50 hover:text-red-700">Hủy order</button>
+              {managable ? (
+                <>
+                  <button onClick={() => setPaymentModal(true)} className="btn-primary w-full py-2.5 mt-1">
+                    <CreditCard className="w-4 h-4" />Thanh toán
+                  </button>
+                  <button onClick={handleCancelOrder} className="btn-ghost w-full text-red-600 hover:bg-red-50 hover:text-red-700">Hủy order</button>
+                </>
+              ) : (
+                <p className="text-xs text-gold-deep bg-gold/12 border border-gold/25 rounded-xl px-3 py-2 mt-1 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />Gói đã hết hạn — chỉ xem. Gia hạn để thanh toán.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -623,15 +680,15 @@ export default function SalesPage() {
             <label className="label-funcafe">Phương thức thanh toán</label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { value: 'cash', label: '💵 Tiền mặt' },
-                { value: 'vietqr', label: '📷 VietQR' },
-                { value: 'bank_transfer', label: '🏦 Chuyển khoản' },
-                { value: 'e_wallet', label: '👛 Ví điện tử' },
+                { value: 'cash', label: 'Tiền mặt', Icon: Banknote },
+                { value: 'vietqr', label: 'VietQR', Icon: VietQrMark },
               ].map(m => (
                 <button key={m.value} onClick={() => setPaymentMethod(m.value)}
-                  className={`px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                  className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
                     paymentMethod === m.value ? 'border-bean bg-bean-tint text-bean ring-1 ring-bean/40' : 'border-line text-slate hover:border-cafe-300'
-                  }`}>{m.label}</button>
+                  }`}>
+                  <m.Icon className="w-4 h-4" />{m.label}
+                </button>
               ))}
             </div>
           </div>
@@ -674,7 +731,10 @@ export default function SalesPage() {
 
           <div className="flex gap-2 pt-1">
             <button onClick={() => setPaymentModal(false)} className="btn-secondary flex-1">Hủy</button>
-            <button onClick={handlePayment} disabled={processing} className="btn-primary flex-1"><CreditCard className="w-4 h-4" />{processing ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</button>
+            <button onClick={handlePayment}
+              disabled={processing || (paymentMethod === 'cash' && Number(cashGiven.replace(/\D/g, '')) > 0 && cashChange < 0)}
+              className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed">
+              <CreditCard className="w-4 h-4" />{processing ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</button>
           </div>
         </div>
       </Modal>
@@ -686,9 +746,11 @@ export default function SalesPage() {
           if (selectedTable) {
             const existingId = draftOrderIds[selectedTable.id];
             if (existingId) {
-              try { await orderService.update(existingId, { tableId: selectedTable.id, items: [], subtotal: 0, discountAmount: 0, totalAmount: 0 }); } catch {}
+              try { await orderService.cancel(existingId); } catch {}
               setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
               setActiveOrders(prev => prev.filter(o => o.id !== existingId));
+              // Hủy order -> bàn về trống
+              setTables(prev => prev.map(t => t.id === selectedTable.id ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t));
             }
             clearCartForTable(selectedTable.id);
           }
@@ -716,6 +778,18 @@ export default function SalesPage() {
               <p className="text-cafe-500 text-xs">Tổng thanh toán</p>
               <p className="text-xl font-bold text-bean">{formatCurrency(successModal.total)}</p>
             </div>
+            {successModal.cashGiven != null && (
+              <div className="flex justify-between text-sm px-1">
+                <span className="text-cafe-500">Tiền khách đưa</span>
+                <span className="font-semibold text-ink">{formatCurrency(successModal.cashGiven)}</span>
+              </div>
+            )}
+            {successModal.change != null && (
+              <div className="flex justify-between text-sm px-1 -mt-2">
+                <span className="text-cafe-500">Tiền thối</span>
+                <span className="font-bold text-pine">{formatCurrency(successModal.change)}</span>
+              </div>
+            )}
             <div className="flex gap-2 pt-1">
               <button onClick={() => { setSuccessModal(null); window.open('/user/invoices', '_blank'); }} className="btn-secondary flex-1 text-sm"><Receipt className="w-4 h-4" />In hóa đơn</button>
               <button onClick={() => setSuccessModal(null)} className="btn-primary flex-1 text-sm">Tạo order mới</button>

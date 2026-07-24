@@ -71,7 +71,7 @@ export default function LoginPage() {
               <div className="w-full max-w-md mx-auto">
                 <div className="mb-6">
                   <h1 className="text-2xl font-bold text-ink">Đăng nhập</h1>
-                  <p className="text-ink/60 text-sm mt-1">Nhập thông tin để vào khu vực quản lý.</p>
+                  <p className="text-ink/70 text-sm mt-1">Nhập thông tin để vào khu vực quản lý.</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -114,7 +114,7 @@ export default function LoginPage() {
                         onClick={() => setShowPw(!showPw)}
                         aria-label={showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                         aria-pressed={showPw}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/40 hover:text-bean"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/70 hover:text-bean"
                       >
                         {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -135,7 +135,7 @@ export default function LoginPage() {
                   </button>
                 </form>
 
-                <div className="mt-4 pt-4 border-t border-line text-center text-sm text-ink/60">
+                <div className="mt-4 pt-4 border-t border-line text-center text-sm text-ink/70">
                   Chưa có tài khoản?{' '}
                   <Link href="/register" className="text-bean font-medium hover:underline">Đăng ký dùng thử</Link>
                 </div>

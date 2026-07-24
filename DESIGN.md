@@ -63,5 +63,31 @@ Quy tắc:
 
 ## Components (tái sử dụng)
 - `Banner`: banner ảnh dùng chung, contrast chuẩn (nội dung `z-10` trên scrim).
-- `AuthAside` (mới): panel ảnh + overlay xanh dương cho trang login/register.
+- `AuthAside`: panel ảnh + overlay xanh dương cho trang login/register.
+- `CtaPanel`: khối kêu gọi hành động cuối trang — **kiểu DUY NHẤT** cho mọi trang
+  public. Bố cục **ngang** (chữ trái · nút phải), đệm trên rất mỏng (`pt-2 md:pt-4`)
+  vì section phía trên đã có `py-16/20`; khối canh giữa cao lênh khênh + cộng dồn
+  hai lớp đệm là lý do cuối trang từng nhìn thô và cách nội dung quá xa.
+  Nền `from-bean-dark to-[#1E3A8A]` (đậm hơn bean để chữ trắng đạt AA),
+  chữ phụ `text-white/85`. Không tự dựng biến thể CTA mới trong từng trang.
+- **Đánh giá (`ReviewsCarousel`) chỉ đặt ở TRANG CHỦ.** Đặt thêm ở trang giá là lặp
+  y hệt, làm trang dài vô ích.
+- `AppShot`: khung "cửa sổ ứng dụng" bao ảnh chụp giao diện thật (thanh 3 chấm +
+  nhãn). Dùng ở trang chủ và trang hỗ trợ.
 - `Reveal`, `ReviewsCarousel`, `Avatar`, `FeatureShots` (giữ).
+
+## Ngưỡng an toàn (kiểm bằng số, không ước lượng bằng mắt)
+- **Chữ trên nền sáng: sàn là `text-ink/70`.** `text-ink/60` chỉ đạt 4.07:1 — TRƯỢT
+  AA. Không dùng `/60` trở xuống cho chữ; icon mang nghĩa cũng nên ≥ `/70`.
+- **Chữ trắng trên xanh:** trên `bean #2563EB` thì `text-white/75` chỉ đạt 3.6:1.
+  Nền xanh có chữ phụ phải dùng `bean-dark` trở lên, chữ ≥ `text-white/85`.
+- **Vùng chạm ≥ 44px** cho nút trên di động (`min-h-11` / `h-11 w-11`).
+- **z-index:** dùng token `z-sticky / z-dropdown / z-drawer-backdrop / z-drawer /
+  z-modal-backdrop / z-modal / z-toast` (namespace `--z-index-*` trong `@theme`),
+  không viết `z-50` tuỳ tiện.
+- **Không cuộn ngang ở 390px.** Hai bẫy đã gặp: (1) quầng sáng `absolute -inset-*`
+  quanh ảnh → bọc section bằng `overflow-x-clip`; (2) `sr-only` (position:absolute)
+  đặt trong vùng `overflow-x-auto` sẽ THOÁT ra ngoài và kéo giãn cả trang → dùng
+  `role="img" + aria-label` trên icon thay cho `<span class="sr-only">`.
+- Kiểm lại bằng `node scripts/shot-public.mjs` (cần dev server): tự dò tràn ngang,
+  lỗi console, trạng thái menu di động, và chụp 6 trang × 3 bề rộng.

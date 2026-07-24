@@ -43,6 +43,10 @@ class User extends Authenticatable
 
     protected $hidden = [
         'password',
+        // SECURITY: token đặt lại mật khẩu là bí mật — ai đọc được là chiếm được
+        // tài khoản. Không bao giờ trả về qua API (kể cả cho admin).
+        'reset_token',
+        'reset_token_expires_at',
     ];
 
     protected $casts = [

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Coffee, LayoutDashboard, Users, Package, CreditCard,
   BarChart3, LogOut, Menu, X, Bell, Search, DollarSign,
-  Star, PanelLeft, ShieldCheck,
+  Star, PanelLeft, ShieldCheck, Mail as MailIcon,
 } from 'lucide-react';
 import { authService, paymentService, userService } from '@/services';
 import { useAuth } from '@/context/AuthContext';
@@ -32,6 +32,12 @@ const navGroups: { title: string; items: { href: string; label: string; icon: ty
       { href: '/admin/revenue', label: 'Doanh thu hệ thống', icon: BarChart3 },
     ],
   },
+  {
+    title: 'Hỗ trợ',
+    items: [
+      { href: '/admin/contacts', label: 'Tin nhắn liên hệ', icon: MailIcon },
+    ],
+  },
 ];
 
 const searchRoutes: Record<string, string> = {
@@ -41,6 +47,7 @@ const searchRoutes: Record<string, string> = {
   revenue: '/admin/revenue', 'doanh thu': '/admin/revenue', 'thống kê': '/admin/revenue',
   dashboard: '/admin/dashboard', 'tổng quan': '/admin/dashboard',
   review: '/admin/reviews', reviews: '/admin/reviews', 'đánh giá': '/admin/reviews',
+  contact: '/admin/contacts', contacts: '/admin/contacts', 'liên hệ': '/admin/contacts', 'tin nhắn': '/admin/contacts',
 };
 
 function AdminSidebar({ collapsed, mobileOpen, onClose, onToggle }: { collapsed: boolean; mobileOpen: boolean; onClose: () => void; onToggle: () => void }) {
@@ -229,8 +236,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
+
+  // ROUTE GUARD: khu vực /admin/* chỉ dành cho role 'admin'.
+  // Chưa đăng nhập -> /login; user thường -> về dashboard user.
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) { router.replace('/login'); return; }
+    if (user.role !== 'admin') router.replace('/user/dashboard');
+  }, [isLoading, user, router]);
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  if (isLoading || !user || user.role !== 'admin') return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper">

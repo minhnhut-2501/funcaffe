@@ -2,12 +2,11 @@
 import { useState, useEffect } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
-import ConfirmModal from '@/components/ui/ConfirmModal';
 import LockedButton from '@/components/ui/LockedButton';
 import { useAuth } from '@/context/AuthContext';
 import { toppingService } from '@/services';
-import { canEdit } from '@/lib/permission';
-import { formatCurrency } from '@/lib/format';
+import { canManage } from '@/lib/permission';
+import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
 import { generateId } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ImageUpload from '@/components/ui/ImageUpload';
@@ -15,18 +14,17 @@ import EmptyState from '@/components/ui/EmptyState';
 import { SearchInput } from '@/components/user/FilterBar';
 import StatusBadge from '@/components/user/StatusBadge';
 import type { Topping } from '@/types';
-import { Plus, Pencil, Trash2, Image as ImageIcon, CupSoda } from 'lucide-react';
+import { Plus, Pencil, EyeOff, RotateCcw, Image as ImageIcon, CupSoda } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 
 export default function ToppingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const pkg = user?.subscription.packageType ?? 'none';
+  const managable = canManage(user?.subscription);
   const [toppings, setToppings] = useState<Topping[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Topping | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Topping | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Partial<Topping>>({ name: '', price: 0, isAvailable: true });
@@ -61,15 +59,14 @@ export default function ToppingsPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
+  // Topping KHÔNG xóa được (từng bán còn trong hóa đơn cũ) — chỉ ẩn/mở bán lại.
+  const handleToggleAvailable = async (t: Topping) => {
     try {
-      await toppingService.remove(deleteTarget.id);
-      setToppings(prev => prev.filter(t => t.id !== deleteTarget.id));
-      setDeleteTarget(null);
-      toast({ description: 'Đã xóa topping' });
+      const updated = await toppingService.update(t.id, { isAvailable: !t.isAvailable });
+      setToppings(prev => prev.map(x => x.id === t.id ? updated : x));
+      toast({ description: updated.isAvailable ? `Đã mở bán lại "${t.name}"` : `Đã ẩn topping "${t.name}"` });
     } catch {
-      toast({ description: 'Xóa thất bại', variant: 'destructive' });
+      toast({ description: 'Cập nhật thất bại', variant: 'destructive' });
     }
   };
 
@@ -78,7 +75,9 @@ export default function ToppingsPage() {
       <PageHeader
         title="Quản lý Topping"
         description={`${toppings.length} topping`}
-        actions={<button onClick={openAdd} className="btn-primary"><Plus className="w-4 h-4" />Thêm topping</button>}
+        actions={managable
+          ? <button onClick={openAdd} className="btn-primary"><Plus className="w-4 h-4" />Thêm topping</button>
+          : <LockedButton>Thêm topping</LockedButton>}
       />
 
       {loading && <LoadingSkeleton variant="list" rows={5} />}
@@ -113,17 +112,25 @@ export default function ToppingsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1 justify-end">
                     <button onClick={() => openEdit(t)} className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                    {canEdit(pkg) ? (
-                      <button onClick={() => setDeleteTarget(t)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    {managable ? (
+                      <button onClick={() => handleToggleAvailable(t)}
+                        title={t.isAvailable ? 'Ẩn topping (ngừng bán)' : 'Mở bán lại'}
+                        className={`p-2 rounded-lg transition-colors ${t.isAvailable ? 'text-cafe-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:text-pine hover:bg-pine/10'}`}>
+                        {t.isAvailable ? <EyeOff className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                      </button>
                     ) : (
-                      <LockedButton variant="danger" className="p-2 text-xs"><Trash2 className="w-3.5 h-3.5" /></LockedButton>
+                      <LockedButton className="p-2 text-xs"><EyeOff className="w-3.5 h-3.5" /></LockedButton>
                     )}
                   </div>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={5}><EmptyState icon={CupSoda} title="Không tìm thấy topping nào" description="Thêm topping để khách có thêm lựa chọn." /></td></tr>
+              <tr><td colSpan={5}>
+                {toppings.length === 0
+                  ? <EmptyState icon={CupSoda} title="Bạn chưa thêm topping nào" description="Thêm topping đầu tiên để khách có thêm lựa chọn khi gọi món." />
+                  : <EmptyState icon={CupSoda} title="Không tìm thấy topping nào" description="Thử đổi từ khóa tìm kiếm." />}
+              </td></tr>
             )}
           </tbody>
         </table>
@@ -137,7 +144,8 @@ export default function ToppingsPage() {
           </div>
           <div>
             <label className="label-funcafe">Giá (đ)</label>
-            <input type="number" min={0} className="input-funcafe" value={form.price ?? 0} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
+            <input type="text" inputMode="numeric" className="input-funcafe" placeholder="0"
+              value={formatThousands(form.price ?? 0)} onChange={e => setForm({ ...form, price: parseThousands(e.target.value) })} />
           </div>
           <div>
             <label className="label-funcafe">Ảnh topping</label>
@@ -149,7 +157,7 @@ export default function ToppingsPage() {
           </label>
           <div className="flex gap-2 pt-2">
             <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Hủy</button>
-            {canEdit(pkg) ? (
+            {managable ? (
               <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Đang lưu...' : editTarget ? 'Cập nhật' : 'Thêm topping'}</button>
             ) : (
               <LockedButton className="flex-1">{editTarget ? 'Cập nhật' : 'Thêm topping'}</LockedButton>
@@ -158,16 +166,6 @@ export default function ToppingsPage() {
         </div>
       </Modal>
 
-      <ConfirmModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        title="Xóa topping"
-        message={`Bạn có chắc muốn xóa topping "${deleteTarget?.name}"?`}
-        confirmLabel="Xóa"
-        danger
-        loading={saving}
-      />
       </>)}
     </div>
   );

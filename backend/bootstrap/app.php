@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'subscription' => \App\Http\Middleware\CheckSubscription::class,
+            'ai' => \App\Http\Middleware\RequiresAI::class,
         ]);
 
         $middleware->statefulApi();

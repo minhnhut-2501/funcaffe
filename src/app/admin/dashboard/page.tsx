@@ -38,7 +38,10 @@ export default function AdminDashboard() {
   const totalRevenue = useMemo(() => paidPayments.reduce((s, p) => s + p.amount, 0), [paidPayments]);
   const approvedPayments = paidPayments;
   const activeUsers = useMemo(() => users.filter(u => u.status === 'active').length, [users]);
-  const pendingPayments = useMemo(() => payments.filter(p => p.status === 'pending').length, [payments]);
+  // Trước đây chỗ này đếm "hoàn tiền chờ duyệt" — chỉ số đó luôn bằng 0 vì không nơi
+  // nào trong hệ thống tạo ra yêu cầu hoàn tiền chờ xử lý (nâng cấp giữa kỳ cấn trừ
+  // thẳng vào hóa đơn mới). Thay bằng số giao dịch đã thanh toán, có ý nghĩa thật.
+  const paidCount = paidPayments.length;
   const promaxUsers = useMemo(() => users.filter(u => u.packageType === 'promax').length, [users]);
   const revenueData = useMemo(() => {
     const groups: Record<string, number> = {};
@@ -67,7 +70,7 @@ export default function AdminDashboard() {
           <StatCard label="Đang hoạt động" value={activeUsers} icon={PackageCheck} color="green" />
         </Link>
         <Link href="/admin/payments" className="block">
-          <StatCard label="Thanh toán chờ duyệt" value={pendingPayments} icon={CreditCard} color="yellow" />
+          <StatCard label="Giao dịch đã thanh toán" value={paidCount} icon={CreditCard} color="yellow" />
         </Link>
         <Link href="/admin/revenue" className="block">
           <StatCard label="Doanh thu hệ thống" value={formatCurrency(totalRevenue)} icon={TrendingUp} featured />

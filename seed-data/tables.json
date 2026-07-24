@@ -1,7 +1,0 @@
-[
-  { "_id": { "$oid": "666900000000000000000001" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Bàn 1", "capacity": 2, "display_order": 1, "status": "empty", "current_order_id": null, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
-  { "_id": { "$oid": "666900000000000000000002" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Bàn 2", "capacity": 4, "display_order": 2, "status": "empty", "current_order_id": null, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
-  { "_id": { "$oid": "666900000000000000000003" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Bàn 3", "capacity": 4, "display_order": 3, "status": "empty", "current_order_id": null, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
-  { "_id": { "$oid": "666900000000000000000004" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Bàn 4", "capacity": 6, "display_order": 4, "status": "empty", "current_order_id": null, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
-  { "_id": { "$oid": "666900000000000000000005" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Bàn 5", "capacity": 2, "display_order": 5, "status": "empty", "current_order_id": null, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } }
-]

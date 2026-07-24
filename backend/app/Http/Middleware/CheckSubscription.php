@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Cafe;
+use App\Models\Subscription;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -10,14 +12,18 @@ class CheckSubscription
     public function handle(Request $request, Closure $next)
     {
         if ($request->user() && $request->user()->role !== 'admin') {
-            // BUG-04 FIX: Kiểm tra cả end_date để chặn subscription hết hạn
-            $hasActiveSub = $request->user()->subscriptions()
-                ->where('status', 'active')
-                ->where('end_date', '>', now())
-                ->exists();
+            // ĐA QUÁN: gói tính theo TỪNG QUÁN. Mọi route gắn middleware này đều là
+            // cafes/{cafe}/... nên đọc quán từ route rồi kiểm gói CÒN HIỆU LỰC của quán đó.
+            $cafe = $request->route('cafe');
+            $cafeId = $cafe instanceof Cafe ? (string) $cafe->id : (string) $cafe;
+
+            // BUG-04 FIX: dùng scope effective() (active + còn hạn) cho thống nhất toàn hệ thống.
+            $hasActiveSub = $cafeId
+                ? Subscription::where('cafe_id', $cafeId)->effective()->exists()
+                : false;
 
             if (!$hasActiveSub) {
-                return response()->json(['message' => 'Bạn cần kích hoạt gói dịch vụ để sử dụng chức năng này.'], 403);
+                return response()->json(['message' => 'Quán này cần kích hoạt gói dịch vụ để sử dụng chức năng này.'], 403);
             }
         }
 

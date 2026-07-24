@@ -56,15 +56,6 @@ class ToppingController extends Controller
         return response()->json($topping);
     }
 
-    public function destroy(Cafe $cafe, Topping $topping)
-    {
-        $this->authorizeCafe($cafe);
-
-        if ($topping->cafe_id !== $cafe->id) {
-            return response()->json(['message' => 'Not found'], 404);
-        }
-
-        $topping->delete();
-        return response()->json(['message' => 'Deleted']);
-    }
+    // destroy() đã bị GỠ BỎ có chủ đích: topping từng bán còn trong hóa đơn cũ
+    // và cấu hình gắn món (item_toppings) — chỉ ẨN qua is_available.
 }

@@ -8,12 +8,17 @@ class Order extends Model
 {
     protected $connection = 'mongodb';
     protected $collection = 'orders';
-    protected $fillable = ['cafe_id', 'table_id', 'code', 'status', 'note', 'subtotal', 'discount_amount', 'total_amount', 'paid_at'];
+    protected $fillable = ['cafe_id', 'table_id', 'code', 'status', 'note', 'subtotal', 'discount_amount', 'total_amount', 'paid_at',
+        // Thanh toán gộp thẳng vào order (bỏ bảng invoices): mã phiếu + phương thức +
+        // trạng thái thanh toán (paid/refunded) + tiền mặt/thối + thông tin hoàn tiền.
+        'invoice_code', 'payment_method', 'payment_status', 'cash_received', 'change_amount', 'refunded_at', 'refund_reason'];
 
     protected $casts = [
         'subtotal' => 'float',
         'discount_amount' => 'float',
         'total_amount' => 'float',
+        'cash_received' => 'integer',
+        'change_amount' => 'integer',
     ];
 
     public function cafe()
@@ -29,10 +34,5 @@ class Order extends Model
     public function orderDetails()
     {
         return $this->hasMany(OrderDetail::class);
-    }
-
-    public function invoice()
-    {
-        return $this->hasOne(Invoice::class);
     }
 }

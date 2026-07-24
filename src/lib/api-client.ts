@@ -65,7 +65,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     );
   }
 
-  return response.json();
+  // 204/205 hoặc thân rỗng: response.json() sẽ ném "Unexpected end of JSON input"
+  // và làm sập cả trang. Trả về null cho các phản hồi không có nội dung.
+  if (response.status === 204 || response.status === 205) return null as T;
+  const text = await response.text();
+  if (!text) return null as T;
+  return JSON.parse(text) as T;
 }
 
 export const api = {
@@ -79,6 +84,30 @@ export const api = {
   setToken,
   getToken,
   removeToken,
+  // Trả về Response thô để đọc body dạng stream (hiệu ứng gõ chữ cho chat AI).
+  postStream: async (endpoint: string, data?: unknown): Promise<Response> => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/plain',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        removeToken();
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(body.message || `HTTP ${res.status}`, res.status, body.errors);
+    }
+    return res;
+  },
   upload: async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
@@ -128,12 +157,12 @@ export interface SubscriptionData {
     max_tables?: number | null;
     max_menu_items?: number | null;
   };
-  // #4: Các giao dịch của subscription, kèm thông tin hoàn tiền
+  // Các giao dịch của subscription, kèm khoản cấn trừ khi nâng cấp
   package_payments?: Array<{
     _id: string;
     action_type?: string;
-    refund_amount?: number;
-    refund_status?: string;
+    credit_amount?: number;
+    credit_status?: string;
     created_at?: string;
   }>;
 }

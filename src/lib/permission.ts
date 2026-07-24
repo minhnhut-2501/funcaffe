@@ -12,7 +12,8 @@ export interface PackageLimits {
 // vào user.subscription ở AuthContext và khớp backend EnforcesPackageLimits.
 const PACKAGE_LIMITS: Record<UserPackageType, PackageLimits> = {
   none:   { maxTables: 0,        maxMenuItems: 0,        canUseAI: false },
-  free:   { maxTables: Infinity, maxMenuItems: Infinity, canUseAI: false },
+  // Fun Free là bản dùng thử Pro Max 7 ngày nên có luôn AI (khớp packages.can_use_ai).
+  free:   { maxTables: Infinity, maxMenuItems: Infinity, canUseAI: true  },
   pro:    { maxTables: 10,       maxMenuItems: 15,       canUseAI: false },
   promax: { maxTables: Infinity, maxMenuItems: Infinity, canUseAI: true  },
 };
@@ -33,16 +34,32 @@ export function packageLimits(sub: UserSubscription | null | undefined): Package
   };
 }
 
+// Gói đã hết hạn: vẫn còn document sub (status 'active') nhưng endDate đã qua.
+// Tính theo thời điểm gọi để chính xác kể cả khi app mở qua mốc hết hạn.
+export function isSubscriptionExpired(sub: UserSubscription | null | undefined): boolean {
+  if (!sub || sub.packageType === 'none' || !sub.endDate) return false;
+  return new Date(sub.endDate).getTime() <= Date.now();
+}
+
+// Được phép thao tác ghi (thêm/sửa/xóa/bán hàng): có gói hiệu lực VÀ chưa hết hạn.
+// Xem dữ liệu (kể cả doanh thu, in hóa đơn) không dùng cổng này — vẫn cho phép khi hết hạn.
+export function canManage(sub: UserSubscription | null | undefined): boolean {
+  return (sub?.packageType ?? 'none') !== 'none' && !isSubscriptionExpired(sub);
+}
+
 export function canEdit(pkg: UserPackageType): boolean {
   return pkg !== 'none';
 }
 
-// Có gói đang hiệu lực ⇒ xem được doanh thu (mọi gói đều có quyền này).
-export function canViewRevenue(sub: UserSubscription | null | undefined): boolean {
-  return (sub?.packageType ?? 'none') !== 'none';
+// Xem doanh thu là quyền CƠ BẢN của mọi người dùng — kể cả khi chưa có gói hoặc
+// gói đã hết hạn/bị hủy. Đây là dữ liệu bán hàng của chính chủ quán; backend cũng
+// cho đọc order không cần gói (GET cafes/{cafe}/orders không có middleware subscription).
+// Giữ tham số để nơi gọi không phải đổi.
+export function canViewRevenue(_sub?: UserSubscription | null | undefined): boolean {
+  return true;
 }
 
-// Trợ lý AI (sắp ra mắt) — chỉ gói có bật can_use_ai (mặc định chỉ Pro Max).
+// Trợ lý AI & phân tích doanh thu — chỉ gói có bật can_use_ai (mặc định chỉ Pro Max).
 export function canUseAI(sub: UserSubscription | null | undefined): boolean {
   return packageLimits(sub).canUseAI;
 }

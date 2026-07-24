@@ -39,6 +39,7 @@ export default function Banner({
         src={image}
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
         className="absolute inset-0 w-full h-full object-cover"
       />
       <div

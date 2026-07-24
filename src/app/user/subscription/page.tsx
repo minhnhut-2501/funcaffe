@@ -2,14 +2,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
+import { VnpayLogo } from '@/components/ui/PaymentLogos';
 import { useAuth } from '@/context/AuthContext';
 import { packageService, subscriptionService, timeSubscriptionService } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDate, formatDuration, formatDateTime, formatPaymentMethod } from '@/lib/format';
-import { Check, CreditCard, AlertCircle, ArrowUp, RotateCcw, History } from 'lucide-react';
+import { Check, CreditCard, AlertCircle, ArrowUp, RotateCcw, History, Store } from 'lucide-react';
 import type { Package, DurationMonths, TimeSubscription, MyPayment } from '@/types';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import { isSubscriptionExpired } from '@/lib/permission';
 
 const durations: { value: DurationMonths; label: string }[] = [
   { value: 1, label: '1 tháng' },
@@ -28,12 +30,15 @@ function getTimeSubId(timeSubs: TimeSubscription[], dur: DurationMonths): string
 }
 
 type FlowAction = 'new' | 'renew' | 'upgrade' | null;
+type Tab = 'plans' | 'history';
 
 export default function SubscriptionPage() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, cafes, activeCafeId } = useAuth();
   const { toast } = useToast();
   const pkg = user?.subscription.packageType ?? 'none';
   const sub = user?.subscription;
+  const activeCafeName = cafes.find(c => c.id === activeCafeId)?.name ?? null;
+  const [tab, setTab] = useState<Tab>('plans');
   const [packages, setPackages] = useState<Package[]>([]);
   const [timeSubsMap, setTimeSubsMap] = useState<Record<string, TimeSubscription[]>>({});
   const [loading, setLoading] = useState(true);
@@ -75,21 +80,51 @@ export default function SubscriptionPage() {
       finally { setLoading(false); }
     })();
     loadPayments();
-  }, []);
+    // Nạp lại lịch sử thanh toán khi đổi quán đang chọn (gói theo từng quán).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCafeId]);
 
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
   const [selectedDur, setSelectedDur] = useState<DurationMonths>(1);
   const [paymentModal, setPaymentModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<string>('vnpay');
+  // Subscription chỉ hỗ trợ VNPay (cổng thật, kích hoạt tự động).
+  const paymentMethod = 'vnpay';
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(''); // lỗi hiển thị NGAY TRONG modal (không chỉ toast)
   const [flowAction, setFlowAction] = useState<FlowAction>(null);
 
   const selected = (packages ?? []).find(p => p.id === selectedPkg);
+
+  // Hành động tương ứng khi chọn 1 gói, dựa trên gói đang dùng (khớp logic backend):
+  // chưa có gói -> mua mới; cao hơn -> nâng cấp; bằng -> gia hạn; thấp hơn -> KHÔNG cho (hạ gói).
+  const actionFor = (p: Package): 'new' | 'upgrade' | 'renew' | 'downgrade' => {
+    if (currentLevel < 0) return 'new';
+    if (p.level > currentLevel) return 'upgrade';
+    if (p.level === currentLevel) return 'renew';
+    return 'downgrade';
+  };
+
+  // Mở popup mua/nâng cấp/gia hạn cho một gói cụ thể.
+  const openPackageModal = (p: Package) => {
+    const action = actionFor(p);
+    if (action === 'downgrade') {
+      toast({
+        description: `Bạn đang dùng gói cao hơn — không thể chuyển xuống "${p.name}" khi gói hiện tại còn hiệu lực. Vui lòng chờ gói hết hạn nếu muốn đổi sang gói thấp hơn.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    setFlowAction(action === 'new' ? null : action);
+    setSelectedPkg(p.id);
+    setSubmitError('');
+    setPaymentModal(true);
+  };
 
   const resetSelection = () => {
     setSelectedPkg(null);
     setSelectedDur(1);
     setFlowAction(null);
+    setSubmitError('');
   };
 
   const openPayment = (action: FlowAction, pkgId?: string) => {
@@ -106,6 +141,7 @@ export default function SubscriptionPage() {
     if (!selectedPkg) return;
     const tsId = getTimeSubId(timeSubsMap[selectedPkg] ?? [], selectedDur);
     setSubmitting(true);
+    setSubmitError('');
     try {
       const res: any = await subscriptionService.create({
         package_id: selectedPkg,
@@ -123,296 +159,294 @@ export default function SubscriptionPage() {
       setPaymentModal(false);
       resetSelection();
     } catch (err: any) {
-      toast({ description: err?.message || err?.errors?.message || 'Thao tác thất bại, vui lòng thử lại', variant: 'destructive' });
+      const msg = err?.message || err?.errors?.message || 'Thao tác thất bại, vui lòng thử lại';
+      setSubmitError(msg); // hiện lỗi NGAY TRONG modal — toast có thể bị bỏ lỡ
+      toast({ description: msg, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
   };
 
   const pageTitle = flowAction === 'upgrade' ? 'Nâng cấp gói' : flowAction === 'renew' ? 'Gia hạn gói' : 'Thanh toán gói dịch vụ';
-  const confirmLabel = flowAction === 'upgrade' ? 'Xác nhận nâng cấp' : flowAction === 'renew' ? 'Xác nhận gia hạn' : 'Xác nhận đã thanh toán';
+  const hasCreditNote = (sub?.creditAmount ?? 0) > 0 && sub?.creditStatus === 'applied';
 
   return (
-    <div>
-      <PageHeader title="Gói dịch vụ" description="Quản lý gói dịch vụ của bạn" />
+    <div className="max-w-5xl">
+      <PageHeader title="Gói dịch vụ" description="Mỗi quán có gói riêng — bạn đang thao tác cho quán đang chọn" />
 
-      {/* Current Plan Card */}
+      {/* Thẻ gói hiện tại — gộp tên quán + trạng thái + hành động + hoàn tiền vào một chỗ */}
       <div className="card-funcafe mb-6">
-        <h2 className="text-base font-bold text-ink mb-3">Gói hiện tại</h2>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <h2 className="text-base font-bold text-ink">Gói hiện tại</h2>
+              {activeCafeName && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-bean bg-bean-tint px-2 py-0.5 rounded-full">
+                  <Store className="w-3 h-3" />{activeCafeName}
+                </span>
+              )}
+            </div>
             <p className="text-xl font-bold text-bean">{sub?.packageName}</p>
             {sub?.packageType !== 'none' && (
-              <div className="text-sm text-cafe-500 mt-1 space-x-4">
+              <div className="text-sm text-cafe-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
                 <span>Bắt đầu: {sub ? formatDate(sub.startDate) : ''}</span>
                 <span>Hết hạn: {sub ? formatDate(sub.endDate) : ''}</span>
-                <span className="font-semibold text-bean">Còn {sub?.daysLeft} ngày</span>
+                <span className={`font-semibold ${isSubscriptionExpired(sub) ? 'text-red-600' : 'text-bean'}`}>
+                  {isSubscriptionExpired(sub) ? 'Đã hết hạn' : `Còn ${sub?.daysLeft} ngày`}
+                </span>
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {sub?.packageType === 'none' && <span className="badge-inactive">Chưa có gói</span>}
-            {sub?.isPendingReview && (
-              <span className="badge-pending">Đang chờ admin kiểm tra</span>
+
+          <div className="flex flex-col items-end gap-3 shrink-0 ml-auto">
+            {sub?.packageType === 'none'
+              ? <span className="badge-inactive">Chưa có gói</span>
+              : isSubscriptionExpired(sub)
+                ? <span className="badge-inactive">Đã hết hạn</span>
+                : <span className="badge-active">Đang hoạt động</span>}
+
+            {pkg !== 'none' && !loading && (
+              <div className="flex flex-wrap justify-end gap-2">
+                {canUpgrade && (
+                  <button
+                    onClick={() => { setTab('plans'); setFlowAction('upgrade'); setSelectedPkg(null); }}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <ArrowUp className="w-4 h-4" /> Nâng cấp gói
+                  </button>
+                )}
+                {isMaxLevel && (
+                  <button onClick={() => openPayment('renew')} className="btn-secondary flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4" /> Gia hạn gói
+                  </button>
+                )}
+              </div>
             )}
-            {sub?.packageType !== 'none' && !sub?.isPendingReview && (
-              <span className="badge-active">Đang hoạt động</span>
-            )}
           </div>
         </div>
-      </div>
 
-      {/* Upgrade / Renew actions */}
-      {pkg !== 'none' && !loading && (
-        <div className="flex flex-wrap gap-3 mb-6">
-          {canUpgrade && (
-            <button
-              onClick={() => {
-                setFlowAction('upgrade');
-                setSelectedPkg(null);
-              }}
-              className="btn-primary flex items-center gap-2"
-            >
-              <ArrowUp className="w-4 h-4" /> Nâng cấp gói
-            </button>
-          )}
-          {isMaxLevel && (
-            <button
-              onClick={() => openPayment('renew')}
-              className="btn-secondary flex items-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" /> Gia hạn gói
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Pending review warning */}
-      {sub?.isPendingReview && (
-        <div className="mb-4 flex items-center gap-3 bg-gold/12 border border-gold/25 rounded-2xl p-4 text-gold-deep">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <div>
-            <p className="font-semibold text-sm">Thanh toán đang chờ admin kiểm tra</p>
-            <p className="text-xs mt-0.5 opacity-80">Bạn vẫn có thể sử dụng gói trong thời gian chờ duyệt.</p>
-          </div>
-        </div>
-      )}
-
-      {/* #4: Thông báo hoàn tiền khi nâng cấp */}
-      {sub?.refundStatus === 'pending' && (sub?.refundAmount ?? 0) > 0 && (
-        <div className="mb-4 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-800">
-          <CreditCard className="w-5 h-5 shrink-0 text-blue-600" />
-          <div>
-            <p className="font-semibold text-sm">Hoàn tiền {formatCurrency(sub!.refundAmount!)} cho phần thời gian còn lại của gói cũ</p>
-            <p className="text-xs text-blue-700 mt-0.5">Khoản hoàn tiền đang chờ admin xem và xác nhận.</p>
-          </div>
-        </div>
-      )}
-      {sub?.refundStatus === 'approved' && (sub?.refundAmount ?? 0) > 0 && (
-        <div className="mb-4 flex items-center gap-3 bg-pine/10 border border-pine/25 rounded-2xl p-4 text-pine">
-          <Check className="w-5 h-5 shrink-0" />
-          <div>
-            <p className="font-semibold text-sm">Đã hoàn {formatCurrency(sub!.refundAmount!)} cho phần thời gian còn lại của gói cũ</p>
-            <p className="text-xs mt-0.5 opacity-80">Admin đã xác nhận khoản hoàn tiền của bạn.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Lịch sử thanh toán gói của user */}
-      <div className="card-funcafe mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <History className="w-4 h-4 text-bean" />
-          <h2 className="text-base font-bold text-ink">Lịch sử thanh toán</h2>
-        </div>
-        {payments.length === 0 ? (
-          <p className="text-sm text-cafe-400 text-center py-6">Chưa có giao dịch thanh toán nào.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-line">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead className="bg-sand border-b border-line">
-                <tr>
-                  <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Mã GD</th>
-                  <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Gói</th>
-                  <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Loại</th>
-                  <th className="text-right px-3 py-2.5 text-cafe-600 font-semibold">Số tiền</th>
-                  <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Phương thức</th>
-                  <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Trạng thái</th>
-                  <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Thời gian</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line/70">
-                {payments.map(p => (
-                  <tr key={p.id} className="hover:bg-sand/50 transition-colors">
-                    <td className="px-3 py-2.5 font-mono text-xs font-bold text-bean">{p.transactionCode || '—'}</td>
-                    <td className="px-3 py-2.5 text-ink">{p.packageName || '—'}</td>
-                    <td className="px-3 py-2.5 text-cafe-600">
-                      {p.actionType === 'new' ? 'Đăng ký mới' : p.actionType === 'renew' ? 'Gia hạn' : p.actionType === 'upgrade' ? 'Nâng cấp' : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium text-cafe-800">
-                      {formatCurrency(p.amount)}
-                      {p.refundStatus && p.refundStatus !== 'none' && (p.refundAmount ?? 0) > 0 && (
-                        <span className="block text-[11px] text-cafe-400 font-normal">
-                          Hoàn {formatCurrency(p.refundAmount!)} · {p.refundStatus === 'pending' ? 'chờ duyệt' : p.refundStatus === 'approved' ? 'đã hoàn' : 'từ chối'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-cafe-600">{formatPaymentMethod(p.paymentMethod)}</td>
-                    <td className="px-3 py-2">
-                      <span className={p.status === 'paid' ? 'badge-active' : p.status === 'pending' ? 'badge-pending' : 'badge-inactive'}>
-                        {p.status === 'paid' ? 'Đã thanh toán' : p.status === 'pending' ? 'Chờ duyệt' : p.status === 'rejected' ? 'Bị từ chối' : 'Thất bại'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-cafe-400 text-xs">{formatDateTime(p.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Cấn trừ khi nâng cấp — gộp gọn vào thẻ, không còn banner riêng */}
+        {hasCreditNote && (
+          <div className="mt-4 pt-4 border-t border-line flex items-start gap-2 text-sm">
+            <CreditCard className="w-4 h-4 shrink-0 mt-0.5 text-bean" />
+            <p className="text-cafe-600">
+              Đã cấn trừ <b className="text-ink">{formatCurrency(sub!.creditAmount!)}</b> phần còn lại của gói cũ vào giá nâng cấp — bạn chỉ trả phần chênh lệch.
+            </p>
           </div>
         )}
       </div>
 
-      <h2 className="text-lg font-bold text-ink mb-4">
-        {flowAction === 'upgrade' ? 'Chọn gói nâng cấp' :
-         flowAction === 'renew' ? 'Gia hạn gói hiện tại' :
-         'Chọn gói dịch vụ'}
-      </h2>
+      {/* Tabs: tách "chọn gói" và "lịch sử thanh toán" để trang không bị nhồi */}
+      <div className="flex gap-1 border-b border-line mb-6">
+        <button onClick={() => setTab('plans')}
+          className={`px-4 py-2.5 text-sm border-b-2 -mb-px transition-colors ${tab === 'plans' ? 'border-bean text-bean font-semibold' : 'border-transparent text-cafe-500 hover:text-ink font-medium'}`}>
+          Gói dịch vụ
+        </button>
+        <button onClick={() => setTab('history')}
+          className={`px-4 py-2.5 text-sm border-b-2 -mb-px transition-colors inline-flex items-center gap-1.5 ${tab === 'history' ? 'border-bean text-bean font-semibold' : 'border-transparent text-cafe-500 hover:text-ink font-medium'}`}>
+          <History className="w-4 h-4" />Lịch sử thanh toán
+          {payments.length > 0 && <span className="text-[11px] font-semibold bg-sand text-cafe-500 rounded-full px-1.5">{payments.length}</span>}
+        </button>
+      </div>
 
-      {loading && <LoadingSkeleton variant="card" rows={3} />}
-      {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-2xl p-4"><AlertCircle className="w-5 h-5" /><span>Không thể tải danh sách gói dịch vụ.</span></div>}
-      {!loading && !error && (packages ?? []).length === 0 && <EmptyState title="Chưa có gói dịch vụ" description="Hiện chưa có gói nào khả dụng." />}
-
-      {/* Plan selection grid */}
-      {!loading && !error && packages.length > 0 && (
+      {/* ===== Tab: Gói dịch vụ ===== */}
+      {tab === 'plans' && (
         <>
-          {/* Duration tabs — chỉ hiển thị khi gói được chọn không phải trial */}
-          {(flowAction === 'new' || flowAction === 'renew') && (
-            (() => {
-              const selectedPkgObj = packages.find(p => p.id === selectedPkg);
-              const showDuration = !selectedPkg || !selectedPkgObj?.isTrial;
-              return showDuration ? (
-                <div className="segmented mb-4">
-                  {durations.map(d => (
-                    <button key={d.value} onClick={() => setSelectedDur(d.value)}
-                      className={`seg-item ${selectedDur === d.value ? 'seg-item-active' : ''}`}>
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null;
-            })()
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {(flowAction === 'upgrade' ? upgradePackages : packages).map(p => {
-              const price = getPrice(timeSubsMap[p.id] ?? [], selectedDur);
-              const isSelected = selectedPkg === p.id;
-              return (
-                <div key={p.id} onClick={() => setSelectedPkg(p.id)}
-                  className={`rounded-2xl border p-5 cursor-pointer transition-all ${isSelected ? 'border-bean ring-2 ring-bean/40 bg-bean-tint shadow-card' : 'border-line hover:border-cafe-300 bg-white shadow-soft hover:-translate-y-0.5'}`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-lg font-bold text-ink">{p.name}</h3>
-                    {isSelected && <div className="w-5 h-5 bg-bean rounded-full flex items-center justify-center"><Check className="w-3 h-3 text-white" /></div>}
-                  </div>
-                  <p className="text-2xl font-bold text-bean mb-1">{p.isTrial ? 'Miễn phí' : formatCurrency(price)}</p>
-                  {!p.isTrial && flowAction !== 'upgrade' && <p className="text-xs text-cafe-400 mb-2">/{formatDuration(selectedDur)}</p>}
-                  <p className="text-xs text-cafe-500 mb-3">{p.description}</p>
-                  <ul className="space-y-1.5">
-                    {p.features.slice(0, 4).map(f => (
-                      <li key={f} className="flex items-center gap-1.5 text-xs text-cafe-600">
-                        <Check className="w-3.5 h-3.5 text-pine shrink-0" />{f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-            {flowAction === 'upgrade' && upgradePackages.length === 0 && (
-              <div className="col-span-3 text-center text-cafe-400 py-8">Không có gói cao hơn để nâng cấp.</div>
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <h2 className="text-lg font-bold text-ink">
+              {flowAction === 'upgrade' ? 'Chọn gói nâng cấp' : flowAction === 'renew' ? 'Gia hạn gói hiện tại' : 'Chọn gói dịch vụ'}
+            </h2>
+            {flowAction === 'upgrade' && (
+              <button onClick={() => { setFlowAction(null); }} className="text-sm text-cafe-500 hover:text-bean font-medium">Xem tất cả gói</button>
             )}
           </div>
 
-          {/* Action button */}
-          {selectedPkg && (
-            <div className="rounded-2xl border border-bean/30 bg-bean-tint/50 p-5 sm:p-6 mb-4">
-              <h3 className="font-bold text-ink mb-3">
-                {flowAction === 'upgrade' ? 'Nâng cấp lên' : flowAction === 'renew' ? 'Gia hạn' : 'Tóm tắt thanh toán'}
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-ink">
-                  <span>Gói {selected?.name}</span>
-                  <span>{selected?.isTrial ? 'Miễn phí' : formatCurrency(getPrice(timeSubsMap[selected!.id] ?? [], selectedDur))}</span>
-                </div>
-                {!selected?.isTrial && (
-                  <div className="flex justify-between text-cafe-500"><span>Thời hạn</span><span>{formatDuration(selectedDur)}</span></div>
-                )}
-                <div className="border-t border-line pt-2 flex justify-between font-bold text-ink">
-                  <span>Tổng cộng</span>
-                  <span className="text-bean">{selected?.isTrial ? 'Miễn phí' : formatCurrency(getPrice(timeSubsMap[selected!.id] ?? [], selectedDur))}</span>
-                </div>
-              </div>
-              <div className="mt-4">
-                <button onClick={() => openPayment(flowAction)} className="btn-primary w-full flex items-center justify-center gap-2">
-                  <CreditCard className="w-4 h-4" />
-                  {flowAction === 'upgrade' ? 'Nâng cấp ngay' : flowAction === 'renew' ? 'Gia hạn ngay' : selected?.isTrial ? 'Kích hoạt Fun Free' : 'Thanh toán ngay'}
-                </button>
-              </div>
-            </div>
-          )}
+          {loading && <LoadingSkeleton variant="card" rows={3} />}
+          {error && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-2xl p-4"><AlertCircle className="w-5 h-5" /><span>Không thể tải danh sách gói dịch vụ.</span></div>}
+          {!loading && !error && (packages ?? []).length === 0 && <EmptyState title="Chưa có gói dịch vụ" description="Hiện chưa có gói nào khả dụng." />}
 
-          {/* "New subscription" flow: show for users with no plan */}
-          {pkg === 'none' && !selectedPkg && (
-            <p className="text-center text-cafe-400 text-sm mt-2">Vui lòng chọn một gói để tiếp tục.</p>
+          {!loading && !error && packages.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(flowAction === 'upgrade' ? upgradePackages : packages).map(p => {
+                const price = getPrice(timeSubsMap[p.id] ?? [], 1);
+                const action = actionFor(p);
+                const isCurrent = action === 'renew';
+                const isBlocked = action === 'downgrade';
+                return (
+                  <div key={p.id} onClick={() => openPackageModal(p)}
+                    className={`relative rounded-2xl border bg-white shadow-soft p-5 transition-all flex flex-col ${
+                      isBlocked
+                        ? 'border-line opacity-60 cursor-not-allowed'
+                        : 'border-line hover:border-bean hover:-translate-y-0.5 hover:shadow-card cursor-pointer'
+                    } ${isCurrent ? 'border-bean ring-1 ring-bean/30' : ''}`}>
+                    {isCurrent && (
+                      <span className="absolute -top-2.5 left-4 text-[11px] font-bold bg-bean text-white px-2.5 py-0.5 rounded-full">Gói hiện tại</span>
+                    )}
+                    <h3 className="text-lg font-bold text-ink mb-2">{p.name}</h3>
+                    <p className="text-2xl font-bold text-bean mb-1">{p.isTrial ? 'Miễn phí' : formatCurrency(price)}</p>
+                    {!p.isTrial && <p className="text-xs text-cafe-400 mb-2">/tháng</p>}
+                    <p className="text-xs text-cafe-500 mb-3">{p.description}</p>
+                    <ul className="space-y-1.5 mb-4 flex-1">
+                      {p.features.slice(0, 4).map(f => (
+                        <li key={f} className="flex items-center gap-1.5 text-xs text-cafe-600">
+                          <Check className="w-3.5 h-3.5 text-pine shrink-0" />{f}
+                        </li>
+                      ))}
+                    </ul>
+                    {isBlocked ? (
+                      <span className="w-full flex items-center justify-center gap-2 rounded-xl bg-sand text-cafe-400 text-sm font-semibold py-2.5 pointer-events-none">
+                        Thấp hơn gói hiện tại
+                      </span>
+                    ) : (
+                      <span className="btn-primary w-full flex items-center justify-center gap-2 pointer-events-none">
+                        {action === 'renew' ? <RotateCcw className="w-4 h-4" /> : action === 'upgrade' ? <ArrowUp className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                        {p.isTrial ? 'Kích hoạt Fun Free' : action === 'renew' ? 'Gia hạn gói này' : action === 'upgrade' ? 'Nâng cấp lên gói này' : 'Chọn gói này'}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              {flowAction === 'upgrade' && upgradePackages.length === 0 && (
+                <div className="col-span-3 text-center text-cafe-400 py-8">Không có gói cao hơn để nâng cấp.</div>
+              )}
+            </div>
           )}
         </>
       )}
 
-      <Modal open={paymentModal} onClose={() => { setPaymentModal(false); resetSelection(); }} title={pageTitle}>
-        <div className="space-y-4">
-          <p className="text-sm text-cafe-600">
-            {flowAction === 'upgrade' ? 'Xác nhận nâng cấp lên' : flowAction === 'renew' ? 'Xác nhận gia hạn' : 'Chọn phương thức thanh toán'} gói <strong>{selected?.name}</strong>
-          </p>
-          {/* BUG-03 FIX: Dùng đúng giá trị payment_method theo spec */}
-          {!selected?.isTrial && (
-            <div className="space-y-2">
-              {[
-                { value: 'vnpay', label: 'Thanh toán online qua VNPay (kích hoạt tự động)' },
-                { value: 'bank_transfer', label: 'Chuyển khoản ngân hàng' },
-                { value: 'qr_code', label: 'QR Code' },
-                { value: 'e_wallet', label: 'Ví điện tử (Momo, ZaloPay...)' },
-              ].map(m => (
-                <label key={m.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${paymentMethod === m.value ? 'border-bean bg-bean-tint' : 'border-line hover:bg-sand'}`}>
-                  <input type="radio" name="payMethod" value={m.value} checked={paymentMethod === m.value} onChange={() => setPaymentMethod(m.value)} className="accent-bean" />
-                  <span className="text-sm text-ink">{m.label}</span>
-                </label>
-              ))}
+      {/* ===== Tab: Lịch sử thanh toán ===== */}
+      {tab === 'history' && (
+        <div className="card-funcafe">
+          {payments.length === 0 ? (
+            <p className="text-sm text-cafe-400 text-center py-10">Chưa có giao dịch thanh toán nào.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-line">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead className="bg-sand border-b border-line">
+                  <tr>
+                    <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Mã GD</th>
+                    <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Gói</th>
+                    <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Loại</th>
+                    <th className="text-right px-3 py-2.5 text-cafe-600 font-semibold">Số tiền</th>
+                    <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Phương thức</th>
+                    <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Trạng thái</th>
+                    <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Thời gian</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line/70">
+                  {payments.map(p => (
+                    <tr key={p.id} className="hover:bg-sand/50 transition-colors">
+                      <td className="px-3 py-2.5 font-mono text-xs font-bold text-bean">{p.transactionCode || '—'}</td>
+                      <td className="px-3 py-2.5 text-ink">{p.packageName || '—'}</td>
+                      <td className="px-3 py-2.5 text-cafe-600">
+                        {p.actionType === 'new' ? 'Đăng ký mới' : p.actionType === 'renew' ? 'Gia hạn' : p.actionType === 'upgrade' ? 'Nâng cấp' : p.actionType === 'cancel' ? 'Hủy gói' : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium text-cafe-800">
+                        {formatCurrency(p.amount)}
+                        {p.creditStatus === 'applied' && (p.creditAmount ?? 0) > 0 && (
+                          <span className="block text-[11px] text-cafe-400 font-normal">
+                            {`Đã cấn trừ ${formatCurrency(p.creditAmount!)}`}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-cafe-600">{formatPaymentMethod(p.paymentMethod)}</td>
+                      <td className="px-3 py-2">
+                        <span className={p.status === 'paid' ? 'badge-active' : p.status === 'pending' ? 'badge-pending' : 'badge-inactive'}>
+                          {p.status === 'paid' ? 'Đã thanh toán' : p.status === 'pending' ? 'Chờ duyệt' : p.status === 'rejected' ? 'Bị từ chối' : 'Thất bại'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-cafe-400 text-xs">{formatDateTime(p.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-          {paymentMethod === 'bank_transfer' && !selected?.isTrial && (
-            <div className="bg-sand rounded-xl p-3.5 text-sm space-y-1 text-ink/80 border border-line">
-              <p><strong>Ngân hàng:</strong> Vietcombank</p>
-              <p><strong>Số tài khoản:</strong> 1234 5678 9012</p>
-              <p><strong>Chủ tài khoản:</strong> FUNCAFE VN</p>
-              <p><strong>Nội dung:</strong> FUNCAFE {user?.id?.toUpperCase()} {selected?.name?.toUpperCase()}</p>
-            </div>
-          )}
-          {paymentMethod === 'qr_code' && !selected?.isTrial && (
-            <div className="bg-sand rounded-xl p-6 flex flex-col items-center gap-2 border border-line">
-              <div className="w-32 h-32 bg-white border-2 border-line rounded-xl flex items-center justify-center text-cafe-300 text-xs">QR Code</div>
-              <p className="text-xs text-cafe-500">Quét mã để thanh toán</p>
-            </div>
-          )}
-          {paymentMethod === 'vnpay' && !selected?.isTrial && (
-            <div className="bg-sand rounded-xl p-3.5 text-sm text-ink/80 border border-line">
-              Bạn sẽ được chuyển sang cổng VNPay để thanh toán. Sau khi thanh toán thành công, gói sẽ được <strong>kích hoạt tự động</strong> mà không cần admin duyệt.
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button onClick={() => { setPaymentModal(false); resetSelection(); }} className="btn-secondary flex-1" disabled={submitting}>Hủy</button>
-            <button onClick={handleSubmit} className="btn-primary flex-1" disabled={submitting}>
-              {submitting ? 'Đang xử lý...' : (paymentMethod === 'vnpay' && !selected?.isTrial ? 'Thanh toán qua VNPay' : confirmLabel)}
-            </button>
-          </div>
         </div>
+      )}
+
+      <Modal open={paymentModal} onClose={() => { setPaymentModal(false); resetSelection(); }} title={pageTitle}>
+        {selected && (
+          <div className="space-y-4">
+            {/* Gói đã chọn */}
+            <div className="rounded-xl border border-bean/30 bg-bean-tint/40 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-ink">{selected.name}</h3>
+                  <p className="text-xs text-cafe-500 mt-0.5">{selected.description}</p>
+                </div>
+                <span className="text-lg font-bold text-bean shrink-0">
+                  {selected.isTrial ? 'Miễn phí' : formatCurrency(getPrice(timeSubsMap[selected.id] ?? [], selectedDur))}
+                </span>
+              </div>
+              <ul className="mt-3 grid gap-1.5">
+                {selected.features.slice(0, 4).map(f => (
+                  <li key={f} className="flex items-center gap-1.5 text-xs text-cafe-600"><Check className="w-3.5 h-3.5 text-pine shrink-0" />{f}</li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Chọn thời hạn (gói trả phí) */}
+            {!selected.isTrial && (
+              <div>
+                <label className="label-funcafe">Thời hạn</label>
+                <div className="segmented">
+                  {durations.map(d => (
+                    <button key={d.value} onClick={() => setSelectedDur(d.value)}
+                      className={`seg-item ${selectedDur === d.value ? 'seg-item-active' : ''}`}>{d.label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tóm tắt (giá gói + VAT = tổng thanh toán, khớp cách backend tính) */}
+            {(() => {
+              const price = getPrice(timeSubsMap[selected.id] ?? [], selectedDur);
+              const vatRate = selected.isTrial ? 0 : (selected.vatRate ?? 10);
+              const vatAmount = Math.round(price * vatRate / 100);
+              const total = price + vatAmount;
+              return (
+                <div className="space-y-1.5 text-sm border-t border-line pt-3">
+                  <div className="flex justify-between text-cafe-600"><span>Gói {selected.name}</span><span>{selected.isTrial ? 'Miễn phí' : formatCurrency(price)}</span></div>
+                  {!selected.isTrial && <div className="flex justify-between text-cafe-500"><span>Thời hạn</span><span>{formatDuration(selectedDur)}</span></div>}
+                  {!selected.isTrial && vatRate > 0 && (
+                    <div className="flex justify-between text-cafe-500"><span>Thuế VAT ({vatRate}%)</span><span>{formatCurrency(vatAmount)}</span></div>
+                  )}
+                  <div className="flex justify-between font-bold text-ink border-t border-line pt-1.5"><span>Tổng thanh toán</span><span className="text-bean text-base">{selected.isTrial ? 'Miễn phí' : formatCurrency(total)}</span></div>
+                </div>
+              );
+            })()}
+
+            {/* Phương thức: VNPay (gói trả phí) */}
+            {!selected.isTrial && (
+              <div className="space-y-2">
+                <label className="label-funcafe">Phương thức thanh toán</label>
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-bean bg-bean-tint">
+                  <span className="h-9 px-2.5 rounded-lg bg-white border border-line grid place-items-center shrink-0"><VnpayLogo className="h-4 w-auto" /></span>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">Thanh toán online qua VNPay</p>
+                    <p className="text-xs text-cafe-500">ATM / QR / Visa · kích hoạt tự động</p>
+                  </div>
+                </div>
+                <p className="text-xs text-cafe-500">Bạn sẽ được chuyển sang cổng VNPay. Sau khi thanh toán thành công, gói được <strong>kích hoạt tự động</strong> mà không cần admin duyệt.</p>
+              </div>
+            )}
+
+            {submitError && (
+              <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700" role="alert">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{submitError}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => { setPaymentModal(false); resetSelection(); setSubmitError(''); }} className="btn-secondary flex-1" disabled={submitting}>Hủy</button>
+              <button onClick={handleSubmit} className="btn-primary flex-1" disabled={submitting}>
+                {submitting ? 'Đang xử lý...' : (selected.isTrial ? 'Kích hoạt Fun Free' : 'Thanh toán qua VNPay')}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

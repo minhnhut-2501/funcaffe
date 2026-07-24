@@ -49,3 +49,9 @@ tsconfig.base.json
 .replit
 .replitignore
 .agents/
+
+# Ảnh chụp phục vụ rà soát giao diện (tự sinh lại bằng scripts/audit-pages.mjs)
+design-shots/
+
+# Backup .docx tam thoi cua bao cao (giu local, khong can dong bo)
+doc/_BACKUP_*.docx

@@ -22,6 +22,9 @@ const colorMap = {
 };
 
 export default function StatCard({ label, value, icon: Icon, trend, trendUp, hint, color = 'brown', featured = false }: Props) {
+  // Số tiền dài (vd "25.932.800 đ") trước đây bị `truncate` cắt cụt thành "25.932.80…".
+  // Thu nhỏ cỡ chữ thay vì cắt — con số là thứ người ta vào đây để đọc.
+  const longValue = String(value).length > 11;
   if (featured) {
     return (
       <div className="relative overflow-hidden rounded-2xl bg-bean text-white p-5 shadow-card">
@@ -29,7 +32,7 @@ export default function StatCard({ label, value, icon: Icon, trend, trendUp, hin
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-medium text-white/75 truncate">{label}</p>
-            <p className="text-2xl sm:text-3xl font-bold mt-1 truncate">{value}</p>
+            <p className={cn('font-bold mt-1 tabular-nums', longValue ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl')}>{value}</p>
             {hint && <p className="text-xs text-white/70 mt-1">{hint}</p>}
           </div>
           <div className="w-11 h-11 rounded-xl bg-white/15 grid place-items-center shrink-0">
@@ -45,7 +48,7 @@ export default function StatCard({ label, value, icon: Icon, trend, trendUp, hin
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs sm:text-sm text-cafe-500 font-medium truncate">{label}</p>
-          <p className="text-xl sm:text-2xl font-bold text-ink mt-1 truncate">{value}</p>
+          <p className={cn('font-bold text-ink mt-1 tabular-nums', longValue ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl')}>{value}</p>
           {hint && <p className="text-xs text-cafe-400 mt-1 truncate">{hint}</p>}
           {trend && (
             <p className={cn('text-xs mt-1 font-semibold', trendUp ? 'text-pine' : 'text-red-500')}>

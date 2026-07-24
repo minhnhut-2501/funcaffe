@@ -5,14 +5,49 @@ import type {
 } from '@/types';
 import { api, type SubscriptionData } from '@/lib/api-client';
 
+// ĐA QUÁN: "quán đang chọn" (active café). Mọi endpoint cafes/{cafeId}/... dùng id này.
+// Nhớ theo localStorage để giữ lựa chọn giữa các lần tải trang; xóa khi đăng xuất.
 let cafeIdCache: string | null = null;
+const ACTIVE_CAFE_KEY = 'funcafe.activeCafeId';
+
+function readStoredCafeId(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return window.localStorage.getItem(ACTIVE_CAFE_KEY); } catch { return null; }
+}
+
+// Đặt quán đang chọn (được gọi từ AuthContext khi đăng nhập / chuyển quán / tạo quán).
+export function setActiveCafeId(id: string | null) {
+  cafeIdCache = id;
+  if (typeof window === 'undefined') return;
+  try {
+    if (id) window.localStorage.setItem(ACTIVE_CAFE_KEY, id);
+    else window.localStorage.removeItem(ACTIVE_CAFE_KEY);
+  } catch { /* ignore */ }
+}
+
+function rawCafeId(c: any): string {
+  return c?.id ?? c?._id;
+}
+
+// Chọn quán đang dùng từ danh sách id: ưu tiên quán đã chọn trước đó (cache/localStorage)
+// nếu còn thuộc user, ngược lại lấy quán đầu. Trả về id đã chọn (và lưu lại).
+export function pickActiveCafeId(cafeIds: string[]): string | null {
+  if (cafeIds.length === 0) { setActiveCafeId(null); return null; }
+  const current = cafeIdCache ?? readStoredCafeId();
+  const chosen = current && cafeIds.includes(current) ? current : cafeIds[0];
+  setActiveCafeId(chosen);
+  return chosen;
+}
 
 async function getCafeId(): Promise<string> {
   if (cafeIdCache) return cafeIdCache;
-  const cafes = await api.get<Array<{ id: string }>>('/cafes');
-  if (cafes.length === 0) throw new Error('NO_CAFE');
-  cafeIdCache = cafes[0].id;
-  return cafeIdCache;
+  const cafes = await api.get<any[]>('/cafes');
+  const ids = cafes.map(rawCafeId).filter(Boolean);
+  if (ids.length === 0) throw new Error('NO_CAFE');
+  const stored = readStoredCafeId();
+  const chosen = stored && ids.includes(stored) ? stored : ids[0];
+  setActiveCafeId(chosen);
+  return chosen;
 }
 
 function getCafeIdSync(): string | null {
@@ -21,18 +56,19 @@ function getCafeIdSync(): string | null {
 
 export async function hasCafe(): Promise<boolean> {
   try {
-    const cafes = await api.get<Array<{ id: string }>>('/cafes');
+    const cafes = await api.get<any[]>('/cafes');
     return cafes.length > 0;
   } catch { return false; }
 }
 
 export async function createCafe(data: { name: string; address?: string; phone?: string }): Promise<{ id: string }> {
   const raw = await api.post<any>('/cafes', data);
-  cafeIdCache = raw.id ?? raw._id;
-  return raw;
+  const id = rawCafeId(raw);
+  setActiveCafeId(id); // quán mới tạo trở thành quán đang chọn
+  return { ...raw, id };
 }
 
-export function clearCafeCache() { cafeIdCache = null; }
+export function clearCafeCache() { setActiveCafeId(null); }
 
 function mapId<T extends { _id: string }>(obj: T): Omit<T, '_id'> & { id: string } {
   const { _id, ...rest } = obj;
@@ -125,45 +161,27 @@ function mapOrder(raw: any): Order {
   };
 }
 
+/**
+ * Đã bỏ bảng invoices — "hóa đơn" nay là VIEW của một order đã thanh toán.
+ * mapInvoice nhận thẳng raw order (có invoice_code + field thanh toán + order_details).
+ * Dòng món lấy từ order_details qua mapOrderItem (đã gồm topping snapshot).
+ * Thông tin quán cho phiếu in do trang tự điền từ quán đang chọn (không snapshot).
+ */
 function mapInvoice(raw: any): Invoice {
-  const order = raw.order ?? {};
-  const cafeSnapshot = raw.cafe_snapshot ?? {};
-  const tableSnapshot = raw.table_snapshot ?? {};
-  const tableName = tableSnapshot.name || order.table?.name || '';
-
-  // BUG-07 FIX: Dùng invoice.items snapshot thay vì order.order_details
-  const invoiceItems: OrderItem[] = (raw.items ?? []).map((item: any) => ({
-    id: '',
-    itemId: '',
-    itemNameSnapshot: item.item_name ?? '',
-    sizeNameSnapshot: item.size_name ?? undefined,
-    quantity: item.quantity ?? 0,
-    unitPrice: item.unit_price ?? 0,
-    subtotal: item.item_subtotal ?? 0,
-    toppingTotal: item.topping_total ?? 0,
-    totalPrice: item.total_price ?? 0,
-    toppings: (item.toppings ?? []).map((t: any) => ({
-      toppingId: '',
-      toppingNameSnapshot: t.topping_name ?? '',
-      quantity: t.quantity ?? 0,
-      priceAtTime: t.price ?? 0,
-      subtotal: t.subtotal ?? 0,
-    })),
-    note: item.note ?? undefined,
-  }));
+  const items: OrderItem[] = (raw.order_details ?? []).map(mapOrderItem);
 
   return {
     id: raw.id ?? raw._id,
-    invoiceCode: raw.invoice_code,
-    orderId: raw.order_id,
+    invoiceCode: raw.invoice_code ?? raw.code ?? '',
+    orderId: raw.id ?? raw._id,
     cafeId: raw.cafe_id ?? undefined,
     tableId: raw.table_id ?? undefined,
-    orderCode: order.code ?? '',
-    tableName,
-    cafeName: cafeSnapshot.name,
-    cafeAddress: cafeSnapshot.address,
-    cafePhone: cafeSnapshot.phone,
-    items: invoiceItems,
+    orderCode: raw.code ?? '',
+    tableName: raw.table?.name ?? '',
+    cafeName: undefined,
+    cafeAddress: undefined,
+    cafePhone: undefined,
+    items,
     subtotal: raw.subtotal ?? 0,
     discountAmount: raw.discount_amount ?? 0,
     totalAmount: raw.total_amount ?? 0,
@@ -171,6 +189,10 @@ function mapInvoice(raw: any): Invoice {
     status: raw.payment_status === 'refunded' ? 'refunded' : 'paid',
     createdAt: raw.created_at,
     paidAt: raw.paid_at ?? '',
+    cashReceived: raw.cash_received ?? undefined,
+    changeAmount: raw.change_amount ?? undefined,
+    refundedAt: raw.refunded_at ?? undefined,
+    refundReason: raw.refund_reason ?? undefined,
   };
 }
 
@@ -202,6 +224,7 @@ function mapPackage(raw: any): Package {
     maxTables: raw.max_tables ?? null,
     maxMenuItems: raw.max_menu_items ?? null,
     canUseAI: raw.can_use_ai ?? false,
+    vatRate: raw.vat_rate ?? undefined,
   };
 }
 
@@ -218,6 +241,23 @@ function mapUser(raw: any): User {
     cafeName: raw.cafe_name ?? undefined,
     hasUsedFreeTrial: raw.has_used_free_trial ?? raw.hasUsedFreeTrial ?? undefined,
     createdAt: raw.created_at,
+    // Các trường dưới chỉ có ở /admin/users; endpoint khác trả undefined là bình thường.
+    cafes: Array.isArray(raw.cafes)
+      ? raw.cafes.map((c: any) => ({
+          id: c.id,
+          name: c.name ?? '',
+          address: c.address ?? '',
+          status: (['open', 'closed', 'inactive'] as const).includes(c.status) ? c.status : 'open',
+          packageType: c.package_type ?? 'none',
+          packageName: c.package_name ?? '',
+          packageEndDate: c.package_end_date ?? undefined,
+        }))
+      : undefined,
+    cafeCount: raw.cafe_count ?? undefined,
+    activePackageCount: raw.active_package_count ?? undefined,
+    paymentCount: raw.payment_count ?? undefined,
+    totalPaid: raw.total_paid ?? undefined,
+    lastPaymentAt: raw.last_payment_at ?? undefined,
   };
 }
 
@@ -244,10 +284,8 @@ function mapPayment(raw: any): Payment {
     confirmedAt: raw.paid_at ?? undefined,
     note: raw.note ?? undefined,
     actionType: raw.action_type ?? undefined,
-    refundAmount: raw.refund_amount ?? 0,
-    refundStatus: raw.refund_status ?? 'none',
-    refundNote: raw.refund_note ?? undefined,
-    refundedAt: raw.refunded_at ?? undefined,
+    creditAmount: raw.credit_amount ?? 0,
+    creditStatus: raw.credit_status ?? 'none',
   };
 }
 
@@ -304,6 +342,8 @@ export const menuService = {
       image: data.imageUrl,
       description: data.description,
       sizes: (data.sizes ?? []).map(s => ({ name: s.name, price: s.price, is_active: s.isActive })),
+      // Topping gắn cho món (gộp vào form món). Không cho phép topping -> gửi rỗng.
+      topping_ids: data.allowTopping ? (data.allowedToppingIds ?? []) : [],
     };
     const raw = await api.post<any>(`/cafes/${cafeId}/items`, body);
     return mapItem(raw);
@@ -320,36 +360,42 @@ export const menuService = {
     if (data.imageUrl !== undefined) body.image = data.imageUrl;
     if (data.description !== undefined) body.description = data.description;
     if (data.sizes !== undefined) body.sizes = data.sizes.map(s => ({ name: s.name, price: s.price, is_active: s.isActive }));
+    // Chỉ đồng bộ topping khi form có gửi allowedToppingIds (tránh xóa nhầm khi chỉ toggle trạng thái).
+    if (data.allowedToppingIds !== undefined) body.topping_ids = data.allowTopping === false ? [] : (data.allowedToppingIds ?? []);
     const raw = await api.put<any>(`/cafes/${cafeId}/items/${id}`, body);
     return mapItem(raw);
   },
-  remove: async (id: string) => {
-    const cafeId = await getCafeId();
-    await api.delete(`/cafes/${cafeId}/items/${id}`);
-  },
+  // Không có remove: món chỉ được ẨN (update isAvailable=false), không xóa —
+  // vì món từng bán còn được tham chiếu trong order/hóa đơn cũ.
 };
 
 // Categories
+function mapCategory(raw: any): { id: string; name: string; description?: string; isActive: boolean } {
+  return {
+    id: raw.id ?? raw._id,
+    name: raw.name,
+    description: raw.description ?? undefined,
+    isActive: raw.is_active ?? true,
+  };
+}
+
 export const categoryService = {
   list: async () => {
     const cafeId = await getCafeId();
     const items = await api.get<any[]>(`/cafes/${cafeId}/categories`);
-    return items.map(mapId);
+    return items.map(mapCategory);
   },
   create: async (data: { name: string; description?: string; is_active?: boolean }) => {
     const cafeId = await getCafeId();
     const raw = await api.post<any>(`/cafes/${cafeId}/categories`, data);
-    return mapId(raw);
+    return mapCategory(raw);
   },
   update: async (id: string, data: { name?: string; description?: string; is_active?: boolean; isActive?: boolean }) => {
     const cafeId = await getCafeId();
     const raw = await api.put<any>(`/cafes/${cafeId}/categories/${id}`, data);
-    return mapId(raw);
+    return mapCategory(raw);
   },
-  remove: async (id: string) => {
-    const cafeId = await getCafeId();
-    await api.delete(`/cafes/${cafeId}/categories/${id}`);
-  },
+  // Không có remove: danh mục chỉ ẨN (is_active=false) — xóa sẽ bỏ rơi món bên trong.
 };
 
 // Toppings
@@ -365,6 +411,8 @@ export const toppingService = {
       name: data.name,
       price: data.price,
       is_available: data.isAvailable ?? true,
+      // BUG-FIX: trước đây quên gửi image -> ảnh topping upload xong bị vứt
+      image: data.imageUrl ?? null,
     });
     return mapTopping(raw);
   },
@@ -374,13 +422,11 @@ export const toppingService = {
     if (data.name !== undefined) body.name = data.name;
     if (data.price !== undefined) body.price = data.price;
     if (data.isAvailable !== undefined) body.is_available = data.isAvailable;
+    if (data.imageUrl !== undefined) body.image = data.imageUrl ?? null;
     const raw = await api.put<any>(`/cafes/${cafeId}/toppings/${id}`, body);
     return mapTopping(raw);
   },
-  remove: async (id: string) => {
-    const cafeId = await getCafeId();
-    await api.delete(`/cafes/${cafeId}/toppings/${id}`);
-  },
+  // Không có remove: topping chỉ ẨN (is_available=false) — topping từng bán còn trong hóa đơn cũ.
 };
 
 // Item-Topping config
@@ -469,10 +515,16 @@ export const orderService = {
     const raw = await api.post<any>(`/cafes/${cafeId}/orders`, body);
     return mapOrder(raw);
   },
-  pay: async (orderId: string, data: { payment_method: string; discount_amount?: number }) => {
+  pay: async (orderId: string, data: { payment_method: string; discount_amount?: number; cash_received?: number }) => {
     const cafeId = await getCafeId();
     const raw = await api.post<any>(`/cafes/${cafeId}/orders/${orderId}/pay`, data);
     return raw;
+  },
+  // Hủy order đang phục vụ -> đánh dấu 'cancelled' và trả bàn về trống.
+  cancel: async (orderId: string) => {
+    const cafeId = await getCafeId();
+    const raw = await api.post<any>(`/cafes/${cafeId}/orders/${orderId}/cancel`, {});
+    return mapOrder(raw);
   },
   update: async (id: string, data: Partial<Order>) => {
     const cafeId = await getCafeId();
@@ -505,22 +557,75 @@ export const orderService = {
   },
 };
 
-// Invoices
+// "Hóa đơn" = order đã thanh toán (bảng invoices đã bị bỏ, order tự mang thanh toán).
 export const invoiceService = {
   list: async () => {
     const cafeId = await getCafeId();
-    const items = await api.get<any[]>(`/cafes/${cafeId}/invoices`);
-    return items.map(mapInvoice);
+    const orders = await api.get<any[]>(`/cafes/${cafeId}/orders`);
+    return orders.filter((o) => o.status === 'paid').map(mapInvoice);
   },
   getById: async (id: string) => {
     const cafeId = await getCafeId();
-    const raw = await api.get<any>(`/cafes/${cafeId}/invoices/${id}`);
+    const raw = await api.get<any>(`/cafes/${cafeId}/orders/${id}`);
     return mapInvoice(raw);
+  },
+  // C4: hoàn tiền order đã thanh toán (bắt buộc có lý do)
+  refund: async (id: string, reason: string) => {
+    const cafeId = await getCafeId();
+    const raw = await api.post<any>(`/cafes/${cafeId}/orders/${id}/refund`, { reason });
+    return mapInvoice(raw);
+  },
+};
+
+// Trợ lý AI (chat + phân tích doanh thu). Quyền do BE chặn (middleware 'ai');
+// FE khóa nút bằng canUseAI() cho gọn UX.
+export interface AiRevenueAnalysis {
+  tom_tat: string;
+  diem_noi_bat: string[];
+  canh_bao: string[];
+  goi_y_hanh_dong: string[];
+}
+export interface AiRevenueResponse {
+  analysis: AiRevenueAnalysis;
+  stats: Record<string, unknown>;
+  cached: boolean;
+}
+export const aiService = {
+  chat: async (messages: { role: 'user' | 'assistant'; content: string }[]) => {
+    const cafeId = await getCafeId();
+    const res = await api.post<{ reply: string }>(`/cafes/${cafeId}/ai/chat`, { messages });
+    return res.reply;
+  },
+  // Streaming: gọi onChunk(text) cho từng đoạn AI sinh ra (hiệu ứng gõ chữ).
+  chatStream: async (
+    messages: { role: 'user' | 'assistant'; content: string }[],
+    onChunk: (text: string) => void,
+  ): Promise<void> => {
+    const cafeId = await getCafeId();
+    const res = await api.postStream(`/cafes/${cafeId}/ai/chat/stream`, { messages });
+    const reader = res.body?.getReader();
+    if (!reader) return;
+    const decoder = new TextDecoder();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      if (chunk) onChunk(chunk);
+    }
+  },
+  revenueAnalysis: async (refresh = false) => {
+    const cafeId = await getCafeId();
+    return api.post<AiRevenueResponse>(`/cafes/${cafeId}/ai/revenue-analysis`, { refresh });
   },
 };
 
 // Cafe Info
 export const cafeService = {
+  // Danh sách tất cả quán của user (cho hub Quản lý quán + dropdown chuyển quán)
+  list: async (): Promise<CafeInfo[]> => {
+    const items = await api.get<any[]>('/cafes');
+    return items.map(mapCafe);
+  },
   get: async () => {
     const cafeId = await getCafeId();
     const raw = await api.get<any>(`/cafes/${cafeId}`);
@@ -583,10 +688,11 @@ export const userService = {
   },
 };
 
-// Subscriptions
+// Subscriptions — ĐA QUÁN: gói theo quán đang chọn (cafes/{cafeId}/subscriptions)
 export const subscriptionService = {
   list: async () => {
-    const items = await api.get<any[]>('/subscriptions');
+    const cafeId = await getCafeId();
+    const items = await api.get<any[]>(`/cafes/${cafeId}/subscriptions`);
     return items.map((raw: any) => ({
       id: raw.id ?? raw._id,
       packageId: raw.package_id,
@@ -595,16 +701,17 @@ export const subscriptionService = {
       packageNameSnapshot: raw.package_name_snapshot,
       startDate: raw.start_date,
       endDate: raw.end_date,
-      subtotal: raw.subtotal,
+      // Chi tiết tiền (subtotal/VAT) và loại giao dịch nằm ở package_payments,
+      // xem subscriptionService.payments(). Ở đây chỉ có tổng tiền của chu kỳ hiện hành.
       totalAmount: raw.total_amount,
       status: raw.status,
       isPendingReview: raw.is_pending_review ?? false,
-      actionType: raw.action_type ?? null,
       createdAt: raw.created_at,
     }));
   },
   active: async () => {
-    const raw = await api.get<any>('/subscriptions/active');
+    const cafeId = await getCafeId();
+    const raw = await api.get<any>(`/cafes/${cafeId}/subscriptions/active`);
     return raw ? {
       id: raw.id ?? raw._id,
       packageId: raw.package_id,
@@ -613,21 +720,21 @@ export const subscriptionService = {
       packageNameSnapshot: raw.package_name_snapshot,
       startDate: raw.start_date,
       endDate: raw.end_date,
-      subtotal: raw.subtotal,
       totalAmount: raw.total_amount,
       status: raw.status,
       isPendingReview: raw.is_pending_review ?? false,
-      actionType: raw.action_type ?? null,
       createdAt: raw.created_at,
     } : null;
   },
   create: async (data: { package_id: string; time_subscription_id?: string; payment_method: string; note?: string }) => {
-    const raw = await api.post<any>('/subscriptions', data);
+    const cafeId = await getCafeId();
+    const raw = await api.post<any>(`/cafes/${cafeId}/subscriptions`, data);
     return raw;
   },
-  // Lịch sử thanh toán gói của chính user
+  // Lịch sử thanh toán gói của quán đang chọn
   payments: async (): Promise<MyPayment[]> => {
-    const items = await api.get<any[]>('/subscriptions/payments');
+    const cafeId = await getCafeId();
+    const items = await api.get<any[]>(`/cafes/${cafeId}/subscriptions/payments`);
     return items.map((raw: any) => ({
       id: raw.id ?? raw._id,
       transactionCode: raw.transaction_code ?? '',
@@ -638,9 +745,51 @@ export const subscriptionService = {
       actionType: raw.action_type ?? undefined,
       createdAt: raw.created_at,
       paidAt: raw.paid_at ?? undefined,
-      refundAmount: raw.refund_amount ?? 0,
-      refundStatus: raw.refund_status ?? 'none',
+      creditAmount: raw.credit_amount ?? 0,
+      creditStatus: raw.credit_status ?? 'none',
     } as MyPayment));
+  },
+};
+
+// Tổng doanh thu gộp tất cả quán của user (đa quán)
+export interface CafeRevenueRow {
+  cafeId: string;
+  cafeName: string;
+  status: string;
+  packageName: string | null;
+  hasPackage: boolean;
+  total: number;
+  today: number;
+  month: number;
+}
+export interface RevenueOverview {
+  total: number;
+  today: number;
+  thisMonth: number;
+  revenueByMonth: { month: string; revenue: number }[];
+  cafes: CafeRevenueRow[];
+}
+export const revenueService = {
+  overview: async (): Promise<RevenueOverview> => {
+    const raw = await api.get<any>('/revenue/overview');
+    return {
+      total: raw.total ?? 0,
+      today: raw.today ?? 0,
+      thisMonth: raw.this_month ?? 0,
+      revenueByMonth: Object.entries(raw.revenue_by_month ?? {}).map(([month, revenue]) => ({
+        month, revenue: Number(revenue) || 0,
+      })),
+      cafes: (raw.cafes ?? []).map((c: any) => ({
+        cafeId: c.cafe_id,
+        cafeName: c.cafe_name,
+        status: c.status,
+        packageName: c.package_name ?? null,
+        hasPackage: !!c.has_package,
+        total: c.total ?? 0,
+        today: c.today ?? 0,
+        month: c.month ?? 0,
+      })),
+    };
   },
 };
 
@@ -650,36 +799,60 @@ export const paymentService = {
     const items = await api.get<any[]>('/admin/payments');
     return items.map(mapPayment);
   },
-  approve: async (id: string) => {
-    await api.put(`/admin/payments/${id}/approve`);
-  },
-  reject: async (id: string) => {
-    await api.put(`/admin/payments/${id}/reject`);
-  },
-  reset: async (id: string) => {
-    await api.put(`/admin/payments/${id}/reset`);
-  },
-  update: async (id: string, data: { amount?: number; note?: string }) => {
-    const raw = await api.put<any>(`/admin/payments/${id}`, data);
-    return mapPayment(raw);
-  },
-  // #4: Admin xác nhận / từ chối hoàn tiền khi nâng cấp gói
-  approveRefund: async (id: string, refund_note?: string) => {
-    const raw = await api.put<any>(`/admin/payments/${id}/refund/approve`, { refund_note });
-    return mapPayment(raw);
-  },
-  rejectRefund: async (id: string, refund_note?: string) => {
-    const raw = await api.put<any>(`/admin/payments/${id}/refund/reject`, { refund_note });
-    return mapPayment(raw);
-  },
+  // Chỉ đọc: số tiền là bản ghi tài chính từ cổng thanh toán, admin không sửa;
+  // hoàn tiền khi nâng cấp giữa kỳ được cấn trừ tự động, không có duyệt tay.
 };
 
 // Contact
+export interface ContactMessage {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  cafeName?: string;
+  content: string;
+  isRead: boolean;
+  createdAt: string;
+  /** Nội dung admin đã trả lời qua email (nếu đã trả lời). */
+  reply?: string;
+  repliedAt?: string;
+  repliedBy?: string;
+}
+
 export const contactService = {
   send: async (data: { full_name: string; email: string; phone?: string; cafe_name?: string; content: string }) => {
     return api.post<{ message: string }>('/contact', data);
   },
+  // B6: admin đọc tin nhắn liên hệ từ trang public
+  adminList: async (): Promise<ContactMessage[]> => {
+    const items = await api.get<any[]>('/admin/contacts');
+    return items.map(mapContact);
+  },
+  toggleRead: async (id: string) => {
+    return api.put(`/admin/contacts/${id}/read`);
+  },
+  /** Gửi email trả lời cho khách và lưu lại nội dung đã trả lời. */
+  reply: async (id: string, reply: string): Promise<ContactMessage> => {
+    const raw = await api.post<any>(`/admin/contacts/${id}/reply`, { reply });
+    return mapContact(raw);
+  },
 };
+
+function mapContact(raw: any): ContactMessage {
+  return {
+    id: raw.id ?? raw._id,
+    fullName: raw.full_name ?? '',
+    email: raw.email ?? '',
+    phone: raw.phone || undefined,
+    cafeName: raw.cafe_name || undefined,
+    content: raw.content ?? '',
+    isRead: raw.is_read ?? false,
+    createdAt: raw.created_at,
+    reply: raw.reply || undefined,
+    repliedAt: raw.replied_at || undefined,
+    repliedBy: raw.replied_by || undefined,
+  };
+}
 
 // Time Subscriptions
 export const timeSubscriptionService = {
@@ -713,11 +886,13 @@ export const timeSubscriptionService = {
 
 // Reviews
 export const reviewService = {
-  create: async (cafeId: string, data: {
+  // Gửi đánh giá FunCafe của chủ quán (backend upsert: gửi lại = cập nhật đánh giá cũ)
+  create: async (data: {
     rating: number;
     title?: string;
     comment?: string;
   }) => {
+    const cafeId = await getCafeId();
     return api.post(`/cafes/${cafeId}/reviews`, data);
   },
   adminList: async () => {

@@ -15,9 +15,22 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'full_name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
+            // PHẢI ghi rõ connection 'mongodb'. Connection mặc định của ứng dụng là
+            // sqlite (chỉ để chứa bảng token của Sanctum), nên 'unique:users,email'
+            // sẽ dò trong bảng users RỖNG bên sqlite và luôn cho qua — đã từng tạo
+            // được 2 tài khoản trùng email.
+            'email' => 'required|string|email|max:255|unique:mongodb.users,email',
             'password' => 'required|string|min:8',
             'phone' => 'nullable|string|max:20',
+        ], [
+            // Thông báo tiếng Việt: các lỗi này hiện thẳng lên form đăng ký.
+            'full_name.required' => 'Vui lòng nhập họ tên.',
+            'email.required'     => 'Vui lòng nhập email.',
+            'email.email'        => 'Email không đúng định dạng.',
+            'email.unique'       => 'Email này đã được đăng ký. Bạn hãy đăng nhập hoặc dùng email khác.',
+            'password.required'  => 'Vui lòng nhập mật khẩu.',
+            'password.min'       => 'Mật khẩu phải có ít nhất 8 ký tự.',
+            'phone.max'          => 'Số điện thoại quá dài.',
         ]);
 
         $user = User::create([
@@ -111,6 +124,11 @@ class AuthController extends Controller
 
         $user->update(['password' => Hash::make($validated['new_password'])]);
 
+        // SECURITY: thu hồi các token khác (đăng nhập trên thiết bị khác),
+        // giữ lại token hiện tại để user không bị văng ra ngay sau khi đổi.
+        $currentTokenId = $request->user()->currentAccessToken()->getKey();
+        $user->tokens()->where('id', '!=', $currentTokenId)->delete();
+
         return response()->json(['message' => 'Đã đổi mật khẩu thành công.']);
     }
 
@@ -182,6 +200,10 @@ class AuthController extends Controller
             'reset_token' => null,
             'reset_token_expires_at' => null,
         ]);
+
+        // SECURITY: thu hồi TOÀN BỘ token đăng nhập cũ — reset mật khẩu thường do
+        // nghi ngờ lộ tài khoản, không được để phiên cũ (kẻ xấu) tiếp tục sống.
+        $user->tokens()->delete();
 
         return response()->json(['message' => 'Mật khẩu đã được đặt lại thành công.']);
     }

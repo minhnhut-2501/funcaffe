@@ -84,7 +84,7 @@ export default function RegisterPage() {
               <div className="w-full max-w-md mx-auto">
                 <div className="mb-6">
                   <h1 className="text-2xl font-bold text-ink">Tạo tài khoản</h1>
-                  <p className="text-ink/60 text-sm mt-1">Dùng thử miễn phí 7 ngày, không cần thẻ tín dụng.</p>
+                  <p className="text-ink/70 text-sm mt-1">Dùng thử miễn phí 7 ngày, không cần thẻ tín dụng.</p>
                 </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -121,14 +121,14 @@ export default function RegisterPage() {
                       onClick={() => setShowPw(!showPw)}
                       aria-label={showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       aria-pressed={showPw}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/40 hover:text-bean"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/70 hover:text-bean"
                     >
                       {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                   {fieldError.password
                     ? <p className="mt-1 text-xs text-red-600">{fieldError.password}</p>
-                    : <p className="mt-1 text-xs text-ink/50">Dùng ít nhất 8 ký tự.</p>}
+                    : <p className="mt-1 text-xs text-ink/70">Dùng ít nhất 8 ký tự.</p>}
                 </div>
                 <div>
                   <label htmlFor="reg-confirm" className="label-funcafe">Xác nhận mật khẩu <span className="text-red-500">*</span></label>
@@ -155,7 +155,7 @@ export default function RegisterPage() {
                   {loading ? 'Đang xử lý...' : 'Tạo tài khoản'}
                 </button>
               </form>
-                <div className="mt-4 pt-4 border-t border-line text-center text-sm text-ink/60">
+                <div className="mt-4 pt-4 border-t border-line text-center text-sm text-ink/70">
                   Đã có tài khoản? <Link href="/login" className="text-bean font-medium hover:underline">Đăng nhập</Link>
                 </div>
               </div>

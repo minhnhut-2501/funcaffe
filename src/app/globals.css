@@ -49,13 +49,15 @@
   --shadow-lift: 0 20px 44px -24px rgba(30, 58, 138, 0.28);
   --shadow-pop: 0 28px 70px -24px rgba(15, 23, 42, 0.38);
 
-  /* Thang z-index ngữ nghĩa */
-  --z-dropdown: 40;
-  --z-sticky: 30;
-  --z-drawer: 45;
-  --z-backdrop: 50;
-  --z-modal: 60;
-  --z-toast: 70;
+  /* Thang z-index ngữ nghĩa — namespace --z-index-* để Tailwind v4 sinh utility
+     z-sticky / z-drawer / z-modal ... (trước đây đặt tên --z-* nên không dùng được) */
+  --z-index-sticky: 30;
+  --z-index-dropdown: 40;
+  --z-index-drawer-backdrop: 44;
+  --z-index-drawer: 45;
+  --z-index-modal-backdrop: 50;
+  --z-index-modal: 60;
+  --z-index-toast: 70;
 
   /* Easing */
   --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);

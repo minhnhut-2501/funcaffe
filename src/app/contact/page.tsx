@@ -2,7 +2,7 @@
 import PublicLayout from '@/components/layouts/PublicLayout';
 import Banner from '@/components/public/Banner';
 import Reveal from '@/components/public/Reveal';
-import Link from 'next/link';
+import CtaPanel from '@/components/public/CtaPanel';
 import { useState } from 'react';
 import { contactService } from '@/services';
 import { Mail, Phone, MapPin, Clock, CheckCircle2 } from 'lucide-react';
@@ -70,7 +70,7 @@ export default function ContactPage() {
                     <c.icon className="w-5 h-5" />
                   </span>
                   <div>
-                    <p className="text-xs text-ink/55">{c.label}</p>
+                    <p className="text-xs text-ink/70">{c.label}</p>
                     <p className="text-ink font-medium text-sm">{c.value}</p>
                   </div>
                 </Reveal>
@@ -88,7 +88,7 @@ export default function ContactPage() {
           <div className="lg:col-span-3">
             <Reveal className="bg-white rounded-2xl border border-line shadow-sm p-6 md:p-8">
               {sent ? (
-                <div className="text-center py-12">
+                <div role="status" className="text-center py-12">
                   <span className="inline-flex w-14 h-14 rounded-full bg-pine/10 items-center justify-center mb-4">
                     <CheckCircle2 className="w-8 h-8 text-pine" />
                   </span>
@@ -97,32 +97,88 @@ export default function ContactPage() {
                   <button onClick={() => setSent(false)} className="btn-cafe-outline mt-5">Gửi tin khác</button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4" noValidate={false}>
                   <h2 className="text-lg font-bold text-ink">Gửi yêu cầu tư vấn</h2>
+                  <p className="text-sm text-ink/70 -mt-2">
+                    Ô có dấu <span className="text-red-600">*</span> là bắt buộc.
+                  </p>
                   <div>
-                    <label className="label-funcafe">Họ và tên <span className="text-red-500">*</span></label>
-                    <input className="input-funcafe" placeholder="Nguyễn Văn A" value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} required />
+                    <label htmlFor="contact-name" className="label-funcafe">
+                      Họ và tên <span className="text-red-600" aria-hidden>*</span>
+                    </label>
+                    <input
+                      id="contact-name"
+                      name="fullName"
+                      autoComplete="name"
+                      className="input-funcafe"
+                      placeholder="Nguyễn Văn A"
+                      value={form.fullName}
+                      onChange={e => setForm({ ...form, fullName: e.target.value })}
+                      required
+                    />
                   </div>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="label-funcafe">Email <span className="text-red-500">*</span></label>
-                      <input type="email" className="input-funcafe" placeholder="email@example.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+                      <label htmlFor="contact-email" className="label-funcafe">
+                        Email <span className="text-red-600" aria-hidden>*</span>
+                      </label>
+                      <input
+                        id="contact-email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        className="input-funcafe"
+                        placeholder="email@example.com"
+                        value={form.email}
+                        onChange={e => setForm({ ...form, email: e.target.value })}
+                        required
+                      />
                     </div>
                     <div>
-                      <label className="label-funcafe">Số điện thoại</label>
-                      <input type="tel" className="input-funcafe" placeholder="0901234567" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                      <label htmlFor="contact-phone" className="label-funcafe">Số điện thoại</label>
+                      <input
+                        id="contact-phone"
+                        name="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        inputMode="tel"
+                        className="input-funcafe"
+                        placeholder="0901234567"
+                        value={form.phone}
+                        onChange={e => setForm({ ...form, phone: e.target.value })}
+                      />
                     </div>
                   </div>
                   <div>
-                    <label className="label-funcafe">Tên quán cafe</label>
-                    <input className="input-funcafe" placeholder="Tên quán của bạn" value={form.cafeName} onChange={e => setForm({ ...form, cafeName: e.target.value })} />
+                    <label htmlFor="contact-cafe" className="label-funcafe">Tên quán cafe</label>
+                    <input
+                      id="contact-cafe"
+                      name="cafeName"
+                      autoComplete="organization"
+                      className="input-funcafe"
+                      placeholder="Tên quán của bạn"
+                      value={form.cafeName}
+                      onChange={e => setForm({ ...form, cafeName: e.target.value })}
+                    />
                   </div>
                   <div>
-                    <label className="label-funcafe">Nội dung cần tư vấn <span className="text-red-500">*</span></label>
-                    <textarea rows={4} className="input-funcafe resize-none" placeholder="Mô tả nhu cầu của quán bạn..." value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} required />
+                    <label htmlFor="contact-content" className="label-funcafe">
+                      Nội dung cần tư vấn <span className="text-red-600" aria-hidden>*</span>
+                    </label>
+                    <textarea
+                      id="contact-content"
+                      name="content"
+                      rows={4}
+                      className="input-funcafe resize-y"
+                      placeholder="Mô tả nhu cầu của quán bạn..."
+                      value={form.content}
+                      onChange={e => setForm({ ...form, content: e.target.value })}
+                      required
+                    />
                   </div>
-                  {error && <p className="text-sm text-red-500">{error}</p>}
-                  <button type="submit" disabled={loading} className="btn-cafe w-full py-2.5 disabled:opacity-60">
+                  {/* Lỗi đọc được bởi trình đọc màn hình ngay khi xuất hiện */}
+                  <p role="alert" aria-live="polite" className="text-sm text-red-700 empty:hidden">{error}</p>
+                  <button type="submit" disabled={loading} className="btn-cafe w-full py-3 disabled:opacity-60">
                     {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
                   </button>
                 </form>
@@ -133,22 +189,10 @@ export default function ContactPage() {
       </section>
 
       {/* CTA — panel bo tròn nổi trên nền sáng, tách bạch với footer (đồng bộ trang chủ) */}
-      <section className="bg-paper">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
-          <Reveal>
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-bean to-bean-dark px-6 py-14 md:py-16 text-center shadow-xl shadow-bean/25">
-              <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[36rem] rounded-full bg-white/10 blur-3xl" />
-              <div className="relative">
-                <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Hay là thử luôn cho nhanh?</h2>
-                <p className="text-white/75 mb-7 max-w-xl mx-auto">Bạn có thể tạo tài khoản và dùng thử miễn phí ngay, không cần chờ tư vấn.</p>
-                <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-white text-bean hover:bg-paper active:translate-y-px px-7 py-3 rounded-xl text-base font-semibold transition-colors shadow-lg shadow-black/10">
-                  Dùng thử miễn phí
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <CtaPanel
+        title="Hay là thử luôn cho nhanh?"
+        subtitle="Bạn có thể tạo tài khoản và dùng thử miễn phí ngay, không cần chờ tư vấn."
+      />
     </PublicLayout>
   );
 }

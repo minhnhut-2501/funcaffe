@@ -221,7 +221,7 @@ export default function AdminPackagesPage() {
               </label>
               <label className="flex items-center gap-2 text-sm text-cafe-700 cursor-pointer">
                 <input type="checkbox" checked={form.canUseAI ?? false} onChange={e => setForm({ ...form, canUseAI: e.target.checked })} />
-                Có trợ lý AI (sắp ra mắt)
+                Có trợ lý AI & phân tích doanh thu
               </label>
 
               {/* Giới hạn tài nguyên — null = không giới hạn */}

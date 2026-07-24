@@ -3,12 +3,11 @@ import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import StatCard from '@/components/ui/StatCard';
 import { userService, paymentService } from '@/services';
-import { formatCurrency, formatDateTime } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
 import type { User, Payment } from '@/types';
 import { DollarSign, TrendingUp, Users, BarChart3, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
-import EmptyState from '@/components/ui/EmptyState';
 import SectionCard from '@/components/user/SectionCard';
 import { FilterBar } from '@/components/user/FilterBar';
 
@@ -159,34 +158,10 @@ export default function AdminRevenuePage() {
         </ResponsiveContainer>
       </SectionCard>
 
-      <SectionCard title="Giao dịch đã duyệt" icon={DollarSign} flush>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-sand border-b border-line">
-              <tr>
-                <th className="text-left px-5 py-2.5 text-cafe-600 font-semibold">Mã GD</th>
-                <th className="text-left px-5 py-2.5 text-cafe-600 font-semibold">Người dùng</th>
-                <th className="text-left px-5 py-2.5 text-cafe-600 font-semibold">Gói</th>
-                <th className="text-right px-5 py-2.5 text-cafe-600 font-semibold">Số tiền</th>
-                <th className="text-left px-5 py-2.5 text-cafe-600 font-semibold">Ngày duyệt</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line/70">
-              {approvedPayments.length === 0 ? (
-                <tr><td colSpan={5}><EmptyState title="Chưa có giao dịch" description="Chưa có giao dịch nào được duyệt." /></td></tr>
-              ) : approvedPayments.map(p => (
-                <tr key={p.id} className="hover:bg-sand/50 transition-colors">
-                  <td className="px-5 py-2.5 font-mono text-xs font-bold text-bean">{p.transactionCode}</td>
-                  <td className="px-5 py-2.5 text-ink">{p.userName}</td>
-                  <td className="px-5 py-2.5 text-cafe-600">{p.packageName}</td>
-                  <td className="px-5 py-2.5 text-right font-bold text-ink">{formatCurrency(p.amount)}</td>
-                  <td className="px-5 py-2.5 text-cafe-400 text-xs">{p.confirmedAt ? formatDateTime(p.confirmedAt) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
+      {/* Đã bỏ bảng "Giao dịch đã duyệt": trùng hoàn toàn với trang Quản lý thanh toán
+          (nơi có cả tìm kiếm, lọc theo gói và xem chi tiết), lại còn dùng chữ "đã duyệt"
+          trong khi hệ thống không còn khâu duyệt tay nào. Trang này giữ đúng vai trò
+          thống kê: chỉ số, biểu đồ và phân bố gói. */}
     </div>
   );
 }

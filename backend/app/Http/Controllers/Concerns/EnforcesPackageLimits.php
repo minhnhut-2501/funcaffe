@@ -23,8 +23,11 @@ trait EnforcesPackageLimits
      */
     protected function effectivePackage(Cafe $cafe): ?Package
     {
-        $sub = Subscription::where('user_id', (string) $cafe->user_id)
-            ->where('status', 'active')
+        // B5: dùng scope effective() (active + còn hạn) — trước đây chỉ lọc status
+        // nên gói đã quá end_date vẫn được tính là còn gói.
+        // ĐA QUÁN: gói tính theo CHÍNH QUÁN (cafe_id), không theo chủ quán.
+        $sub = Subscription::where('cafe_id', (string) $cafe->id)
+            ->effective()
             ->latest()
             ->first();
 

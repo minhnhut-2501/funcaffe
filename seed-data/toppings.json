@@ -1,6 +1,0 @@
-[
-  { "_id": { "$oid": "666700000000000000000001" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Trân châu trắng", "price": 5000, "image": null, "is_available": true, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
-  { "_id": { "$oid": "666700000000000000000002" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Pudding", "price": 7000, "image": null, "is_available": true, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
-  { "_id": { "$oid": "666700000000000000000003" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Kem cheese", "price": 8000, "image": null, "is_available": true, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } },
-  { "_id": { "$oid": "666700000000000000000004" }, "cafe_id": { "$oid": "666200000000000000000001" }, "name": "Thạch cafe", "price": 5000, "image": null, "is_available": true, "created_at": { "$date": "2026-06-20T00:00:00Z" }, "updated_at": { "$date": "2026-06-20T00:00:00Z" } }
-]

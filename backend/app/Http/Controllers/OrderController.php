@@ -7,7 +7,6 @@ use App\Models\Order;
 use App\Models\Item;
 use App\Models\ItemPrice;
 use App\Models\Topping;
-use App\Models\Invoice;
 use App\Http\Controllers\Concerns\ChecksCafeOwnership;
 use App\Http\Controllers\Concerns\RunsAtomically;
 use Illuminate\Http\Request;
@@ -25,7 +24,7 @@ class OrderController extends Controller
     public function index(Request $request, Cafe $cafe)
     {
         $this->authorizeCafe($cafe);
-        $orders = $cafe->orders()->with(['orderDetails.orderDetailToppings.topping', 'invoice', 'table'])->get();
+        $orders = $cafe->orders()->with(['orderDetails.orderDetailToppings.topping', 'table'])->get();
         return response()->json($orders);
     }
 
@@ -37,7 +36,7 @@ class OrderController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        $order->load(['orderDetails.orderDetailToppings.topping', 'invoice', 'table']);
+        $order->load(['orderDetails.orderDetailToppings.topping', 'table']);
         return response()->json($order);
     }
 
@@ -65,6 +64,11 @@ class OrderController extends Controller
             'items.*.toppings.*.quantity'           => 'required|integer|min:1',
         ]);
 
+        // Bàn phải thuộc quán này
+        if (!$cafe->tables()->where('_id', $validated['table_id'])->exists()) {
+            return response()->json(['message' => 'Bàn không hợp lệ hoặc không thuộc quán của bạn.'], 422);
+        }
+
         // Chống tạo order trùng: nếu bàn đã có order active thì không tạo mới,
         // trả về order hiện tại để client tiếp tục cập nhật vào đó.
         $existing = $cafe->orders()
@@ -78,8 +82,12 @@ class OrderController extends Controller
 
         $order = $this->atomic(function () use ($cafe, $validated) {
             $todayStr = now()->format('Ymd');
+            // B7: count()+1 có thể trùng khi 2 request chạy song song — dò tiếp
+            // tới số chưa dùng trước khi chốt mã.
             $orderCount = $cafe->orders()->where('code', 'like', "ORD-{$todayStr}-%")->count() + 1;
-            $orderCode = 'ORD-' . $todayStr . '-' . str_pad($orderCount, 4, '0', STR_PAD_LEFT);
+            do {
+                $orderCode = 'ORD-' . $todayStr . '-' . str_pad($orderCount++, 4, '0', STR_PAD_LEFT);
+            } while ($cafe->orders()->where('code', $orderCode)->exists());
 
             $order = $cafe->orders()->create([
                 'table_id'     => $validated['table_id'],
@@ -93,7 +101,7 @@ class OrderController extends Controller
             $orderSubtotal = 0;
 
             foreach ($validated['items'] as $itemData) {
-                [$detail, $itemTotalPrice] = $this->createOrderDetail($order, $itemData);
+                [$detail, $itemTotalPrice] = $this->createOrderDetail($cafe, $order, $itemData);
                 $orderSubtotal += $itemTotalPrice;
             }
 
@@ -163,7 +171,7 @@ class OrderController extends Controller
 
                 $orderSubtotal = 0;
                 foreach ($validated['items'] as $itemData) {
-                    [$detail, $itemTotalPrice] = $this->createOrderDetail($order, $itemData);
+                    [$detail, $itemTotalPrice] = $this->createOrderDetail($cafe, $order, $itemData);
                     $orderSubtotal += $itemTotalPrice;
                 }
 
@@ -196,104 +204,170 @@ class OrderController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        // BUG-FIX: Chặn thanh toán lại order đã 'paid' để tránh tạo hóa đơn trùng
-        if ($order->status === 'paid') {
-            return response()->json(['message' => 'Order này đã được thanh toán.'], 400);
+        // Chỉ order ĐANG PHỤC VỤ mới thanh toán được. Trước đây chỉ chặn mỗi 'paid'
+        // nên order đã HỦY vẫn thanh toán được, sinh hóa đơn và chạy thẳng vào
+        // doanh thu — tiền ảo. Dùng danh sách trắng để trạng thái mới thêm sau này
+        // cũng bị chặn mặc định.
+        if ($order->status !== 'active') {
+            $reason = $order->status === 'paid'
+                ? 'Order này đã được thanh toán.'
+                : 'Order đã hủy, không thể thanh toán.';
+            return response()->json(['message' => $reason], 400);
         }
 
         $validated = $request->validate([
-            'payment_method'  => 'required|string|in:cash,bank_transfer,qr_code,e_wallet,vietqr',
+            'payment_method'  => 'required|string|in:cash,vietqr',
             'discount_amount' => 'nullable|numeric|min:0',
+            'cash_received'   => 'nullable|numeric|min:0',
         ]);
 
         // Chặn giảm giá vượt quá tạm tính → không cho tổng tiền âm
         $discount = min((float) ($validated['discount_amount'] ?? 0), (float) $order->subtotal);
         $total    = max(0.0, (float) $order->subtotal - $discount);
 
+        // Tiền khách đưa + tiền thối (chỉ áp dụng cho tiền mặt) — lưu để đối chứng.
+        $cashReceived = null;
+        $changeAmount = null;
+        if ($validated['payment_method'] === 'cash' && isset($validated['cash_received'])) {
+            $cashReceived = (int) round((float) $validated['cash_received']);
+            // BUG-FIX (B2): khách đưa thiếu tiền thì không được xác nhận thanh toán
+            if ($cashReceived < (int) round($total)) {
+                return response()->json([
+                    'message' => 'Tiền khách đưa chưa đủ. Cần tối thiểu ' . number_format($total, 0, ',', '.') . 'đ.',
+                ], 422);
+            }
+            $changeAmount = max(0, $cashReceived - (int) round($total));
+        }
+
         $todayStr     = now()->format('Ymd');
-        $invoiceCount = Invoice::where('cafe_id', (string) $cafe->id)
+        // B7: dò tiếp tới số chưa dùng để tránh trùng mã khi request song song.
+        // Mã phiếu (invoice_code) nay lưu thẳng trên order — không còn bảng invoices.
+        $invoiceCount = $cafe->orders()
             ->where('invoice_code', 'like', "INV-{$todayStr}-%")
             ->count() + 1;
-        $invoiceCode = 'INV-' . $todayStr . '-' . str_pad($invoiceCount, 4, '0', STR_PAD_LEFT);
-
-        $order->load(['table', 'orderDetails.orderDetailToppings']);
-
-        $invoiceItems = $order->orderDetails->map(function ($detail) {
-            $toppings = $detail->orderDetailToppings->map(function ($t) {
-                return [
-                    'topping_name' => $t->topping_name_snapshot,
-                    'quantity'     => $t->quantity,
-                    'price'        => $t->price_at_time,
-                    'subtotal'     => $t->subtotal,
-                ];
-            });
-
-            return [
-                'item_name'     => $detail->item_name_snapshot,
-                'size_name'     => $detail->size_name_snapshot,
-                'quantity'      => $detail->quantity,
-                'unit_price'    => $detail->unit_price,
-                'item_subtotal' => $detail->subtotal,
-                'toppings'      => $toppings,
-                'topping_total' => $toppings->sum('subtotal'),
-                'total_price'   => $detail->subtotal + $toppings->sum('subtotal'),
-                'note'          => $detail->note,
-            ];
-        })->toArray();
+        do {
+            $invoiceCode = 'INV-' . $todayStr . '-' . str_pad($invoiceCount++, 4, '0', STR_PAD_LEFT);
+        } while ($cafe->orders()->where('invoice_code', $invoiceCode)->exists());
 
         $now = now();
 
-        $this->atomic(function () use ($order, $cafe, $invoiceCode, $invoiceItems, $discount, $total, $validated, $now) {
-            $order->invoice()->create([
+        $this->atomic(function () use ($order, $cafe, $invoiceCode, $discount, $total, $validated, $now, $cashReceived, $changeAmount) {
+            // Order tự "nhận" toàn bộ thông tin thanh toán (dòng món đã ở order_details).
+            $order->update([
+                'status'          => 'paid',
                 'invoice_code'    => $invoiceCode,
-                'cafe_id'         => $cafe->id,
-                'table_id'        => $order->table_id,
-                'items'           => $invoiceItems,
-                'cafe_snapshot'   => [
-                    'name'    => $cafe->name,
-                    'address' => $cafe->address ?? '',
-                    'phone'   => $cafe->phone   ?? '',
-                ],
-                'table_snapshot'  => [
-                    'name' => $order->table->name ?? '',
-                ],
-                'subtotal'        => $order->subtotal,
-                'discount_amount' => $discount,
-                'total_amount'    => $total,
                 'payment_method'  => $validated['payment_method'],
                 'payment_status'  => 'paid',
                 'paid_at'         => $now,
-            ]);
-
-            $order->update([
-                'status'          => 'paid',
-                'paid_at'         => $now,
                 'discount_amount' => $discount,
                 'total_amount'    => $total,
+                'cash_received'   => $cashReceived,
+                'change_amount'   => $changeAmount,
             ]);
 
+            // Thanh toán xong -> bàn về TRỐNG luôn (bỏ trạng thái 'cleaning').
             $cafe->tables()->where('_id', $order->table_id)->update([
-                'status'           => 'cleaning',
+                'status'           => 'empty',
                 'current_order_id' => null,
             ]);
         });
 
-        return response()->json($order->load('invoice'));
+        return response()->json($order->load(['table', 'orderDetails.orderDetailToppings.topping']));
+    }
+
+    /**
+     * Hủy order đang phục vụ: đánh dấu order 'cancelled' và trả bàn về TRỐNG.
+     * Không hủy được order đã thanh toán.
+     */
+    public function cancel(Request $request, Cafe $cafe, Order $order)
+    {
+        $this->authorizeCafe($cafe);
+
+        if ((string) $order->cafe_id !== (string) $cafe->id) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if ($order->status === 'paid') {
+            return response()->json(['message' => 'Order đã thanh toán, không thể hủy.'], 400);
+        }
+
+        $this->atomic(function () use ($order, $cafe) {
+            $order->update(['status' => 'cancelled']);
+
+            $cafe->tables()->where('_id', $order->table_id)->update([
+                'status'           => 'empty',
+                'current_order_id' => null,
+            ]);
+        });
+
+        return response()->json($order->load(['table']));
+    }
+
+    /**
+     * C4: Hoàn tiền một order đã thanh toán (khách trả món, thu ngân hoàn lại tiền).
+     * Chỉ hoàn được order đang 'paid'; bắt buộc ghi lý do để đối soát.
+     * Order 'refunded' bị LOẠI khỏi doanh thu (query thống kê lọc payment_status).
+     */
+    public function refund(Request $request, Cafe $cafe, Order $order)
+    {
+        $this->authorizeCafe($cafe);
+
+        if ((string) $order->cafe_id !== (string) $cafe->id) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if ($order->payment_status === 'refunded') {
+            return response()->json(['message' => 'Đơn này đã được hoàn tiền trước đó.'], 400);
+        }
+        if ($order->payment_status !== 'paid') {
+            return response()->json(['message' => 'Chỉ hoàn tiền được đơn đã thanh toán.'], 400);
+        }
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        $order->update([
+            'payment_status' => 'refunded',
+            'refunded_at'    => now(),
+            'refund_reason'  => $validated['reason'],
+        ]);
+
+        return response()->json($order->fresh()->load(['table', 'orderDetails.orderDetailToppings.topping']));
     }
 
     /**
      * Helper: tạo order_detail và order_detail_toppings, tính giá từ DB.
      * Trả về [$detail, $itemTotalPrice].
+     *
+     * BUG-FIX (B1): item / size / topping BẮT BUỘC tồn tại và thuộc đúng quán.
+     * Trước đây Item::find() không kiểm tra gì — id không tồn tại → giá 0 vẫn
+     * tạo được dòng order ("món ma"), hoặc dùng được giá của quán khác.
      */
-    private function createOrderDetail(Order $order, array $itemData): array
+    private function createOrderDetail(Cafe $cafe, Order $order, array $itemData): array
     {
+        $fail = function (string $msg) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                response()->json(['message' => $msg], 422)
+            );
+        };
+
+        // Món phải tồn tại và thuộc quán này
+        $item = Item::find($itemData['item_id']);
+        if (!$item || (string) $item->cafe_id !== (string) $cafe->id) {
+            $fail('Món không hợp lệ hoặc không thuộc quán của bạn.');
+        }
+
         // Tự lấy giá từ DB
         if (!empty($itemData['item_price_id'])) {
             $itemPrice = ItemPrice::find($itemData['item_price_id']);
-            $unitPrice = $itemPrice ? (float) $itemPrice->price : 0.0;
+            // Size phải tồn tại và thuộc đúng món
+            if (!$itemPrice || (string) $itemPrice->item_id !== (string) $item->id) {
+                $fail('Size không hợp lệ cho món "' . $item->name . '".');
+            }
+            $unitPrice = (float) $itemPrice->price;
         } else {
-            $item      = Item::find($itemData['item_id']);
-            $unitPrice = $item ? (float) $item->base_price : 0.0;
+            $unitPrice = (float) $item->base_price;
         }
 
         $quantity    = (int) $itemData['quantity'];
@@ -303,8 +377,12 @@ class OrderController extends Controller
         $toppingRows  = [];
 
         foreach ($itemData['toppings'] ?? [] as $topData) {
-            $topping      = Topping::find($topData['topping_id']);
-            $toppingPrice = $topping ? (float) $topping->price : 0.0;
+            $topping = Topping::find($topData['topping_id']);
+            // Topping phải tồn tại và thuộc quán này
+            if (!$topping || (string) $topping->cafe_id !== (string) $cafe->id) {
+                $fail('Topping không hợp lệ hoặc không thuộc quán của bạn.');
+            }
+            $toppingPrice = (float) $topping->price;
             $toppingQty   = (int) $topData['quantity'];
             // Công thức: price_at_time * topping_qty * item_qty
             $toppingSubtotal = $toppingPrice * $toppingQty * $quantity;
@@ -312,7 +390,8 @@ class OrderController extends Controller
 
             $toppingRows[] = [
                 'topping_id'            => $topData['topping_id'],
-                'topping_name_snapshot' => $topData['topping_name_snapshot'] ?? ($topping ? $topping->name : ''),
+                // Snapshot tên lấy từ DB — không tin tên client gửi lên (in lên hóa đơn)
+                'topping_name_snapshot' => $topping->name,
                 'quantity'              => $toppingQty,
                 'price_at_time'         => $toppingPrice,
                 'subtotal'              => $toppingSubtotal,
@@ -323,7 +402,8 @@ class OrderController extends Controller
 
         $detail = $order->orderDetails()->create([
             'item_id'            => $itemData['item_id'],
-            'item_name_snapshot' => $itemData['item_name_snapshot'],
+            // Snapshot tên lấy từ DB — không tin tên client gửi lên (in lên hóa đơn)
+            'item_name_snapshot' => $item->name,
             'item_price_id'      => $itemData['item_price_id'] ?? null,
             'size_name_snapshot' => $itemData['size_name_snapshot'] ?? null,
             'quantity'           => $quantity,
