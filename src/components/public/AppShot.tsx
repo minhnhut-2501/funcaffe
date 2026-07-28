@@ -10,6 +10,8 @@ export default function AppShot({
   className = '',
   priority = false,
   maxH,
+  width = 1400,
+  height = 875,
 }: {
   src: string;
   alt: string;
@@ -19,6 +21,10 @@ export default function AppShot({
   /** Lớp giới hạn chiều cao, vd "max-h-[26rem]". Ảnh dài (danh sách bàn) sẽ được
    *  cắt bớt phần dưới thay vì kéo dài làm trống hẳn cột bên cạnh. */
   maxH?: string;
+  /** Kích thước gốc của ảnh (px) — giữ đúng tỉ lệ để trình duyệt chừa chỗ trước
+   *  khi ảnh tải xong, tránh giật layout (CLS). Mặc định khớp ảnh sản phẩm 16:10. */
+  width?: number;
+  height?: number;
 }) {
   return (
     <div
@@ -36,6 +42,8 @@ export default function AppShot({
         <img
           src={src}
           alt={alt}
+          width={width}
+          height={height}
           className={`block w-full ${maxH ? 'object-cover object-top h-full' : ''}`}
           loading={priority ? 'eager' : 'lazy'}
         />

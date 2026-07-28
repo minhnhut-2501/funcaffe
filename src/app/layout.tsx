@@ -1,7 +1,15 @@
 import type { Metadata } from 'next';
+import { Be_Vietnam_Pro } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
+
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['300', '400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-be-vietnam-pro',
+});
 
 export const metadata: Metadata = {
   title: 'FunCafe - Nền tảng quản lý quán cafe',
@@ -14,15 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="vi" className={beVietnamPro.variable} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <AuthProvider>
           {children}

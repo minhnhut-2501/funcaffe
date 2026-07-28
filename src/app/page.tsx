@@ -42,6 +42,7 @@ const showcases = [
     desc: 'Món theo danh mục, có ảnh, giá theo size và topping. Người dùng mới nhìn là chọn được ngay, không sợ nhầm.',
     points: ['Món có ảnh, chia danh mục', 'Nhiều size và topping cho mỗi món', 'Tìm món tức thì khi quán đông'],
     img: '/product/pos-menu.png', label: 'FunCafe · Thực đơn',
+    imgSize: [1118, 1584] as [number, number],
     float: null, glow: 'bg-gold/12',
   },
   {
@@ -110,6 +111,8 @@ export default function HomePage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/banners/cafe-interior.jpg"
+          srcSet="/banners/cafe-interior-900w.jpg 900w, /banners/cafe-interior.jpg 1600w"
+          sizes="100vw"
           alt="Không gian quán cafe ấm cúng"
           className="absolute inset-0 w-full h-full object-cover"
           loading="eager"
@@ -243,7 +246,14 @@ export default function HomePage() {
                   </Reveal>
                   <Reveal delay={120} className={`relative ${flip ? 'lg:order-1' : ''}`}>
                     <div aria-hidden className={`absolute -inset-6 rounded-[2.5rem] blur-3xl ${s.glow}`} />
-                    <AppShot src={s.img} alt={s.title} label={s.label} className={flip ? 'rotate-[-1deg]' : 'rotate-[1deg]'} />
+                    <AppShot
+                      src={s.img}
+                      alt={s.title}
+                      label={s.label}
+                      className={flip ? 'rotate-[-1deg]' : 'rotate-[1deg]'}
+                      width={s.imgSize?.[0]}
+                      height={s.imgSize?.[1]}
+                    />
                     {s.float && (
                       <div className={`absolute -bottom-6 z-20 w-[30%] max-w-[150px] rounded-xl border border-line bg-white overflow-hidden ${flip ? '-right-4 rotate-[5deg]' : '-left-4 rotate-[-5deg]'} hidden sm:block`}
                         style={{ boxShadow: '0 22px 48px -20px rgba(15,23,42,0.45)' }}>
@@ -295,6 +305,8 @@ export default function HomePage() {
             <img
               src="/product/ai-chat.png"
               alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý ba combo đồ uống kèm giá cho buổi chiều vắng khách"
+              width={768}
+              height={1066}
               className="relative w-full max-w-[340px] rounded-2xl border border-line bg-white"
               style={{ boxShadow: '0 34px 80px -34px rgba(15,23,42,0.45)' }}
               loading="lazy"

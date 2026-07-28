@@ -37,6 +37,8 @@ export default function Banner({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={image}
+        srcSet={`${image.replace(/\.jpg$/, '-900w.jpg')} 900w, ${image} 1600w`}
+        sizes="100vw"
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}

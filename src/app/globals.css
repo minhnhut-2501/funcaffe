@@ -35,7 +35,7 @@
   --color-pine: #2F6F5E;        /* xanh lá — trạng thái tích cực */
   --color-line: #E2E8F0;        /* đường kẻ (slate-200) */
 
-  --font-sans: 'Be Vietnam Pro', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-be-vietnam-pro), 'Inter', ui-sans-serif, system-ui, sans-serif;
 
   /* Bán kính nhất quán */
   --radius-xl: 0.875rem;

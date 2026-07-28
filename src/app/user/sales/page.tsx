@@ -76,6 +76,7 @@ export default function SalesPage() {
   const managable = canManage(user?.subscription);
   const [loading, setLoading] = useState(true);
   const [clearConfirm, setClearConfirm] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'tables' | 'menu' | 'cart'>('tables');
   const [savingItem, setSavingItem] = useState(false);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [draftOrderIds, setDraftOrderIds] = useState<Record<string, string>>({});
@@ -469,9 +470,23 @@ export default function SalesPage() {
       </div>
 
       {loading ? <div className="flex-1"><LoadingSkeleton variant="table" rows={6} cols={4} /></div> : (
+      <>
+      {/* Tab chuyển cột trên mobile — desktop vẫn xem cả 3 cột cùng lúc như cũ */}
+      <div className="md:hidden flex gap-1.5 mb-3 bg-sand rounded-xl p-1">
+        {([
+          { key: 'tables', label: 'Bàn' },
+          { key: 'menu', label: 'Menu' },
+          { key: 'cart', label: `Giỏ hàng${cart.length ? ` (${cart.length})` : ''}` },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setMobileTab(t.key)}
+            className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-colors ${mobileTab === t.key ? 'bg-white text-bean shadow-soft' : 'text-cafe-500'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
       <div className="flex flex-col md:flex-row gap-3 flex-1 md:min-h-0">
         {/* Column 1: Tables */}
-        <div data-shot="tables" className="h-[40vh] md:h-auto w-full md:w-[26%] shrink-0 bg-white rounded-2xl border border-line shadow-soft flex flex-col overflow-hidden">
+        <div data-shot="tables" className={`${mobileTab === 'tables' ? 'flex' : 'hidden'} md:flex h-[60vh] md:h-auto w-full md:w-[26%] shrink-0 bg-white rounded-2xl border border-line shadow-soft flex-col overflow-hidden`}>
           <div className="px-3.5 py-2.5 border-b border-line bg-sand/60 space-y-2">
             <p className="text-[11px] font-bold text-bean uppercase tracking-wider">Bàn</p>
             <select className="input-funcafe text-xs py-1.5" value={tableFilter} onChange={e => setTableFilter(e.target.value)}>
@@ -480,23 +495,23 @@ export default function SalesPage() {
           </div>
           <div className="flex-1 overflow-y-auto p-2.5 grid grid-cols-2 gap-2 content-start">
             {filteredTables.map(t => (
-              <TableTile key={t.id} table={t} selected={selectedTable?.id === t.id} onClick={() => setSelectedTable(t)} />
+              <TableTile key={t.id} table={t} selected={selectedTable?.id === t.id} onClick={() => { setSelectedTable(t); setMobileTab('menu'); }} />
             ))}
             {filteredTables.length === 0 && <p className="col-span-2 text-xs text-cafe-400 text-center py-6">{tables.length === 0 ? 'Bạn chưa thêm bàn nào' : 'Không tìm thấy bàn'}</p>}
           </div>
         </div>
 
         {/* Column 2: Menu */}
-        <div data-shot="menu" className="h-[58vh] md:h-auto w-full md:flex-1 bg-white rounded-2xl border border-line shadow-soft flex flex-col overflow-hidden">
+        <div data-shot="menu" className={`${mobileTab === 'menu' ? 'flex' : 'hidden'} md:flex h-[60vh] md:h-auto w-full md:flex-1 bg-white rounded-2xl border border-line shadow-soft flex-col overflow-hidden`}>
           <div className="px-3.5 py-2.5 border-b border-line bg-sand/60 space-y-2">
             <p className="text-[11px] font-bold text-bean uppercase tracking-wider">Thực đơn</p>
             <input className="input-funcafe py-1.5 text-xs" placeholder="Tìm món..." value={menuSearch} onChange={e => setMenuSearch(e.target.value)} />
             <div className="flex gap-1.5 flex-wrap">
               <button onClick={() => setCatFilter('all')}
-                className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${catFilter === 'all' ? 'bg-bean text-white' : 'bg-sand text-slate hover:bg-bean-tint hover:text-bean'}`}>Tất cả</button>
+                className={`text-xs px-3.5 py-2 md:px-3 md:py-1 rounded-full font-semibold transition-colors ${catFilter === 'all' ? 'bg-bean text-white' : 'bg-sand text-slate hover:bg-bean-tint hover:text-bean'}`}>Tất cả</button>
               {categories.filter(cat => cat.isActive).map(cat => (
                 <button key={cat.id} onClick={() => setCatFilter(cat.id)}
-                  className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${catFilter === cat.id ? 'bg-bean text-white' : 'bg-sand text-slate hover:bg-bean-tint hover:text-bean'}`}>{cat.name}</button>
+                  className={`text-xs px-3.5 py-2 md:px-3 md:py-1 rounded-full font-semibold transition-colors ${catFilter === cat.id ? 'bg-bean text-white' : 'bg-sand text-slate hover:bg-bean-tint hover:text-bean'}`}>{cat.name}</button>
               ))}
             </div>
           </div>
@@ -518,7 +533,7 @@ export default function SalesPage() {
         </div>
 
         {/* Column 3: Cart */}
-        <div data-shot="cart" className="h-[58vh] md:h-auto w-full md:w-[28%] shrink-0 bg-white rounded-2xl border border-line shadow-soft flex flex-col overflow-hidden">
+        <div data-shot="cart" className={`${mobileTab === 'cart' ? 'flex' : 'hidden'} md:flex h-[60vh] md:h-auto w-full md:w-[28%] shrink-0 bg-white rounded-2xl border border-line shadow-soft flex-col overflow-hidden`}>
           <div className="px-3.5 py-2.5 border-b border-line bg-sand/60 flex items-center justify-between">
             <p className="text-[11px] font-bold text-bean uppercase tracking-wider">
               {selectedTable ? selectedTable.name : 'Order hiện tại'}
@@ -556,11 +571,11 @@ export default function SalesPage() {
                         {c.note && <span className="block text-xs text-cafe-400 italic mt-0.5">&ldquo;{c.note}&rdquo;</span>}
                       </span>
                     </button>
-                    <button onClick={() => removeCartItem(c.id)} className="text-cafe-300 hover:text-red-500 p-0.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => removeCartItem(c.id)} className="text-cafe-300 hover:text-red-500 p-2 md:p-0.5 shrink-0"><X className="w-4 h-4 md:w-3.5 md:h-3.5" /></button>
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <div className="flex items-center gap-1.5">
-                      <button onClick={() => updateQty(c.id, -1)} className="w-6 h-6 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Minus className="w-3 h-3" /></button>
+                      <button onClick={() => updateQty(c.id, -1)} className="w-9 h-9 md:w-6 md:h-6 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Minus className="w-3.5 h-3.5 md:w-3 md:h-3" /></button>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -573,9 +588,9 @@ export default function SalesPage() {
                         onBlur={(e) => {
                           if (!e.target.value || parseInt(e.target.value, 10) < 1) setQty(c.id, 1);
                         }}
-                        className="text-xs font-bold w-9 h-6 text-center rounded-lg border border-line bg-white focus:outline-none focus:ring-1 focus:ring-bean focus:border-bean [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="text-xs font-bold w-11 h-9 md:w-9 md:h-6 text-center rounded-lg border border-line bg-white focus:outline-none focus:ring-1 focus:ring-bean focus:border-bean [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <button onClick={() => updateQty(c.id, 1)} className="w-6 h-6 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Plus className="w-3 h-3" /></button>
+                      <button onClick={() => updateQty(c.id, 1)} className="w-9 h-9 md:w-6 md:h-6 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Plus className="w-3.5 h-3.5 md:w-3 md:h-3" /></button>
                     </div>
                     <span className="text-xs font-bold text-bean">{formatCurrency(calcCartItem(c))}</span>
                   </div>
@@ -612,6 +627,20 @@ export default function SalesPage() {
           )}
         </div>
       </div>
+
+      {/* Thanh giỏ hàng nổi trên mobile — luôn thấy tổng tiền dù đang ở tab Bàn/Menu */}
+      {selectedTable && cart.length > 0 && mobileTab !== 'cart' && (
+        <div className="md:hidden fixed bottom-4 left-3 right-3 z-30 bg-bean text-white rounded-2xl shadow-pop px-4 py-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-white/70 leading-tight">{cart.length} món</p>
+            <p className="text-sm font-bold leading-tight">{formatCurrency(cartTotal)}</p>
+          </div>
+          <button onClick={() => setMobileTab('cart')} className="shrink-0 bg-white text-bean text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5">
+            <ShoppingCart className="w-3.5 h-3.5" />Xem giỏ hàng
+          </button>
+        </div>
+      )}
+      </>
       )}
 
       {/* Option Modal */}

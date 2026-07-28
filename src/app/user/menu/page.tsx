@@ -220,7 +220,57 @@ export default function MenuPage() {
         <button onClick={resetFilters} className="btn-secondary"><RotateCcw className="w-3.5 h-3.5" />Đặt lại</button>
       </FilterBar>
 
-      <div className="bg-white rounded-2xl border border-line overflow-x-auto shadow-soft">
+      {/* Mobile: giao diện thẻ thay cho bảng cứng để không phải cuộn ngang trên màn hẹp */}
+      <div className="md:hidden space-y-2.5">
+        {filtered.map(item => {
+          const minPrice = item.hasSize && item.sizes.length > 0
+            ? Math.min(...item.sizes.filter(s => s.isActive).map(s => s.price))
+            : item.basePrice;
+          return (
+            <div key={item.id} className="bg-white rounded-2xl border border-line shadow-soft p-3.5">
+              <div className="flex gap-3">
+                {item.imageUrl ? (
+                  <img src={item.imageUrl} alt="" className="w-14 h-14 rounded-xl object-cover border border-line shrink-0" />
+                ) : (
+                  <div className="w-14 h-14 rounded-xl bg-sand border border-line flex items-center justify-center text-cafe-300 shrink-0"><ImageIcon className="w-5 h-5" /></div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-ink text-sm leading-snug truncate">{item.name}</p>
+                    <StatusBadge tone={item.isAvailable ? 'success' : 'neutral'} className="shrink-0">{item.isAvailable ? 'Đang bán' : 'Hết món'}</StatusBadge>
+                  </div>
+                  <p className="text-xs text-cafe-500 mt-0.5">{getCatName(item.categoryId)}</p>
+                  <p className="text-sm font-semibold text-bean mt-1">{item.hasSize ? `Từ ${formatCurrency(minPrice)}` : formatCurrency(item.basePrice)}</p>
+                  <div className="flex gap-1.5 mt-1.5">
+                    {item.hasSize && <span className="badge-free text-[10px]">Có size</span>}
+                    {item.allowTopping && <span className="badge-pro text-[10px]">Topping</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-1 mt-2.5 pt-2.5 border-t border-line/60">
+                <button onClick={() => setViewTarget(item)} title="Xem" className="p-3 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Eye className="w-4 h-4" /></button>
+                <button onClick={() => openEdit(item)} title="Sửa" className="p-3 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                {managable ? (
+                  <button onClick={() => handleToggleAvailable(item)}
+                    title={item.isAvailable ? 'Ẩn món (ngừng bán)' : 'Mở bán lại'}
+                    className={`p-3 rounded-lg transition-colors ${item.isAvailable ? 'text-cafe-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:text-pine hover:bg-pine/10'}`}>
+                    {item.isAvailable ? <EyeOff className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                  </button>
+                ) : (
+                  <LockedButton className="p-3 text-xs"><EyeOff className="w-3.5 h-3.5" /></LockedButton>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          items.length === 0
+            ? <EmptyState icon={UtensilsCrossed} title="Bạn chưa thêm món nào" description="Thêm món đầu tiên vào thực đơn để bắt đầu bán hàng." />
+            : <EmptyState icon={UtensilsCrossed} title="Không tìm thấy món nào" description="Thử đổi bộ lọc hoặc từ khóa tìm kiếm." />
+        )}
+      </div>
+
+      <div className="hidden md:block bg-white rounded-2xl border border-line overflow-x-auto shadow-soft">
         <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-sand border-b border-line">
             <tr>
