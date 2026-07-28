@@ -231,14 +231,12 @@ class SubscriptionController extends Controller
             // Cổng online: GIỮ 'pending' (chưa cấp gói) tới khi cổng xác nhận thanh toán.
             // Tránh việc khách chọn cổng rồi back lại vẫn được kích hoạt.
             $subscriptionStatus = ($isTrial || !$isGateway) ? 'active' : 'pending';
-            // Cổng online không đi qua duyệt tay của admin (kích hoạt tự động).
-            $isPendingReview = !$isTrial && !$isGateway;
             $paymentStatus = $isTrial ? 'paid' : 'pending';
 
             $subscription = $this->atomic(function () use (
                 $user, $cafe, $cafeId, $package, $timeSub, $startDate, $endDate, $amount,
                 $subtotal, $vatRate, $vatAmount,
-                $subscriptionStatus, $isPendingReview, $paymentStatus, $txnCode,
+                $subscriptionStatus, $paymentStatus, $txnCode,
                 $validated, $now, $isTrial
             ) {
                 $subscription = $user->subscriptions()->create([
@@ -250,7 +248,6 @@ class SubscriptionController extends Controller
                     'end_date' => $endDate,
                     'total_amount' => $amount,
                     'status' => $subscriptionStatus,
-                    'is_pending_review' => $isPendingReview,
                 ]);
 
                 $subscription->packagePayments()->create([
@@ -271,7 +268,6 @@ class SubscriptionController extends Controller
                     'previous_subscription_id' => null,
                     'previous_end_date' => null,
                     'credit_amount' => 0,
-                    'credit_status' => 'none',
                 ]);
 
                 // Set has_used_free_trial = true khi quán dùng Fun Free (trial theo QUÁN)
@@ -297,7 +293,6 @@ class SubscriptionController extends Controller
             $grossAmount = $amount;                                            // giá gói mới (đã gồm VAT)
             $credit      = min($this->calculateProratedCredit($activeSub), $grossAmount); // không vượt quá giá gói mới
             $payable     = max(0, round($grossAmount - $credit));              // số tiền thực trả sau khi cấn trừ
-            $creditStatus = $credit > 0 ? 'applied' : 'none';                  // 'applied' = đã cấn trừ trực tiếp
 
             // Nếu phần cấn trừ đã phủ hết giá gói mới (payable = 0) thì không cần qua cổng thanh toán:
             // kích hoạt ngay như luồng duyệt tay (admin xác nhận giao dịch 0đ).
@@ -306,7 +301,7 @@ class SubscriptionController extends Controller
             $subscription = $this->atomic(function () use (
                 $user, $cafeId, $package, $timeSub, $startDate, $endDate, $payable,
                 $subtotal, $vatRate, $vatAmount,
-                $txnCode, $validated, $activeSub, $credit, $creditStatus, $gatewayCharge
+                $txnCode, $validated, $activeSub, $credit, $gatewayCharge
             ) {
                 // VNPay (có thu tiền): HOÃN hủy gói cũ tới khi thanh toán xác nhận (khách back lại -> giữ nguyên gói cũ).
                 if (!$gatewayCharge) {
@@ -324,7 +319,6 @@ class SubscriptionController extends Controller
                     'end_date' => $endDate,
                     'total_amount' => $payable,
                     'status' => $gatewayCharge ? 'pending' : 'active',
-                    'is_pending_review' => !$gatewayCharge,
                 ]);
 
                 $subscription->packagePayments()->create([
@@ -345,7 +339,6 @@ class SubscriptionController extends Controller
                     'previous_subscription_id' => (string) $activeSub->id,
                     'previous_end_date' => null,
                     'credit_amount' => $credit,
-                    'credit_status' => $creditStatus,
                 ]);
 
                 return $subscription;
@@ -388,7 +381,6 @@ class SubscriptionController extends Controller
                         // Phải cộng dồn ĐÚNG THEO CẶP với end_date, nếu không calculateProratedCredit()
                         // sẽ chia số tiền cũ cho khoảng thời gian đã dài ra -> cấn trừ thiếu cho khách.
                         'total_amount' => (float) ($activeSub->total_amount ?? 0) + $amount,
-                        'is_pending_review' => true,
                     ]);
                 }
 
@@ -411,7 +403,6 @@ class SubscriptionController extends Controller
                     'previous_subscription_id' => (string) $activeSub->id,
                     'previous_end_date' => $previousEndDate,
                     'credit_amount' => 0,
-                    'credit_status' => 'none',
                 ]);
             });
 

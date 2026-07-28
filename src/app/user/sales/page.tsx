@@ -369,6 +369,18 @@ export default function SalesPage() {
     });
   };
 
+  const setQty = (id: string, qty: number) => {
+    if (!selectedTable) return;
+    setCart(prev => {
+      const next = prev.map(c => {
+        if (c.id !== id) return c;
+        return { ...c, quantity: qty };
+      }).filter(c => c.quantity > 0) as CartItem[];
+      persistCart(selectedTable.id, next);
+      return next;
+    });
+  };
+
   const [processing, setProcessing] = useState(false);
 
   const handleCancelOrder = async () => {
@@ -549,7 +561,20 @@ export default function SalesPage() {
                   <div className="flex items-center justify-between mt-2">
                     <div className="flex items-center gap-1.5">
                       <button onClick={() => updateQty(c.id, -1)} className="w-6 h-6 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Minus className="w-3 h-3" /></button>
-                      <span className="text-xs font-bold w-5 text-center">{c.quantity}</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        value={c.quantity}
+                        onChange={(e) => {
+                          const n = parseInt(e.target.value, 10);
+                          if (!Number.isNaN(n)) setQty(c.id, n);
+                        }}
+                        onBlur={(e) => {
+                          if (!e.target.value || parseInt(e.target.value, 10) < 1) setQty(c.id, 1);
+                        }}
+                        className="text-xs font-bold w-9 h-6 text-center rounded-lg border border-line bg-white focus:outline-none focus:ring-1 focus:ring-bean focus:border-bean [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
                       <button onClick={() => updateQty(c.id, 1)} className="w-6 h-6 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Plus className="w-3 h-3" /></button>
                     </div>
                     <span className="text-xs font-bold text-bean">{formatCurrency(calcCartItem(c))}</span>

@@ -22,10 +22,9 @@ class PackagePayment extends Model
         'note', 'paid_at',
         'action_type', 'previous_subscription_id', 'previous_end_date',
         // Nâng cấp giữa kỳ: giá trị còn lại của gói cũ được CẤN TRỪ THẲNG vào giá gói mới
-        // (khách chỉ trả phần chênh lệch). Đây KHÔNG phải hoàn tiền mặt — không có luồng
-        // admin duyệt, nên chỉ có 2 trạng thái.
-        // credit_status: none | applied
-        'credit_amount', 'credit_status',
+        // (khách chỉ trả phần chênh lệch, lưu như một dòng biên lai). Đây KHÔNG phải hoàn
+        // tiền mặt; đã "applied" hay chưa suy trực tiếp từ credit_amount > 0.
+        'credit_amount',
         // Thông tin từ cổng thanh toán online (VNPay)
         'gateway_txn_no', 'gateway_bank_code',
     ];

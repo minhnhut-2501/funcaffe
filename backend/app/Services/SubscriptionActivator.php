@@ -52,7 +52,6 @@ class SubscriptionActivator
                 }
             }
 
-            $sub->update(['is_pending_review' => false]);
             if ($sub->status !== 'active') {
                 $sub->update(['status' => 'active']);
             }
@@ -121,15 +120,9 @@ class SubscriptionActivator
         }
 
         if ($payment->action_type === 'new') {
-            $sub->update([
-                'status' => 'cancelled',
-                'is_pending_review' => false,
-            ]);
+            $sub->update(['status' => 'cancelled']);
         } elseif ($payment->action_type === 'upgrade') {
-            $sub->update([
-                'status' => 'cancelled',
-                'is_pending_review' => false,
-            ]);
+            $sub->update(['status' => 'cancelled']);
             // Khôi phục subscription cũ nếu còn hạn
             if ($payment->previous_subscription_id) {
                 $oldSub = Subscription::find($payment->previous_subscription_id);
@@ -138,10 +131,10 @@ class SubscriptionActivator
                 }
             }
             // Khoản cấn trừ đi liền với subscription mới đã bị hủy ở trên, nên không
-            // cần đụng credit_amount/credit_status: chúng chỉ còn giá trị lịch sử.
+            // cần đụng credit_amount: nó chỉ còn giá trị lịch sử (biên lai).
         } elseif ($payment->action_type === 'renew') {
             // Rollback end_date về previous_end_date
-            $updateData = ['is_pending_review' => false];
+            $updateData = [];
             if ($payment->previous_end_date) {
                 $updateData['end_date'] = $payment->previous_end_date;
             }

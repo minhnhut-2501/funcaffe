@@ -10,11 +10,14 @@ import Link from 'next/link';
 import {
   PencilLine, HelpCircle, Layers, Calculator,
   Check, ArrowRight, UserPlus, Store, ListPlus, Play, Sparkles,
+  Building2, ArrowLeftRight, Wallet, Gift, Zap, Crown,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { packageService, timeSubscriptionService } from '@/services';
 import type { Package, TimeSubscription } from '@/types';
 import { formatCurrency } from '@/lib/format';
+
+const planIcons: Record<string, typeof Gift> = { free: Gift, pro: Zap, promax: Crown };
 
 const problems = [
   { icon: PencilLine, text: 'Ghi order bằng giấy dễ nhầm món, sai số lượng.' },
@@ -59,9 +62,17 @@ const steps = [
 ];
 
 const aiPoints = [
-  'Hỏi nhanh: doanh thu hôm nay, còn bao nhiêu bàn trống',
+  'Hỏi nhanh: doanh thu hôm nay, thực đơn và giá từng món',
   'Gợi ý combo và khuyến mãi dựa trên món quán đang bán',
-  'Tự phân tích doanh thu, chỉ ra món bán chạy và giờ cao điểm',
+  'Tự phân tích doanh thu, chỉ ra món bán chạy và xu hướng theo ngày/tháng',
+];
+
+// Đa quán (đa chi nhánh): một tài khoản quản nhiều quán, mỗi quán có dữ liệu
+// riêng, chuyển qua lại bằng bộ chọn ở đầu trang. Ảnh là màn hình thật.
+const branchPoints = [
+  { icon: Building2, title: 'Thêm quán bao nhiêu tuỳ ý', desc: 'Mỗi chi nhánh có bàn, thực đơn và hóa đơn riêng — không lẫn vào nhau.' },
+  { icon: ArrowLeftRight, title: 'Đổi chi nhánh trong một chạm', desc: 'Bộ chọn quán ngay đầu trang, chuyển qua lại mà không cần đăng xuất.' },
+  { icon: Wallet, title: 'Tổng doanh thu mọi quán', desc: 'Xem con số gộp của cả chuỗi, hoặc bóc tách doanh thu từng chi nhánh.' },
 ];
 
 // Số liệu trấn an hiển thị trên banner ảnh (không phải số kỹ thuật bịa).
@@ -131,6 +142,54 @@ export default function HomePage() {
               <Check className="w-4 h-4 text-[#93C5FD]" /> Miễn phí 7 ngày · Không cần thẻ tín dụng
             </Reveal>
           </div>
+        </div>
+      </section>
+
+      {/* 1.5 Đa quán — năng lực nổi bật ngay sau hero: một tài khoản, nhiều chi nhánh.
+          Ảnh là màn hình thật (danh sách quán + bộ chọn quán). overflow-x-clip vì
+          quầng sáng -inset-6 và thẻ nổi tràn nhẹ ra ngoài khung ở màn 390px. */}
+      <section className="bg-paper-textured border-b border-line overflow-x-clip">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+          <Reveal>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-bean px-3 py-1 text-xs font-semibold text-white">
+              <Building2 className="w-3.5 h-3.5" aria-hidden /> Một tài khoản · nhiều chi nhánh
+            </span>
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-ink mt-4 mb-3 leading-[1.15]">
+              Có bao nhiêu quán cũng <span className="text-bean">quản trên một tài khoản</span>
+            </h2>
+            <p className="text-ink/75 leading-relaxed mb-7 max-w-md">
+              Mở thêm chi nhánh không phải lập tài khoản mới. Mỗi quán giữ dữ liệu riêng,
+              còn bạn thì đổi qua lại và xem tổng doanh thu cả chuỗi chỉ trên một màn hình.
+            </p>
+            <ul className="space-y-4 mb-8">
+              {branchPoints.map((p, i) => (
+                <Reveal as="li" key={p.title} delay={i * 80} className="flex gap-3.5 items-start">
+                  <span className="w-10 h-10 rounded-xl bg-bean/10 border border-bean/15 flex items-center justify-center shrink-0">
+                    <p.icon className="w-5 h-5 text-bean" aria-hidden />
+                  </span>
+                  <div>
+                    <p className="font-semibold text-ink leading-snug">{p.title}</p>
+                    <p className="text-sm text-ink/65 leading-relaxed mt-0.5">{p.desc}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </ul>
+            <Link href="/register" className="btn-cafe px-6 py-3 text-base inline-flex items-center gap-2">
+              Dùng thử miễn phí <ArrowRight className="w-4 h-4" aria-hidden />
+            </Link>
+          </Reveal>
+
+          <Reveal delay={120} className="relative">
+            <div aria-hidden className="absolute -inset-6 rounded-[2.5rem] blur-3xl bg-bean/10" />
+            <AppShot src="/product/cafes-multi.png" alt="Danh sách nhiều quán trên một tài khoản FunCafe" label="FunCafe · Quản lý quán" className="rotate-[1deg]" />
+            <div
+              className="absolute -bottom-6 -left-4 z-20 w-[42%] max-w-[210px] rounded-xl border border-line bg-white overflow-hidden rotate-[-5deg] hidden sm:block"
+              style={{ boxShadow: '0 22px 48px -20px rgba(15,23,42,0.45)' }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/product/cafe-switcher.png" alt="Bộ chọn quán để chuyển nhanh giữa các chi nhánh" className="block w-full object-cover object-left-top h-full max-h-[130px]" loading="lazy" />
+            </div>
+          </Reveal>
         </div>
       </section>
 
@@ -296,10 +355,11 @@ export default function HomePage() {
             <h2 className="text-2xl md:text-3xl font-bold text-ink mb-3">Gói dịch vụ</h2>
             <p className="text-ink/70">Bắt đầu với gói dùng thử, nâng cấp khi quán cần thêm tính năng.</p>
           </Reveal>
-          <div className="grid sm:grid-cols-3 gap-5 max-w-4xl mx-auto items-start">
+          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto pt-3">
             {loadingPkg && packages.length === 0 &&
               Array.from({ length: 3 }).map((_, i) => (
-                <div key={`sk-${i}`} className="rounded-2xl border border-line p-6 bg-white animate-pulse">
+                <div key={`sk-${i}`} className="flex flex-col rounded-3xl border border-line p-7 bg-white animate-pulse">
+                  <div className="h-9 w-9 rounded-full bg-sand mb-4" />
                   <div className="h-4 w-24 rounded bg-sand mb-3" />
                   <div className="h-7 w-28 rounded bg-sand mb-5" />
                   <div className="space-y-2.5">
@@ -311,34 +371,59 @@ export default function HomePage() {
               ))}
             {packages.map((pkg, i) => {
               const highlight = pkg.type === 'promax';
+              const PlanIcon = planIcons[pkg.type] ?? Gift;
               const sub = (timeSubsMap[pkg.id] ?? []).find(t => t.durationValue === 1 && t.durationUnit === 'month');
               const priceLabel = pkg.isTrial ? 'Miễn phí' : sub ? formatCurrency(sub.price) : 'Liên hệ';
-              const period = pkg.isTrial ? '7 ngày dùng thử' : '/tháng';
+              const period = pkg.isTrial ? '7 ngày dùng thử' : '/ tháng';
               return (
-                <Reveal
-                  key={pkg.id}
-                  delay={i * 80}
-                  className={`relative rounded-2xl border p-6 bg-white lift ${
-                    highlight ? 'border-bean ring-1 ring-bean/30 sm:-mt-3 sm:mb-3 shadow-md' : 'border-line'
-                  }`}
-                >
-                  {highlight && (
-                    <span className="absolute -top-3 left-6 inline-flex items-center rounded-full bg-bean px-3 py-1 text-xs font-medium text-white">
-                      Phổ biến nhất
-                    </span>
-                  )}
-                  <h3 className="font-bold text-ink mb-1">{pkg.name}</h3>
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <span className="text-2xl font-bold text-bean">{priceLabel}</span>
-                    <span className="text-xs text-ink/70">{period}</span>
+                <Reveal key={pkg.id} delay={i * 80} className="h-full">
+                  <div
+                    className={`group relative flex h-full flex-col rounded-3xl border p-7 transition-all duration-300 ${
+                      highlight
+                        ? 'border-bean bg-gradient-to-b from-bean-tint to-white shadow-xl shadow-bean/15 sm:scale-[1.04]'
+                        : 'border-line bg-white shadow-sm hover:-translate-y-1 hover:shadow-lg hover:border-bean/30'
+                    }`}
+                  >
+                    {highlight && (
+                      <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-bean px-3.5 py-1 text-xs font-semibold text-white shadow-sm shadow-bean/30">
+                        <Sparkles className="w-3 h-3" aria-hidden /> Phổ biến nhất
+                      </span>
+                    )}
+                    <div
+                      className={`flex items-center justify-center w-10 h-10 rounded-full mb-4 ${
+                        highlight ? 'bg-bean text-white' : 'bg-bean-tint text-bean'
+                      }`}
+                    >
+                      <PlanIcon className="w-5 h-5" aria-hidden />
+                    </div>
+                    <h3 className="font-bold text-ink text-lg mb-3">{pkg.name}</h3>
+                    <div className="mb-5">
+                      <span className={`text-3xl font-extrabold ${highlight ? 'text-bean' : 'text-ink'}`}>
+                        {priceLabel}
+                      </span>
+                      <p className="text-xs font-medium text-ink/60 mt-1">{period}</p>
+                    </div>
+                    <ul className="flex-1 space-y-3 mb-6">
+                      {pkg.features.slice(0, 4).map((f) => (
+                        <li key={f} className="flex items-start gap-2.5 text-sm text-ink/70">
+                          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-pine/10 shrink-0 mt-0.5">
+                            <Check className="w-3 h-3 text-pine" strokeWidth={3} />
+                          </span>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      href="/register"
+                      className={`inline-flex items-center justify-center gap-1.5 rounded-lg h-11 px-4 text-sm font-semibold transition-colors ${
+                        highlight
+                          ? 'bg-bean text-white hover:bg-bean-dark'
+                          : 'bg-bean-tint text-bean hover:bg-bean/15'
+                      }`}
+                    >
+                      Chọn {pkg.name}
+                    </Link>
                   </div>
-                  <ul className="space-y-2">
-                    {pkg.features.slice(0, 4).map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-ink/70">
-                        <Check className="w-4 h-4 text-pine shrink-0 mt-0.5" />{f}
-                      </li>
-                    ))}
-                  </ul>
                 </Reveal>
               );
             })}

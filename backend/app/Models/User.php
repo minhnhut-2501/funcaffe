@@ -36,7 +36,6 @@ class User extends Authenticatable
         'avatar',
         'role',
         'status',
-        'has_used_free_trial',
         'reset_token',
         'reset_token_expires_at',
     ];
@@ -50,7 +49,6 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'has_used_free_trial' => 'boolean',
         'reset_token_expires_at' => 'datetime',
     ];
 

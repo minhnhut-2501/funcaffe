@@ -23,7 +23,6 @@ class Subscription extends Model
         'package_name_snapshot',
         'start_date', 'end_date', 'status',
         'total_amount',
-        'is_pending_review',
     ];
 
     /**

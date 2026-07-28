@@ -122,7 +122,7 @@ const chapters: Chapter[] = [
 ];
 
 const aiFeatures: Feature[] = [
-  { name: 'Hỏi đáp bằng tiếng Việt', desc: 'Hỏi “doanh thu hôm nay bao nhiêu”, “còn mấy bàn trống” và nhận câu trả lời dựa trên số liệu thật của quán bạn.' },
+  { name: 'Hỏi đáp bằng tiếng Việt', desc: 'Hỏi “doanh thu hôm nay bao nhiêu”, “thực đơn có món gì, giá bao nhiêu” và nhận câu trả lời dựa trên số liệu thật của quán bạn.' },
   { name: 'Gợi ý combo và khuyến mãi', desc: 'Trợ lý đọc thực đơn thật rồi đề xuất combo kèm mức giá, không phải gợi ý chung chung.' },
   { name: 'Phân tích doanh thu tự động', desc: 'Một cú bấm để nhận ba phần: điểm nổi bật, cảnh báo bất thường và gợi ý hành động cụ thể.' },
 ];

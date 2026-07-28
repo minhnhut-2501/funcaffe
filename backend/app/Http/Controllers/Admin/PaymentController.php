@@ -9,9 +9,9 @@ use App\Models\PackagePayment;
  * Bảng theo dõi giao dịch mua gói — CHỈ ĐỌC.
  *
  * Đã gỡ (2026-07-22): approveRefund/rejectRefund và update.
- *  - Hai hàm duyệt hoàn tiền đều chặn bằng `credit_status` (khi đó còn tên refund_status), mà KHÔNG
- *    nơi nào trong hệ thống gán 'pending' (nâng cấp giữa kỳ cấn trừ thẳng =>
- *    'applied'). Tức là chúng không bao giờ chạy được.
+ *  - Hai hàm duyệt hoàn tiền đều chặn bằng cờ trạng thái cấn trừ cũ (`credit_status`/`refund_status`),
+ *    mà KHÔNG nơi nào gán 'pending' (nâng cấp giữa kỳ cấn trừ thẳng). Tức là chúng không bao giờ
+ *    chạy được; cờ đó nay đã được gỡ, chỉ còn `credit_amount` như dòng biên lai.
  *  - update() cho phép sửa `amount` của một bản ghi tài chính do cổng thanh toán
  *    trả về — sai nghiệp vụ, và để hở endpoint là để hở luôn cả đường sửa bằng
  *    công cụ ngoài giao diện.
