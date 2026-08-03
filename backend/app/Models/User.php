@@ -57,8 +57,6 @@ class User extends Authenticatable
         return $this->hasMany(Cafe::class);
     }
 
-    public function subscriptions()
-    {
-        return $this->hasMany(Subscription::class);
-    }
+    // Không có quan hệ subscriptions(): gói gắn với QUÁN, đi qua cafes.
+    // $user->cafes->pluck('id') rồi lọc Subscription theo cafe_id.
 }

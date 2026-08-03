@@ -31,7 +31,9 @@ class PaymentController extends Controller
      */
     public function index()
     {
-        $payments = PackagePayment::with('subscription.user', 'subscription.package', 'user', 'package')
+        // Người trả tiền lấy từ chính giao dịch (`user`), không đi vòng qua
+        // subscription: subscription không còn giữ user_id nữa.
+        $payments = PackagePayment::with('subscription.package', 'user', 'package')
             ->where(function ($q) {
                 $q->whereNotIn('payment_method', PackagePayment::ONLINE_GATEWAYS)
                   ->orWhere('payment_status', '!=', 'pending');

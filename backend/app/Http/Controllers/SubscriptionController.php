@@ -239,7 +239,10 @@ class SubscriptionController extends Controller
                 $subscriptionStatus, $paymentStatus, $txnCode,
                 $validated, $now, $isTrial
             ) {
-                $subscription = $user->subscriptions()->create([
+                // Tạo thẳng qua model, KHÔNG qua $user->subscriptions(): đi qua quan hệ
+                // sẽ tự nhét user_id vào document, mà gói thì gắn với quán chứ không
+                // gắn với tài khoản.
+                $subscription = Subscription::create([
                     'cafe_id' => $cafeId,
                     'package_id' => (string) $package->id,
                     'time_subscription_id' => $timeSub ? (string) $timeSub->id : null,
@@ -310,7 +313,7 @@ class SubscriptionController extends Controller
 
                 // Tạo sub mới. VNPay -> 'pending' (chưa hiệu lực) tới khi cổng xác nhận.
                 // total_amount = số THỰC TRẢ (đã cấn trừ) -> pro-rata lần nâng cấp sau tính đúng.
-                $subscription = $user->subscriptions()->create([
+                $subscription = Subscription::create([
                     'cafe_id' => $cafeId,
                     'package_id' => (string) $package->id,
                     'time_subscription_id' => $timeSub ? (string) $timeSub->id : null,

@@ -19,7 +19,10 @@ class Subscription extends Model
      * gian còn lại. Nó PHẢI được cập nhật đúng theo cặp với `end_date` ở mọi nhánh gia hạn.
      */
     protected $fillable = [
-        'user_id', 'cafe_id', 'package_id', 'time_subscription_id',
+        // KHÔNG có user_id: chủ sở hữu suy từ cafe_id -> cafes.user_id. Mọi truy vấn
+        // gói đều lọc theo cafe_id, nên bản sao user_id ở đây chỉ tạo thêm một nguồn
+        // sự thật thứ hai mà không ai đọc.
+        'cafe_id', 'package_id', 'time_subscription_id',
         'package_name_snapshot',
         'start_date', 'end_date', 'status',
         'total_amount',
@@ -34,11 +37,6 @@ class Subscription extends Model
     public function scopeEffective($query)
     {
         return $query->where('status', 'active')->where('end_date', '>', now());
-    }
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
     }
 
     public function cafe()
