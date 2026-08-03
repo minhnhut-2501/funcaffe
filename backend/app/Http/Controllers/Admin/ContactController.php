@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ContactReplyMail;
 use App\Models\ContactMessage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -45,17 +46,7 @@ class ContactController extends Controller
             'reply' => 'required|string|min:10|max:5000',
         ]);
 
-        $sentAt = $contact->created_at?->format('d/m/Y H:i') ?? '';
-        $body = "Chào anh/chị {$contact->full_name},\n\n"
-            . "Cảm ơn anh/chị đã liên hệ với FunCafe. Về câu hỏi của anh/chị:\n\n"
-            . $validated['reply'] . "\n\n"
-            . "--- Nội dung anh/chị đã gửi ngày {$sentAt} ---\n"
-            . $contact->content . "\n\n"
-            . "Trân trọng,\nĐội ngũ FunCafe\nsupport@funcafe.vn · 1900 1234";
-
-        Mail::raw($body, function ($m) use ($contact) {
-            $m->to($contact->email)->subject('[FunCafe] Phản hồi yêu cầu tư vấn của bạn');
-        });
+        Mail::to($contact->email)->send(new ContactReplyMail($contact, $validated['reply']));
 
         $contact->update([
             'reply'      => $validated['reply'],

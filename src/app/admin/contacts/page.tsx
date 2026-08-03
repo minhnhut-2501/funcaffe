@@ -6,7 +6,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Modal from '@/components/ui/Modal';
 import { contactService, type ContactMessage } from '@/services';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, MailOpen, Mail, Eye, Send, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, MailOpen, Mail, Eye, Send, CheckCircle2 } from 'lucide-react';
 import { formatDateTime } from '@/lib/format';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge, { type Tone } from '@/components/user/StatusBadge';
@@ -78,14 +78,6 @@ export default function AdminContactsPage() {
     } finally {
       setSending(false);
     }
-  };
-
-  const mailtoHref = (m: ContactMessage) => {
-    const subject = encodeURIComponent('[FunCafe] Phản hồi yêu cầu tư vấn của bạn');
-    const body = encodeURIComponent(
-      `Chào anh/chị ${m.fullName},\n\n\n\n--- Nội dung anh/chị đã gửi ---\n${m.content}\n`
-    );
-    return `mailto:${m.email}?subject=${subject}&body=${body}`;
   };
 
   const q = search.toLowerCase();
@@ -235,12 +227,7 @@ export default function AdminContactsPage() {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 pt-1">
-              <a href={mailtoHref(detail)} className="btn-secondary" target="_blank" rel="noreferrer">
-                <ExternalLink className="w-4 h-4" />
-                Soạn bằng ứng dụng mail
-              </a>
-              <div className="hidden sm:block flex-1" />
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-2 pt-1">
               <button onClick={() => setDetail(null)} className="btn-secondary">Đóng</button>
               <button
                 onClick={handleSendReply}
