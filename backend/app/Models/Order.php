@@ -10,8 +10,8 @@ class Order extends Model
     protected $collection = 'orders';
     protected $fillable = ['cafe_id', 'table_id', 'code', 'status', 'note', 'subtotal', 'discount_amount', 'total_amount', 'paid_at',
         // Thanh toán gộp thẳng vào order (bỏ bảng invoices): mã phiếu + phương thức +
-        // trạng thái thanh toán (paid/refunded) + tiền mặt/thối + thông tin hoàn tiền.
-        'invoice_code', 'payment_method', 'payment_status', 'cash_received', 'change_amount', 'refunded_at', 'refund_reason'];
+        // trạng thái thanh toán + tiền mặt/thối.
+        'invoice_code', 'payment_method', 'payment_status', 'cash_received', 'change_amount'];
 
     protected $casts = [
         'subtotal' => 'float',

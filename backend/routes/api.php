@@ -85,8 +85,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('cafes/{cafe}/orders/{order}', [OrderController::class, 'update'])->middleware('subscription');
     Route::post('cafes/{cafe}/orders/{order}/pay', [OrderController::class, 'pay'])->middleware('subscription');
     Route::post('cafes/{cafe}/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('subscription');
-    // C4: hoàn tiền order đã thanh toán (gộp từ InvoiceController cũ; thao tác ghi -> cần gói còn hạn)
-    Route::post('cafes/{cafe}/orders/{order}/refund', [OrderController::class, 'refund'])->middleware('subscription');
 
     // Reviews
     Route::get('cafes/{cafe}/reviews', [ReviewController::class, 'index']);

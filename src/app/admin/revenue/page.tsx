@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import SectionCard from '@/components/user/SectionCard';
 import { FilterBar } from '@/components/user/FilterBar';
+import DateRangePicker from '@/components/ui/DateRangePicker';
 
 export default function AdminRevenuePage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -101,8 +102,7 @@ export default function AdminRevenuePage() {
           <span>Lọc biểu đồ</span>
         </div>
         <FilterBar>
-          <input type="date" className="input-funcafe !w-auto min-w-[150px]" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
-          <input type="date" className="input-funcafe !w-auto min-w-[150px]" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
+          <DateRangePicker from={fromDate} to={toDate} onChange={(f, t) => { setFromDate(f); setToDate(t); }} />
           <select className="input-funcafe !w-auto min-w-[150px]" value={viewMode} onChange={e => setViewMode(e.target.value)}>
             <option value="day">Theo ngày</option>
             <option value="month">Theo tháng</option>

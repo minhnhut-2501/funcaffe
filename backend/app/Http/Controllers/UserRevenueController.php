@@ -46,7 +46,6 @@ class UserRevenueController extends Controller
             ->keyBy(fn ($s) => (string) $s->cafe_id);
 
         // Doanh thu đọc thẳng từ order đã thanh toán (bỏ bảng invoices).
-        // Loại đơn đã hoàn tiền (payment_status='refunded').
         $invoices = Order::whereIn('cafe_id', $cafeIds)
             ->where('status', 'paid')
             ->where('payment_status', 'paid')

@@ -304,39 +304,6 @@ class OrderController extends Controller
     }
 
     /**
-     * C4: Hoàn tiền một order đã thanh toán (khách trả món, thu ngân hoàn lại tiền).
-     * Chỉ hoàn được order đang 'paid'; bắt buộc ghi lý do để đối soát.
-     * Order 'refunded' bị LOẠI khỏi doanh thu (query thống kê lọc payment_status).
-     */
-    public function refund(Request $request, Cafe $cafe, Order $order)
-    {
-        $this->authorizeCafe($cafe);
-
-        if ((string) $order->cafe_id !== (string) $cafe->id) {
-            return response()->json(['message' => 'Not found'], 404);
-        }
-
-        if ($order->payment_status === 'refunded') {
-            return response()->json(['message' => 'Đơn này đã được hoàn tiền trước đó.'], 400);
-        }
-        if ($order->payment_status !== 'paid') {
-            return response()->json(['message' => 'Chỉ hoàn tiền được đơn đã thanh toán.'], 400);
-        }
-
-        $validated = $request->validate([
-            'reason' => 'required|string|max:500',
-        ]);
-
-        $order->update([
-            'payment_status' => 'refunded',
-            'refunded_at'    => now(),
-            'refund_reason'  => $validated['reason'],
-        ]);
-
-        return response()->json($order->fresh()->load(['table', 'orderDetails.orderDetailToppings.topping']));
-    }
-
-    /**
      * Helper: tạo order_detail và order_detail_toppings, tính giá từ DB.
      * Trả về [$detail, $itemTotalPrice].
      *

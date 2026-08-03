@@ -186,13 +186,11 @@ function mapInvoice(raw: any): Invoice {
     discountAmount: raw.discount_amount ?? 0,
     totalAmount: raw.total_amount ?? 0,
     paymentMethod: raw.payment_method,
-    status: raw.payment_status === 'refunded' ? 'refunded' : 'paid',
+    status: 'paid',
     createdAt: raw.created_at,
     paidAt: raw.paid_at ?? '',
     cashReceived: raw.cash_received ?? undefined,
     changeAmount: raw.change_amount ?? undefined,
-    refundedAt: raw.refunded_at ?? undefined,
-    refundReason: raw.refund_reason ?? undefined,
   };
 }
 
@@ -264,7 +262,8 @@ function mapUser(raw: any): User {
 function mapPayment(raw: any): Payment {
   const sub = raw.subscription ?? {};
   const pkg = sub.package ?? raw.package ?? {};
-  const usr = sub.user ?? raw.user ?? {};
+  // Người trả tiền nằm trên chính giao dịch; subscription không giữ user nữa.
+  const usr = raw.user ?? sub.user ?? {};
   const rawStatus = raw.payment_status ?? 'pending';
   const status: Payment['status'] = ['paid', 'pending', 'failed', 'rejected'].includes(rawStatus)
     ? rawStatus as Payment['status']
@@ -272,7 +271,7 @@ function mapPayment(raw: any): Payment {
   return {
     id: raw.id ?? raw._id,
     transactionCode: raw.transaction_code ?? '',
-    userId: sub.user_id ?? '',
+    userId: raw.user_id ?? sub.user_id ?? '',
     userName: usr.full_name ?? '',
     userEmail: usr.email ?? '',
     packageName: pkg.name ?? '',
@@ -564,15 +563,21 @@ export const invoiceService = {
     const orders = await api.get<any[]>(`/cafes/${cafeId}/orders`);
     return orders.filter((o) => o.status === 'paid').map(mapInvoice);
   },
+  /**
+   * Hóa đơn của MỘT quán chỉ định (không phụ thuộc quán đang chọn).
+   * Trang doanh thu dùng hàm này để gộp số liệu nhiều quán: /revenue/overview chỉ
+   * trả về tổng và số theo tháng nên không đủ để lọc theo ngày hay tính top món.
+   */
+  listByCafe: async (cafeId: string, cafeName?: string) => {
+    const orders = await api.get<any[]>(`/cafes/${cafeId}/orders`);
+    return orders
+      .filter((o) => o.status === 'paid')
+      .map(mapInvoice)
+      .map((inv) => ({ ...inv, cafeId, cafeName }));
+  },
   getById: async (id: string) => {
     const cafeId = await getCafeId();
     const raw = await api.get<any>(`/cafes/${cafeId}/orders/${id}`);
-    return mapInvoice(raw);
-  },
-  // C4: hoàn tiền order đã thanh toán (bắt buộc có lý do)
-  refund: async (id: string, reason: string) => {
-    const cafeId = await getCafeId();
-    const raw = await api.post<any>(`/cafes/${cafeId}/orders/${id}/refund`, { reason });
     return mapInvoice(raw);
   },
 };
@@ -901,6 +906,7 @@ export const reviewService = {
       id: raw.id ?? raw._id,
       userId: raw.user_id,
       userName: raw.user_name ?? '',
+      userEmail: raw.user_email ?? undefined,
       cafeId: raw.cafe_id,
       cafeName: raw.cafe_name ?? raw.cafe?.name ?? '',
       packageId: raw.package_id,
@@ -910,7 +916,16 @@ export const reviewService = {
       comment: raw.comment ?? undefined,
       status: raw.status,
       createdAt: raw.created_at,
-    }));
+      updatedAt: raw.updated_at ?? raw.created_at,
+      // Đánh giá tạo trước khi có tính năng lưu lịch sử sẽ không có field này.
+      history: (raw.history ?? []).map((h: any) => ({
+        rating: h.rating,
+        title: h.title ?? undefined,
+        comment: h.comment ?? undefined,
+        writtenAt: h.written_at ?? undefined,
+        replacedAt: h.replaced_at ?? undefined,
+      })),
+    } as Review));
   },
   getPublicReviews: async () => {
     const items = await api.get<any[]>(`/reviews`);

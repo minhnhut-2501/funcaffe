@@ -3,7 +3,7 @@ export type UserPackageType = 'none' | 'free' | 'pro' | 'promax';
 export type TableStatus = 'empty' | 'serving';
 export type OrderStatus = 'active' | 'paid' | 'cancelled';
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'qr_code' | 'e_wallet' | 'vietqr' | 'vnpay';
-export type InvoiceStatus = 'paid' | 'refunded';
+export type InvoiceStatus = 'paid';
 export type MenuItemStatus = 'available' | 'unavailable';
 export type ToppingStatus = 'available' | 'unavailable';
 export type PackageType = 'free' | 'pro' | 'promax';
@@ -122,9 +122,6 @@ export interface Invoice {
   paidAt: string;
   cashReceived?: number;
   changeAmount?: number;
-  // C4: hoàn tiền hóa đơn
-  refundedAt?: string;
-  refundReason?: string;
 }
 
 export interface CafeInfo {
@@ -254,10 +251,22 @@ export interface MyPayment {
   creditStatus?: CreditStatus;
 }
 
+/** Một bản đánh giá cũ đã bị chủ quán sửa đè lên. */
+export interface ReviewVersion {
+  rating: number;
+  title?: string;
+  comment?: string;
+  /** Thời điểm bản này được viết. */
+  writtenAt?: string;
+  /** Thời điểm bản này bị thay bằng bản mới. */
+  replacedAt?: string;
+}
+
 export interface Review {
   id: string;
   userId: string;
   userName?: string;
+  userEmail?: string;
   cafeId: string;
   cafeName?: string;
   packageId?: string;
@@ -267,6 +276,10 @@ export interface Review {
   comment?: string;
   status: 'visible' | 'hidden';
   createdAt: string;
+  /** Lần sửa gần nhất; bằng createdAt nếu chưa từng sửa. */
+  updatedAt?: string;
+  /** Các bản cũ, mới nhất trước. Rỗng nghĩa là chưa sửa lần nào. */
+  history?: ReviewVersion[];
 }
 
 export interface PublicReview extends Review {
