@@ -84,8 +84,31 @@ class ReviewController extends Controller
             ->first();
 
         if ($existing) {
+            $history = (array) ($existing->history ?? []);
+
+            // Chỉ lưu bản cũ khi nội dung THỰC SỰ đổi — bấm "Cập nhật" mà không
+            // sửa gì thì không sinh ra một mốc lịch sử rỗng nghĩa.
+            $changed = (int) $existing->rating !== (int) $validated['rating']
+                || ($existing->title ?? '') !== ($validated['title'] ?? '')
+                || ($existing->comment ?? '') !== ($validated['comment'] ?? '');
+
+            if ($changed) {
+                $history[] = [
+                    'rating'      => (int) $existing->rating,
+                    'title'       => $existing->title,
+                    'comment'     => $existing->comment,
+                    'package_id'  => $existing->package_id,
+                    // Thời điểm bản này được viết, và thời điểm nó bị thay thế.
+                    'written_at'  => optional($existing->updated_at ?? $existing->created_at)->toIso8601String(),
+                    'replaced_at' => now()->toIso8601String(),
+                ];
+                // Giữ 20 bản gần nhất: đủ để đối chiếu mà document không phình vô hạn.
+                $history = array_slice($history, -20);
+            }
+
             $existing->update(array_merge($validated, [
                 'package_id' => $package ? (string) $package->package_id : $existing->package_id,
+                'history'    => $history,
             ]));
             $review = $existing->fresh();
             $statusCode = 200;
