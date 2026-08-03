@@ -3,6 +3,7 @@
 import PublicLayout from '@/components/layouts/PublicLayout';
 import Reveal from '@/components/public/Reveal';
 import Banner from '@/components/public/Banner';
+import HeroSlider from '@/components/public/HeroSlider';
 import ReviewsCarousel from '@/components/public/ReviewsCarousel';
 import CtaPanel from '@/components/public/CtaPanel';
 import AppShot from '@/components/public/AppShot';
@@ -106,47 +107,8 @@ export default function HomePage() {
 
   return (
     <PublicLayout>
-      {/* 1. Hero — full-bleed ảnh thật + scrim, chữ lớn (KiotViet-style) */}
-      <section className="relative overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/banners/cafe-interior.jpg"
-          srcSet="/banners/cafe-interior-900w.jpg 900w, /banners/cafe-interior.jpg 1600w"
-          sizes="100vw"
-          alt="Không gian quán cafe ấm cúng"
-          className="absolute inset-0 w-full h-full object-cover"
-          loading="eager"
-          fetchPriority="high"
-        />
-        {/* Scrim: đậm bên trái để chữ đọc rõ, nhạt dần sang phải */}
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-[#0B1220]/92 via-[#0B1220]/72 to-[#0B1220]/40" />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-[#0B1220]/75 via-transparent to-transparent" />
-
-        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 lg:py-36">
-          <div className="max-w-2xl">
-            <Reveal as="span" className="chip">Dành cho quán cafe, trà sữa, nước ép</Reveal>
-            <Reveal as="h1" delay={70} className="banner-title text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-[1.08] tracking-tight mt-5 mb-5">
-              Phần mềm quản lý <span className="text-[#93C5FD]">quán cafe</span> gọn nhẹ
-            </Reveal>
-            <Reveal as="p" delay={140} className="banner-sub text-white/90 text-lg md:text-xl leading-relaxed mb-8 max-w-xl">
-              Gom bàn, thực đơn, order, hóa đơn và doanh thu về một màn hình —
-              đơn giản, dễ dùng cho cả người dùng mới.
-            </Reveal>
-            <Reveal as="div" delay={210} className="flex flex-col sm:flex-row gap-3">
-              <Link href="/register" className="btn-cafe px-6 py-3 text-base shadow-lg shadow-black/20">Dùng thử miễn phí</Link>
-              <Link
-                href="/pricing"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 px-6 py-3 text-base font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20 active:translate-y-px"
-              >
-                Xem bảng giá
-              </Link>
-            </Reveal>
-            <Reveal as="p" delay={260} className="banner-sub text-white/75 text-sm mt-4 flex items-center gap-2">
-              <Check className="w-4 h-4 text-[#93C5FD]" /> Miễn phí 7 ngày · Không cần thẻ tín dụng
-            </Reveal>
-          </div>
-        </div>
-      </section>
+      {/* 1. Hero — slider ảnh thật + scrim, mỗi slide một góc giới thiệu khác nhau */}
+      <HeroSlider />
 
       {/* 1.5 Đa quán — năng lực nổi bật ngay sau hero: một tài khoản, nhiều chi nhánh.
           Ảnh là màn hình thật (danh sách quán + bộ chọn quán). overflow-x-clip vì
@@ -367,7 +329,7 @@ export default function HomePage() {
             <h2 className="text-2xl md:text-3xl font-bold text-ink mb-3">Gói dịch vụ</h2>
             <p className="text-ink/70">Bắt đầu với gói dùng thử, nâng cấp khi quán cần thêm tính năng.</p>
           </Reveal>
-          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto pt-3">
+          <div className="grid sm:grid-cols-3 gap-6 pt-3">
             {loadingPkg && packages.length === 0 &&
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={`sk-${i}`} className="flex flex-col rounded-3xl border border-line p-7 bg-white animate-pulse">
@@ -416,7 +378,7 @@ export default function HomePage() {
                       <p className="text-xs font-medium text-ink/60 mt-1">{period}</p>
                     </div>
                     <ul className="flex-1 space-y-3 mb-6">
-                      {pkg.features.slice(0, 4).map((f) => (
+                      {pkg.features.map((f) => (
                         <li key={f} className="flex items-start gap-2.5 text-sm text-ink/70">
                           <span className="flex items-center justify-center w-5 h-5 rounded-full bg-pine/10 shrink-0 mt-0.5">
                             <Check className="w-3 h-3 text-pine" strokeWidth={3} />

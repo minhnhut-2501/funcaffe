@@ -3,14 +3,18 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import MediaUploader from '@/components/ui/MediaUploader';
 import { useAuth } from '@/context/AuthContext';
-import { cafeService, createCafe, revenueService, type RevenueOverview } from '@/services';
+import { cafeService, createCafe, invoiceService, revenueService, type RevenueOverview } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/format';
-import type { CafeInfo } from '@/types';
+import type { CafeInfo, Invoice } from '@/types';
 import { VN_BANKS } from '@/lib/banks';
+import { FilterBar, SearchInput } from '@/components/user/FilterBar';
+import DateRangePicker from '@/components/ui/DateRangePicker';
+import CafeRevenueComparison from '@/components/user/CafeRevenueComparison';
+import SectionCard from '@/components/user/SectionCard';
 import {
-  MapPin, Store, Pencil, Landmark,
-  Plus, Check, ArrowLeft, DollarSign, CalendarDays, TrendingUp, CreditCard, Wallet,
+  MapPin, Store, Pencil, Landmark, RotateCcw, Receipt, BarChart3,
+  Plus, Check, ArrowLeft, DollarSign, CalendarDays, TrendingUp,
 } from 'lucide-react';
 
 const STATUS_META: Record<string, { label: string; cls: string; dot: string }> = {
@@ -20,6 +24,12 @@ const STATUS_META: Record<string, { label: string; cls: string; dot: string }> =
 };
 
 const emptyForm: CafeInfo = { id: '', name: '', address: '', phone: '', description: '', status: 'open' };
+
+/** Ngày thanh toán 'YYYY-MM-DD'; hóa đơn cũ thiếu paid_at thì lấy ngày tạo. */
+const dayOf = (i: Invoice) => (i.paidAt || i.createdAt).slice(0, 10);
+const now = new Date();
+const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+const thisMonthStr = todayStr.slice(0, 7);
 
 type Mode = 'list' | 'edit';
 
@@ -33,6 +43,11 @@ export default function CafePage() {
   const [saving, setSaving] = useState(false);
   const [overview, setOverview] = useState<RevenueOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const loadOverview = useCallback(() => {
     revenueService.overview().then(setOverview).catch(() => setOverview(null));
@@ -51,12 +66,80 @@ export default function CafePage() {
     setLoading(false);
   }, [cafes.length, loadOverview]);
 
-  // Bản đồ doanh thu/gói theo cafeId để render thẻ.
-  const revByCafe = useMemo(() => {
+  // Thông tin GÓI của từng quán lấy từ /revenue/overview (endpoint này không lọc
+  // được theo ngày nên phần tiền bên dưới tính từ hóa đơn).
+  const pkgByCafe = useMemo(() => {
     const m: Record<string, RevenueOverview['cafes'][number]> = {};
     (overview?.cafes ?? []).forEach((c) => { m[c.cafeId] = c; });
     return m;
   }, [overview]);
+
+  // Hóa đơn của mọi quán -> cho phép lọc doanh thu theo khoảng ngày, thứ mà
+  // /revenue/overview không làm được (nó chỉ trả tổng, hôm nay và tháng này).
+  const cafeKey = cafes.map(c => c.id).join(',');
+  useEffect(() => {
+    if (cafes.length === 0) { setInvoices([]); return; }
+    let cancelled = false;
+    Promise.all(cafes.map(c => invoiceService.listByCafe(c.id, c.name)))
+      .then(res => { if (!cancelled) setInvoices(res.flat()); })
+      .catch(() => { if (!cancelled) setInvoices([]); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cafeKey]);
+
+  const hasRange = !!(fromDate || toDate);
+  const ranged = useMemo(() => {
+    let r = invoices;
+    if (fromDate) r = r.filter(i => dayOf(i) >= fromDate);
+    if (toDate) r = r.filter(i => dayOf(i) <= toDate);
+    return r;
+  }, [invoices, fromDate, toDate]);
+
+  // Doanh thu từng quán trong khoảng đang lọc — dùng cho bảng so sánh.
+  const statByCafe = useMemo(() => {
+    const m: Record<string, { total: number; count: number }> = {};
+    cafes.forEach(c => { m[c.id] = { total: 0, count: 0 }; });
+    ranged.forEach(i => {
+      const e = m[i.cafeId ?? ''];
+      if (!e) return;
+      e.total += i.totalAmount;
+      e.count += 1;
+    });
+    return m;
+  }, [cafes, ranged]);
+
+  const rangeRevenue = useMemo(() => ranged.reduce((s, i) => s + i.totalAmount, 0), [ranged]);
+  const todayRevenue = useMemo(
+    () => invoices.filter(i => dayOf(i) === todayStr).reduce((s, i) => s + i.totalAmount, 0),
+    [invoices],
+  );
+  const monthRevenue = useMemo(
+    () => invoices.filter(i => dayOf(i).startsWith(thisMonthStr)).reduce((s, i) => s + i.totalAmount, 0),
+    [invoices],
+  );
+  const avgPerInvoice = ranged.length > 0 ? Math.round(rangeRevenue / ranged.length) : 0;
+
+  const comparisonRows = useMemo(
+    () => cafes.map(c => ({
+      id: c.id,
+      name: c.name,
+      revenue: statByCafe[c.id]?.total ?? 0,
+      count: statByCafe[c.id]?.count ?? 0,
+    })),
+    [cafes, statByCafe],
+  );
+
+  const rangeLabel = hasRange
+    ? `${fromDate ? fromDate.split('-').reverse().join('/') : 'đầu kỳ'} → ${toDate ? toDate.split('-').reverse().join('/') : 'nay'}`
+    : 'toàn bộ thời gian';
+
+  // Bộ lọc chỉ hiện khi có từ 3 quán trở lên; ít hơn thì nhìn là thấy hết rồi.
+  const showFilters = cafes.length > 2;
+  const q = search.trim().toLowerCase();
+  const visibleCafes = useMemo(() => cafes.filter(c =>
+    (statusFilter === 'all' || c.status === statusFilter) &&
+    (q === '' || c.name.toLowerCase().includes(q) || (c.address ?? '').toLowerCase().includes(q))
+  ), [cafes, statusFilter, q]);
 
   const openCreate = () => {
     setForm(emptyForm);
@@ -222,100 +305,179 @@ export default function CafePage() {
         actions={<button onClick={openCreate} className="btn-primary"><Plus className="w-4 h-4" />Thêm quán</button>}
       />
 
+      {/* Bộ lọc khoảng ngày phải nằm NGOÀI băng doanh thu: băng đó có overflow-hidden
+          để bo góc khối màu bên trong, đặt lịch vào trong sẽ bị cắt mất bảng lịch. */}
+      <FilterBar>
+        <DateRangePicker from={fromDate} to={toDate} onChange={(f, t) => { setFromDate(f); setToDate(t); }} />
+        {hasRange && (
+          <button onClick={() => { setFromDate(''); setToDate(''); }} className="btn-secondary">
+            <RotateCcw className="w-3.5 h-3.5" />Xóa lọc
+          </button>
+        )}
+        <span className="text-sm text-cafe-500">
+          Đang xem <span className="font-semibold text-ink">{rangeLabel}</span> · {ranged.length} hóa đơn
+        </span>
+      </FilterBar>
+
       {/* Băng tổng doanh thu gộp mọi quán */}
-      <section className="rounded-2xl border border-line bg-white shadow-card overflow-hidden mb-8">
+      <section className="rounded-2xl border border-line bg-white shadow-card overflow-hidden mb-6">
         <div className="flex flex-col sm:flex-row">
           <div className="flex items-center gap-4 bg-bean-tint/70 px-6 py-5 sm:w-[40%] sm:border-r border-line">
             <span className="w-12 h-12 rounded-2xl bg-bean text-white flex items-center justify-center shadow-soft shrink-0">
               <DollarSign className="w-6 h-6" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-bean-dark">Tổng doanh thu · mọi quán</p>
-              <p className="text-2xl font-bold text-ink tracking-tight tabular-nums">{formatCurrency(overview?.total ?? 0)}</p>
+              <p className="text-xs font-semibold text-bean-dark">
+                {hasRange ? 'Doanh thu trong khoảng' : 'Tổng doanh thu'}
+              </p>
+              <p className="text-2xl font-bold text-ink tracking-tight tabular-nums">{formatCurrency(rangeRevenue)}</p>
             </div>
           </div>
+          {/* Chưa lọc thì hai mốc hôm nay/tháng này hữu ích hơn; đã lọc rồi thì
+              chúng lạc quẻ, thay bằng số liệu của chính khoảng đang xem. */}
           <dl className="flex-1 grid grid-cols-3 divide-x divide-line">
-            <SummaryStat icon={CalendarDays} label="Hôm nay" value={formatCurrency(overview?.today ?? 0)} />
-            <SummaryStat icon={TrendingUp} label="Tháng này" value={formatCurrency(overview?.thisMonth ?? 0)} />
-            <SummaryStat icon={Store} label="Số quán" value={String(cafes.length)} />
+            {hasRange ? (
+              <>
+                <SummaryStat icon={Receipt} label="Số hóa đơn" value={String(ranged.length)} />
+                <SummaryStat icon={TrendingUp} label="TB/hóa đơn" value={formatCurrency(avgPerInvoice)} />
+                <SummaryStat icon={Store} label="Số quán" value={String(cafes.length)} />
+              </>
+            ) : (
+              <>
+                <SummaryStat icon={CalendarDays} label="Hôm nay" value={formatCurrency(todayRevenue)} />
+                <SummaryStat icon={TrendingUp} label="Tháng này" value={formatCurrency(monthRevenue)} />
+                <SummaryStat icon={Store} label="Số quán" value={String(cafes.length)} />
+              </>
+            )}
           </dl>
         </div>
       </section>
+
+      {cafes.length > 1 && (
+        <div className="mb-8">
+          <SectionCard
+            title="So sánh doanh thu các quán"
+            subtitle={rangeLabel}
+            icon={BarChart3}
+          >
+            <CafeRevenueComparison rows={comparisonRows} />
+          </SectionCard>
+        </div>
+      )}
 
       {/* Danh sách quán */}
       <div className="flex items-center gap-2 mb-3">
         <Store className="w-4 h-4 text-bean" />
         <h2 className="text-base font-bold text-ink">Quán của bạn</h2>
-        <span className="text-sm text-cafe-400">({cafes.length})</span>
+        <span className="text-sm text-cafe-400">
+          ({showFilters && visibleCafes.length !== cafes.length ? `${visibleCafes.length}/${cafes.length}` : cafes.length})
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {cafes.map((cafe) => {
-          const rev = revByCafe[cafe.id];
+      {showFilters && (
+        <FilterBar>
+          <SearchInput value={search} onChange={setSearch} placeholder="Tìm theo tên hoặc địa chỉ quán..." />
+          <select
+            className="input-funcafe !w-auto min-w-[160px]"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            aria-label="Lọc theo trạng thái"
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="open">Đang mở cửa</option>
+            <option value="closed">Đã đóng cửa</option>
+            <option value="inactive">Ngừng hoạt động</option>
+          </select>
+          <button onClick={() => { setSearch(''); setStatusFilter('all'); }} className="btn-secondary">
+            <RotateCcw className="w-3.5 h-3.5" />Đặt lại
+          </button>
+        </FilterBar>
+      )}
+
+      {showFilters && visibleCafes.length === 0 && (
+        <div className="rounded-2xl border border-line bg-white p-8 text-center text-sm text-cafe-500 mb-4">
+          Không có quán nào khớp bộ lọc. Thử đổi từ khóa hoặc trạng thái.
+        </div>
+      )}
+
+      {/* Danh sách dạng hàng: mỗi quán một dòng, chỉ giữ thông tin nhận diện và
+          hành động. Phần tiền đã có băng tổng và bảng so sánh ở trên lo. */}
+      <div className="space-y-3">
+        {visibleCafes.map((cafe) => {
+          const pkg = pkgByCafe[cafe.id];
           const isActive = cafe.id === activeCafeId;
           const s = STATUS_META[cafe.status] ?? STATUS_META.open;
           return (
-            <article key={cafe.id} className={`group relative flex flex-col rounded-2xl border bg-white shadow-card overflow-hidden lift ${isActive ? 'border-bean ring-1 ring-bean' : 'border-line'}`}>
-              {/* Cover + logo */}
-              <div className="relative h-16 bg-bean-tint">
-                {isActive && (
-                  <span className="absolute top-2.5 left-3 inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-bean px-2 py-0.5 rounded-full shadow-soft">
-                    <Check className="w-3 h-3" />Đang chọn
-                  </span>
-                )}
-                <span className={`absolute top-2.5 right-3 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${s.cls}`}>
+            <article
+              key={cafe.id}
+              className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border bg-white shadow-card px-4 py-3.5 transition-colors ${isActive ? 'border-bean ring-1 ring-bean' : 'border-line hover:border-bean/40'}`}
+            >
+              {/* Nhận diện quán */}
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <span className="w-12 h-12 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-bean-tint">
+                  {cafe.logoUrl ? (
+                    <img src={cafe.logoUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-bean font-bold text-lg">{cafe.name?.charAt(0) || 'C'}</span>
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-ink truncate">{cafe.name}</h3>
+                    {isActive && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-bean px-2 py-0.5 rounded-full shrink-0">
+                        <Check className="w-3 h-3" />Đang chọn
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-cafe-500 flex items-center gap-1 mt-0.5 truncate">
+                    {cafe.address ? <><MapPin className="w-3 h-3 shrink-0" />{cafe.address}</> : <span className="italic text-cafe-400">Chưa có địa chỉ</span>}
+                  </p>
+                </div>
+              </div>
+
+              {/* Trạng thái + gói */}
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${s.cls}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
                 </span>
+                {pkg?.hasPackage
+                  ? <span className={pkgBadgeClass(pkg.packageName)}>{pkg.packageName}</span>
+                  : (
+                    <a
+                      href="/user/subscription"
+                      onClick={(e) => { e.preventDefault(); handleSelect(cafe).then(() => { window.location.href = '/user/subscription'; }); }}
+                      className="text-[11px] font-semibold text-gold-deep bg-gold/12 border border-gold/25 rounded-full px-2.5 py-1 hover:bg-gold/20 transition-colors"
+                    >
+                      Chưa có gói · Mua ngay
+                    </a>
+                  )}
               </div>
-              <div className="px-5 pb-5 -mt-8 flex flex-col flex-1">
-                <div className="w-16 h-16 rounded-2xl ring-4 ring-white bg-white shadow-soft overflow-hidden flex items-center justify-center">
-                  {cafe.logoUrl ? (
-                    <img src={cafe.logoUrl} alt={cafe.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="w-full h-full bg-bean-tint text-bean flex items-center justify-center font-bold text-2xl">{cafe.name?.charAt(0) || 'C'}</span>
-                  )}
-                </div>
-                <h3 className="mt-3 font-bold text-ink text-lg truncate">{cafe.name}</h3>
-                <p className="text-xs text-cafe-500 flex items-center gap-1 mt-0.5 truncate min-h-[1rem]">
-                  {cafe.address ? <><MapPin className="w-3 h-3 shrink-0" />{cafe.address}</> : <span className="italic text-cafe-400">Chưa có địa chỉ</span>}
-                </p>
 
-                {/* Gói + doanh thu */}
-                <div className="mt-4 flex items-center justify-between rounded-xl bg-sand/70 px-3.5 py-2.5">
-                  <span className="text-xs text-cafe-500 flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5" />Gói</span>
-                  {rev?.hasPackage
-                    ? <span className={pkgBadgeClass(rev.packageName)}>{rev.packageName}</span>
-                    : <span className="badge-inactive">Chưa có gói</span>}
-                </div>
-                <div className="mt-2 flex items-baseline justify-between px-1">
-                  <span className="text-xs text-cafe-500 flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" />Doanh thu</span>
-                  <span className="text-sm font-bold text-ink tabular-nums">{formatCurrency(rev?.total ?? 0)}</span>
-                </div>
-
-                {!rev?.hasPackage && (
-                  <a href="/user/subscription" onClick={(e) => { e.preventDefault(); handleSelect(cafe).then(() => { window.location.href = '/user/subscription'; }); }}
-                    className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-gold-deep bg-gold/12 border border-gold/25 rounded-lg px-2.5 py-2 hover:bg-gold/20 transition-colors">
-                    Mua gói để mở khóa bán hàng
-                  </a>
+              {/* Hành động */}
+              <div className="flex items-center gap-2 shrink-0">
+                {!isActive ? (
+                  <button onClick={() => handleSelect(cafe)} className="btn-secondary justify-center flex-1 sm:flex-none">
+                    <Check className="w-4 h-4" />Chọn quán
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center justify-center text-xs font-semibold text-bean bg-bean-tint rounded-xl px-3.5 py-2.5 flex-1 sm:flex-none">
+                    Đang quản lý
+                  </span>
                 )}
-
-                <div className="mt-auto pt-4 flex gap-2">
-                  {!isActive ? (
-                    <button onClick={() => handleSelect(cafe)} className="btn-secondary flex-1 justify-center"><Check className="w-4 h-4" />Chọn quán</button>
-                  ) : (
-                    <span className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-bean bg-bean-tint rounded-xl py-2.5">Đang quản lý</span>
-                  )}
-                  <button onClick={() => openEdit(cafe)} className="btn-secondary justify-center !px-3" title="Sửa thông tin"><Pencil className="w-4 h-4" /></button>
-                </div>
+                <button onClick={() => openEdit(cafe)} className="btn-secondary justify-center !px-3.5" title="Sửa thông tin" aria-label={`Sửa thông tin ${cafe.name}`}>
+                  <Pencil className="w-4 h-4" />
+                </button>
               </div>
             </article>
           );
         })}
 
-        {/* Thẻ thêm quán */}
-        <button onClick={openCreate} className="group flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-line bg-white/50 text-cafe-400 hover:text-bean hover:border-bean hover:bg-bean-tint/40 min-h-[248px] transition-colors">
-          <span className="w-14 h-14 rounded-full bg-bean-tint text-bean flex items-center justify-center transition-transform group-hover:scale-110"><Plus className="w-7 h-7" /></span>
-          <span className="text-sm font-semibold">Thêm quán mới</span>
+        <button
+          onClick={openCreate}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-white/50 text-cafe-500 hover:text-bean hover:border-bean hover:bg-bean-tint/40 py-4 text-sm font-semibold transition-colors"
+        >
+          <Plus className="w-5 h-5" />Thêm quán mới
         </button>
       </div>
     </div>

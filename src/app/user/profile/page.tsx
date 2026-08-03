@@ -52,7 +52,7 @@ export default function ProfilePage() {
   const initial = user?.fullName?.charAt(0)?.toUpperCase() ?? 'U';
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-6xl">
       <PageHeader title="Hồ sơ cá nhân" description="Quản lý thông tin tài khoản và bảo mật của bạn." />
 
       <div className="grid lg:grid-cols-5 gap-6 items-start">

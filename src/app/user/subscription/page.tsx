@@ -171,7 +171,7 @@ export default function SubscriptionPage() {
   const hasCreditNote = (sub?.creditAmount ?? 0) > 0 && sub?.creditStatus === 'applied';
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-6xl">
       <PageHeader title="Gói dịch vụ" description="Mỗi quán có gói riêng — bạn đang thao tác cho quán đang chọn" />
 
       {/* Thẻ gói hiện tại — gộp tên quán + trạng thái + hành động + hoàn tiền vào một chỗ */}
@@ -287,9 +287,9 @@ export default function SubscriptionPage() {
                     {!p.isTrial && <p className="text-xs text-cafe-400 mb-2">/tháng</p>}
                     <p className="text-xs text-cafe-500 mb-3">{p.description}</p>
                     <ul className="space-y-1.5 mb-4 flex-1">
-                      {p.features.slice(0, 4).map(f => (
-                        <li key={f} className="flex items-center gap-1.5 text-xs text-cafe-600">
-                          <Check className="w-3.5 h-3.5 text-pine shrink-0" />{f}
+                      {p.features.map(f => (
+                        <li key={f} className="flex items-start gap-1.5 text-xs text-cafe-600">
+                          <Check className="w-3.5 h-3.5 text-pine shrink-0 mt-0.5" />{f}
                         </li>
                       ))}
                     </ul>
@@ -380,8 +380,8 @@ export default function SubscriptionPage() {
                 </span>
               </div>
               <ul className="mt-3 grid gap-1.5">
-                {selected.features.slice(0, 4).map(f => (
-                  <li key={f} className="flex items-center gap-1.5 text-xs text-cafe-600"><Check className="w-3.5 h-3.5 text-pine shrink-0" />{f}</li>
+                {selected.features.map(f => (
+                  <li key={f} className="flex items-start gap-1.5 text-xs text-cafe-600"><Check className="w-3.5 h-3.5 text-pine shrink-0 mt-0.5" />{f}</li>
                 ))}
               </ul>
             </div>

@@ -128,7 +128,7 @@ export default function PricingPage() {
         priority
       />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
         {/* Chọn thời hạn */}
         <Reveal className="flex justify-center mb-12">
           {/* Trên điện thoại: 3 cột đều nhau, nhãn và mức tiết kiệm xuống dòng riêng

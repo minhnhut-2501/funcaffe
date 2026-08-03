@@ -3,8 +3,11 @@ import Link from 'next/link';
 import {
   ShoppingCart, UtensilsCrossed, Receipt, TrendingUp, TrendingDown, Users,
   ClipboardList, CreditCard, AlertCircle, ArrowRight, ArrowUpRight, Sparkles, Zap,
+  BarChart3, History,
 } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
+import MiniBars from '@/components/user/MiniBars';
+import ActivityFeed, { type ActivityItem } from '@/components/user/ActivityFeed';
 import { useAuth } from '@/context/AuthContext';
 import { invoiceService, orderService, tableService } from '@/services';
 import { useApi } from '@/hooks/use-api';
@@ -17,6 +20,8 @@ const quickActions = [
   { href: '/user/invoices', icon: Receipt, label: 'Xem hóa đơn', desc: 'Lịch sử thanh toán' },
   { href: '/user/subscription', icon: CreditCard, label: 'Gói dịch vụ', desc: 'Nâng cấp / gia hạn' },
 ];
+
+const WEEKDAY_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -42,7 +47,8 @@ export default function DashboardPage() {
   const { data: orders, loading: loadingOrd, error: errorOrd } = useApi(() => orderService.list());
   const { data: tables, loading: loadingTbl, error: errorTbl } = useApi(() => tableService.list());
 
-  const activeOrders = orders?.filter(o => o.status === 'active').length ?? 0;
+  const activeOrderList = (orders ?? []).filter(o => o.status === 'active');
+  const activeOrders = activeOrderList.length;
   const now = new Date();
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const todayStr = iso(now);
@@ -58,6 +64,36 @@ export default function DashboardPage() {
 
   const delta = yesterdayRevenue > 0 ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100) : null;
   const up = (delta ?? 0) >= 0;
+
+  // Doanh thu 7 ngày gần nhất — tính từ hóa đơn đã tải, không gọi thêm API.
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - i));
+    const key = iso(d);
+    return { label: WEEKDAY_SHORT[d.getDay()], value: revOn(key), highlight: key === todayStr };
+  });
+  const weekTotal = week.reduce((s, d) => s + d.value, 0);
+
+  // Hoạt động gần đây: hóa đơn vừa thanh toán + order đang phục vụ, mới nhất lên trước.
+  const activity: ActivityItem[] = [
+    ...paid.map((i): ActivityItem => ({
+      id: `inv-${i.id}`,
+      icon: Receipt,
+      tone: 'pine',
+      title: <><span className="font-medium">{i.tableName}</span> đã thanh toán</>,
+      at: i.paidAt || i.createdAt,
+      trailing: formatCurrency(i.totalAmount),
+    })),
+    ...activeOrderList.map((o): ActivityItem => ({
+      id: `ord-${o.id}`,
+      icon: ClipboardList,
+      tone: 'bean',
+      title: <><span className="font-medium">{o.tableName}</span> đang phục vụ · {o.items.length} món</>,
+      at: o.createdAt,
+      trailing: formatCurrency(o.totalAmount),
+    })),
+  ]
+    .sort((a, b) => (a.at < b.at ? 1 : -1))
+    .slice(0, 6);
 
   if (loadingInv || loadingOrd || loadingTbl) {
     return (
@@ -85,9 +121,7 @@ export default function DashboardPage() {
     <div className="max-w-6xl space-y-6">
       {/* Lời chào + gói + CTA */}
       <section className="relative overflow-hidden rounded-3xl bg-bean text-white shadow-card px-6 py-6 sm:px-8 sm:py-7">
-        {/* Vệt sáng trang trí */}
         <div aria-hidden className="pointer-events-none absolute -top-16 -right-10 w-64 h-64 rounded-full bg-white/10 blur-2xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-24 right-24 w-56 h-56 rounded-full bg-white/5 blur-2xl" />
         <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
           <div className="min-w-0">
             <p className="text-white/70 text-sm">{dayLabel()}</p>
@@ -125,7 +159,6 @@ export default function DashboardPage() {
 
       {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Doanh thu — nổi bật, bấm để xem báo cáo */}
         <Link href="/user/revenue" className="group rounded-2xl bg-bean text-white shadow-card p-4 sm:p-5 flex flex-col lift">
           <div className="flex items-start justify-between">
             <span className="w-10 h-10 rounded-xl bg-white/15 grid place-items-center"><TrendingUp className="w-5 h-5" /></span>
@@ -148,6 +181,33 @@ export default function DashboardPage() {
         <KpiTile icon={Receipt} tone="gold" value={todayInvoicesCount} label="Hóa đơn hôm nay" />
       </div>
 
+      {/* Doanh thu tuần + hoạt động gần đây */}
+      <div className="grid lg:grid-cols-5 gap-4 sm:gap-6">
+        <section className="lg:col-span-3 rounded-2xl border border-line bg-white shadow-soft p-5 flex flex-col">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-base font-bold text-ink flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-bean" />7 ngày gần nhất
+              </h2>
+              <p className="text-sm text-cafe-500 mt-0.5">
+                Tổng <span className="font-semibold text-ink">{formatCurrency(weekTotal)}</span>
+              </p>
+            </div>
+            <Link href="/user/revenue" className="text-sm font-semibold text-bean hover:underline shrink-0 inline-flex items-center gap-1">
+              Chi tiết <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <MiniBars data={week} format={formatCurrency} className="mt-auto" />
+        </section>
+
+        <section className="lg:col-span-2 rounded-2xl border border-line bg-white shadow-soft p-5">
+          <h2 className="text-base font-bold text-ink flex items-center gap-2 mb-4">
+            <History className="w-4 h-4 text-bean" />Hoạt động gần đây
+          </h2>
+          <ActivityFeed items={activity} emptyText="Chưa có order hay hóa đơn nào hôm nay." />
+        </section>
+      </div>
+
       {/* Lối tắt */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -164,7 +224,7 @@ export default function DashboardPage() {
                 <ArrowRight className="w-4 h-4 text-cafe-300 group-hover:text-bean group-hover:translate-x-0.5 transition-all" />
               </div>
               <p className="text-sm font-semibold text-ink mt-3">{a.label}</p>
-              <p className="text-xs text-cafe-400 mt-0.5">{a.desc}</p>
+              <p className="text-xs text-cafe-500 mt-0.5">{a.desc}</p>
             </Link>
           ))}
         </div>

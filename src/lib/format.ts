@@ -49,7 +49,7 @@ export function formatDateTime(dateStr: string): string {
 export function formatPaymentMethod(method: string): string {
   const map: Record<string, string> = {
     cash: 'Tiền mặt',
-    vietqr: 'VietQR',
+    vietqr: 'Chuyển khoản',
     vnpay: 'VNPay',
     cancel: 'Hủy gói',
     bank_transfer: 'Chuyển khoản',
