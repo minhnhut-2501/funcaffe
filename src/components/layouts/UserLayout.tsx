@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Coffee, LayoutDashboard, Store, Grid3X3, UtensilsCrossed,
   CupSoda, ShoppingCart, Receipt,
@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { isSubscriptionExpired } from '@/lib/permission';
-import { invoiceService, authService } from '@/services';
+import { invoiceService } from '@/services';
 import AiChatWidget from '@/components/user/AiChatWidget';
 
 const navGroups: { title: string; items: { href: string; label: string; icon: typeof Coffee }[] }[] = [
@@ -58,16 +58,11 @@ function PackageBadge({ type }: { type: string }) {
   return <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${m.cls}`}>{m.label}</span>;
 }
 
-function Sidebar({ collapsed, mobileOpen, onClose, onToggle }: { collapsed: boolean; mobileOpen: boolean; onClose: () => void; onToggle: () => void }) {
+function Sidebar({ collapsed, mobileOpen, onClose, onToggle, onLogout }: { collapsed: boolean; mobileOpen: boolean; onClose: () => void; onToggle: () => void; onLogout: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { user } = useAuth();
   const sub = user?.subscription;
-
-  const handleLogout = async () => {
-    try { await authService.logout(); } catch {}
-    router.push('/');
-  };
+  const handleLogout = onLogout;
 
   return (
     <aside
@@ -310,14 +305,30 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isLoading, cafes, activeCafeId } = useAuth();
+  const { user, isLoading, cafes, activeCafeId, logout } = useAuth();
   const hasPackage = user?.subscription.packageType !== 'none';
   const expired = isSubscriptionExpired(user?.subscription);
+
+  // Đăng xuất phải nằm ở ĐÂY, cùng chỗ với route guard bên dưới. logout() xoá
+  // `user`, guard thấy vậy liền bắn router.replace('/login') — tranh chấp với
+  // lệnh về trang chủ. Cờ loggingOut cho guard biết đây là chủ động đăng xuất
+  // chứ không phải truy cập trái phép, nên nó đứng yên.
+  const loggingOut = useRef(false);
+  const handleLogout = useCallback(async () => {
+    loggingOut.current = true;
+    // logout() dọn state ngay rồi mới chờ mạng, nên gọi router trong cùng nhịp:
+    // React gộp hai việc vào một lần render, không có khoảnh khắc layout này bị
+    // trả về null (màn hình trắng) trước khi trang chủ kịp hiện.
+    const done = logout();
+    // replace: đã đăng xuất thì nút Back không đưa lại được vào trang quản lý.
+    router.replace('/');
+    await done;
+  }, [logout, router]);
 
   // ROUTE GUARD: khu vực /user/* yêu cầu đăng nhập với role 'user'.
   // Chưa đăng nhập -> /login; admin -> về dashboard admin.
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || loggingOut.current) return;
     if (!user) { router.replace('/login'); return; }
     if (user.role === 'admin') router.replace('/admin/dashboard');
   }, [isLoading, user, router]);
@@ -341,7 +352,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="flex h-screen overflow-hidden bg-paper">
       {mobileOpen && <div className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-40 md:hidden" onClick={() => setMobileOpen(false)} />}
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} onToggle={() => setCollapsed(!collapsed)} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} onToggle={() => setCollapsed(!collapsed)} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Topbar onMenuClick={() => setMobileOpen(true)} />
         {!hasPackage && (

@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import { api, type AuthUser, type AuthResponse, type SubscriptionData } from '@/lib/api-client';
 import type { CurrentUser, UserSubscription, CafeInfo } from '@/types';
 import { defaultPackageLimits } from '@/lib/permission';
-import { cafeService, setActiveCafeId, pickActiveCafeId } from '@/services';
+import { cafeService, setActiveCafeId, pickActiveCafeId, clearCafeCache } from '@/services';
 
 interface AuthContextType {
   user: CurrentUser | null;
@@ -16,7 +16,7 @@ interface AuthContextType {
   reloadCafes: () => Promise<CafeInfo[]>;
   login: (email: string, password: string, remember?: boolean) => Promise<'user' | 'admin'>;
   register: (data: { fullName: string; email: string; phone: string; password: string }) => Promise<'user' | 'admin'>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser?: () => Promise<void>;
 }
 
@@ -152,18 +152,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [hydrate]);
 
   const logout = useCallback(async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch {
-      // ignore
-    }
+    // Gửi lệnh thu hồi token rồi DỌN TRẠNG THÁI NGAY, không chờ mạng: request()
+    // đã đọc token ra trước lần await đầu tiên nên yêu cầu vẫn đi kèm đúng
+    // token. Nhờ vậy nút Đăng xuất phản hồi tức thì kể cả khi backend chậm.
+    const revoked = api.post('/auth/logout').catch(() => {});
     api.removeToken();
     // BUG-15 FIX: Xóa quán đang chọn khi đăng xuất tránh dùng của user cũ
-    const { clearCafeCache } = await import('@/services');
     clearCafeCache();
     setUser(null);
     setCafes([]);
     setActiveCafeIdState(null);
+    await revoked;
   }, []);
 
   const refreshUser = useCallback(async () => {

@@ -34,6 +34,31 @@ function removeToken() {
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
+/**
+ * Có nên đá người dùng về /login khi gặp 401 không?
+ *
+ * Chỉ khi một PHIÊN ĐANG SỐNG bị từ chối giữa chừng (token hết hạn / bị thu
+ * hồi từ thiết bị khác). Đá là `window.location.href` — nạp lại cả trang và
+ * cắt ngang mọi việc đang chạy — nên phải rất chọn lọc:
+ *
+ *  - `endpoint` thuộc `/auth/*`: /auth/logout trả 401 khi token đã bị thu hồi
+ *    là chuyện bình thường, không phải lý do nạp lại trang.
+ *  - Trong storage KHÔNG còn token: nghĩa là phiên đã được kết thúc CÓ CHỦ Ý
+ *    (bấm Đăng xuất) ngay trước đó. Các request đã bay đi từ trước — bảng
+ *    thông báo, danh sách hoá đơn... — mang theo token cũ nên vẫn nhận 401,
+ *    nhưng chúng chỉ là dư âm. Trước đây chính chúng kéo người dùng về /login
+ *    thay vì về trang chủ sau khi đăng xuất.
+ *
+ * Vì vậy phải đọc token TẠI THỜI ĐIỂM nhận 401, không dùng token đã bắt lúc
+ * gửi request.
+ */
+function shouldBounceToLogin(endpoint: string): boolean {
+  if (endpoint.startsWith('/auth/')) return false;
+  if (typeof window === 'undefined') return false;
+  if (!getToken()) return false;
+  return !window.location.pathname.startsWith('/login');
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -52,10 +77,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!response.ok) {
     // BUG-28 FIX: Token hết hạn → xóa token và redirect về login
     if (response.status === 401) {
+      // Quyết định TRƯỚC khi xoá token — hàm dưới đọc storage để phân biệt
+      // "phiên hết hạn" với "vừa bấm đăng xuất".
+      const bounce = shouldBounceToLogin(endpoint);
       removeToken();
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
-      }
+      if (bounce) window.location.href = '/login';
     }
     const body = await response.json().catch(() => ({}));
     throw new ApiError(
@@ -98,10 +124,9 @@ export const api = {
     });
     if (!res.ok) {
       if (res.status === 401) {
+        const bounce = shouldBounceToLogin(endpoint);
         removeToken();
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
+        if (bounce) window.location.href = '/login';
       }
       const body = await res.json().catch(() => ({}));
       throw new ApiError(body.message || `HTTP ${res.status}`, res.status, body.errors);

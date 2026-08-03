@@ -1,13 +1,13 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Coffee, LayoutDashboard, Users, Package, CreditCard,
   BarChart3, LogOut, Menu, X, Bell, Search, DollarSign,
   Star, PanelLeft, ShieldCheck, Mail as MailIcon,
 } from 'lucide-react';
-import { authService, paymentService, userService } from '@/services';
+import { paymentService, userService } from '@/services';
 import { useAuth } from '@/context/AuthContext';
 
 const navGroups: { title: string; items: { href: string; label: string; icon: typeof Coffee }[] }[] = [
@@ -50,14 +50,9 @@ const searchRoutes: Record<string, string> = {
   contact: '/admin/contacts', contacts: '/admin/contacts', 'liên hệ': '/admin/contacts', 'tin nhắn': '/admin/contacts',
 };
 
-function AdminSidebar({ collapsed, mobileOpen, onClose, onToggle }: { collapsed: boolean; mobileOpen: boolean; onClose: () => void; onToggle: () => void }) {
+function AdminSidebar({ collapsed, mobileOpen, onClose, onToggle, onLogout }: { collapsed: boolean; mobileOpen: boolean; onClose: () => void; onToggle: () => void; onLogout: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    try { await authService.logout(); } catch {}
-    router.push('/');
-  };
+  const handleLogout = onLogout;
 
   return (
     <aside
@@ -237,12 +232,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
+
+  // Đăng xuất phải nằm ở ĐÂY, cùng chỗ với route guard bên dưới. logout() xoá
+  // `user`, guard thấy vậy liền bắn router.replace('/login') — tranh chấp với
+  // lệnh về trang chủ. Cờ loggingOut cho guard biết đây là chủ động đăng xuất
+  // chứ không phải truy cập trái phép, nên nó đứng yên.
+  const loggingOut = useRef(false);
+  const handleLogout = useCallback(async () => {
+    loggingOut.current = true;
+    // logout() dọn state ngay rồi mới chờ mạng, nên gọi router trong cùng nhịp:
+    // React gộp hai việc vào một lần render, không có khoảnh khắc layout này bị
+    // trả về null (màn hình trắng) trước khi trang chủ kịp hiện.
+    const done = logout();
+    // replace: đã đăng xuất thì nút Back không đưa lại được vào trang quản trị.
+    router.replace('/');
+    await done;
+  }, [logout, router]);
 
   // ROUTE GUARD: khu vực /admin/* chỉ dành cho role 'admin'.
   // Chưa đăng nhập -> /login; user thường -> về dashboard user.
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || loggingOut.current) return;
     if (!user) { router.replace('/login'); return; }
     if (user.role !== 'admin') router.replace('/user/dashboard');
   }, [isLoading, user, router]);
@@ -254,7 +265,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex h-screen overflow-hidden bg-paper">
       {mobileOpen && <div className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-40 md:hidden" onClick={() => setMobileOpen(false)} />}
-      <AdminSidebar collapsed={collapsed} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} onToggle={() => setCollapsed(!collapsed)} />
+      <AdminSidebar collapsed={collapsed} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} onToggle={() => setCollapsed(!collapsed)} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <AdminTopbar onMenuClick={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
