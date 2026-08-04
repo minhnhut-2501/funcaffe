@@ -55,7 +55,7 @@ export default function ProfilePage() {
     <div className="max-w-6xl">
       <PageHeader title="Hồ sơ cá nhân" description="Quản lý thông tin tài khoản và bảo mật của bạn." />
 
-      <div className="grid lg:grid-cols-5 gap-6 items-start">
+      <div className="stagger grid lg:grid-cols-5 gap-6 items-start">
         {/* Thông tin cá nhân */}
         <div className="lg:col-span-3 rounded-2xl border border-line bg-white shadow-card overflow-hidden">
           {/* Cover + avatar (badge camera kiểu Facebook để đổi ảnh) */}

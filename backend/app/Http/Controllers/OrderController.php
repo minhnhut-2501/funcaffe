@@ -24,7 +24,12 @@ class OrderController extends Controller
     public function index(Request $request, Cafe $cafe)
     {
         $this->authorizeCafe($cafe);
-        $orders = $cafe->orders()->with(['orderDetails.orderDetailToppings.topping', 'table'])->get();
+        // Không có orderBy thì MongoDB trả theo thứ tự CHÈN, tức đơn cũ nhất nằm
+        // trên cùng — trang Hóa đơn mở ra là thấy đơn từ hồi khai trương.
+        $orders = $cafe->orders()
+            ->with(['orderDetails.orderDetailToppings.topping', 'table'])
+            ->orderBy('created_at', 'desc')
+            ->get();
         return response()->json($orders);
     }
 

@@ -129,7 +129,7 @@ export default function AdminPackagesPage() {
       {!loading && !error && packages.length === 0 && <EmptyState title="Chưa có gói dịch vụ" />}
 
       {!loading && !error && packages.length > 0 && (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="stagger grid grid-cols-1 md:grid-cols-3 gap-6">
         {packages.map(pkg => {
           const highlight = pkg.type === 'promax';
           return (
@@ -201,7 +201,18 @@ export default function AdminPackagesPage() {
       </div>
       )}
 
-      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={`Chỉnh sửa gói: ${editTarget?.name}`} size="lg">
+      <Modal
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        title={`Chỉnh sửa gói: ${editTarget?.name}`}
+        size="lg"
+        footer={
+          <div className="flex gap-2">
+            <button onClick={() => setEditTarget(null)} className="btn-secondary flex-1">Hủy</button>
+            <button onClick={handleSave} className="btn-primary flex-1" disabled={saving}>Lưu thay đổi</button>
+          </div>
+        }
+      >
         {editTarget && (
           <div className="space-y-6">
             {/* Package form */}
@@ -296,17 +307,23 @@ export default function AdminPackagesPage() {
                 </div>
               )}
             </div>
-
-            <div className="flex gap-2 pt-2 border-t border-line">
-              <button onClick={() => setEditTarget(null)} className="btn-secondary flex-1">Hủy</button>
-              <button onClick={handleSave} className="btn-primary flex-1" disabled={saving}>Lưu thay đổi</button>
-            </div>
           </div>
         )}
       </Modal>
 
       {/* Time Subscription add/edit modal */}
-      <Modal open={tsModal} onClose={() => setTsModal(false)} title={tsEdit ? 'Chỉnh sửa thời hạn' : 'Thêm thời hạn'} size="md">
+      <Modal
+        open={tsModal}
+        onClose={() => setTsModal(false)}
+        title={tsEdit ? 'Chỉnh sửa thời hạn' : 'Thêm thời hạn'}
+        size="md"
+        footer={
+          <div className="flex gap-2">
+            <button onClick={() => setTsModal(false)} className="btn-secondary flex-1">Hủy</button>
+            <button onClick={handleTsSave} className="btn-primary flex-1" disabled={saving}>Lưu</button>
+          </div>
+        }
+      >
         <div className="space-y-4">
           <div>
             <label className="label-funcafe">Nhãn hiển thị</label>
@@ -333,10 +350,6 @@ export default function AdminPackagesPage() {
             <input type="checkbox" checked={tsForm.status === 'active'} onChange={e => setTsForm({ ...tsForm, status: e.target.checked ? 'active' : 'inactive' })} />
             Đang hiển thị
           </label>
-          <div className="flex gap-2 pt-2">
-            <button onClick={() => setTsModal(false)} className="btn-secondary flex-1">Hủy</button>
-            <button onClick={handleTsSave} className="btn-primary flex-1" disabled={saving}>Lưu</button>
-          </div>
         </div>
       </Modal>
 

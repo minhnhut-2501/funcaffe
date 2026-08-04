@@ -29,7 +29,7 @@ export default function CafeRevenueComparison({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="stagger space-y-4">
       {sorted.map((c, idx) => (
         <div key={c.id}>
           <div className="flex items-baseline justify-between gap-3 mb-1.5">

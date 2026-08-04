@@ -266,7 +266,7 @@ export default function SubscriptionPage() {
           {!loading && !error && (packages ?? []).length === 0 && <EmptyState title="Chưa có gói dịch vụ" description="Hiện chưa có gói nào khả dụng." />}
 
           {!loading && !error && packages.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="stagger grid grid-cols-1 md:grid-cols-3 gap-4">
               {(flowAction === 'upgrade' ? upgradePackages : packages).map(p => {
                 const price = getPrice(timeSubsMap[p.id] ?? [], 1);
                 const action = actionFor(p);
@@ -333,7 +333,7 @@ export default function SubscriptionPage() {
                     <th className="text-left px-3 py-2.5 text-cafe-600 font-semibold">Thời gian</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line/70">
+                <tbody className="stagger divide-y divide-line/70">
                   {payments.map(p => (
                     <tr key={p.id} className="hover:bg-sand/50 transition-colors">
                       <td className="px-3 py-2.5 font-mono text-xs font-bold text-bean">{p.transactionCode || '—'}</td>
@@ -365,7 +365,19 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      <Modal open={paymentModal} onClose={() => { setPaymentModal(false); resetSelection(); }} title={pageTitle}>
+      <Modal
+        open={paymentModal}
+        onClose={() => { setPaymentModal(false); resetSelection(); }}
+        title={pageTitle}
+        footer={selected && (
+          <div className="flex gap-2">
+            <button onClick={() => { setPaymentModal(false); resetSelection(); setSubmitError(''); }} className="btn-secondary flex-1" disabled={submitting}>Hủy</button>
+            <button onClick={handleSubmit} className="btn-primary flex-1" disabled={submitting}>
+              {submitting ? 'Đang xử lý...' : (selected.isTrial ? 'Kích hoạt Fun Free' : 'Thanh toán qua VNPay')}
+            </button>
+          </div>
+        )}
+      >
         {selected && (
           <div className="space-y-4">
             {/* Gói đã chọn */}
@@ -438,13 +450,6 @@ export default function SubscriptionPage() {
                 <span>{submitError}</span>
               </div>
             )}
-
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => { setPaymentModal(false); resetSelection(); setSubmitError(''); }} className="btn-secondary flex-1" disabled={submitting}>Hủy</button>
-              <button onClick={handleSubmit} className="btn-primary flex-1" disabled={submitting}>
-                {submitting ? 'Đang xử lý...' : (selected.isTrial ? 'Kích hoạt Fun Free' : 'Thanh toán qua VNPay')}
-              </button>
-            </div>
           </div>
         )}
       </Modal>

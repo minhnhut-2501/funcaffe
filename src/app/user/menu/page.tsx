@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { menuService, categoryService, toppingService } from '@/services';
 import { canManage, packageLimits } from '@/lib/permission';
 import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
-import { generateId } from '@/lib/utils';
+import { generateId, compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ImageUpload from '@/components/ui/ImageUpload';
 import EmptyState from '@/components/ui/EmptyState';
@@ -59,7 +59,7 @@ export default function MenuPage() {
     (sizeFilter === 'all' || (sizeFilter === 'yes' ? i.hasSize : !i.hasSize)) &&
     (toppingFilter === 'all' || (toppingFilter === 'yes' ? i.allowTopping : !i.allowTopping)) &&
     i.name.toLowerCase().includes(search.toLowerCase())
-  );
+  ).sort((a, b) => compareByName(a.name, b.name));
 
   // Giới hạn theo gói (Pro: tối đa 15 món; Free/Pro Max: không giới hạn).
   // Chỉ áp cho gói có quyền chỉnh sửa & có trần hữu hạn (Pro) — bỏ qua 'none'.
@@ -221,7 +221,7 @@ export default function MenuPage() {
       </FilterBar>
 
       {/* Mobile: giao diện thẻ thay cho bảng cứng để không phải cuộn ngang trên màn hẹp */}
-      <div className="md:hidden space-y-2.5">
+      <div className="stagger md:hidden space-y-2.5">
         {filtered.map(item => {
           const minPrice = item.hasSize && item.sizes.length > 0
             ? Math.min(...item.sizes.filter(s => s.isActive).map(s => s.price))
@@ -284,7 +284,7 @@ export default function MenuPage() {
               <th className="text-right px-4 py-3 text-cafe-600 font-semibold">Hành động</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line/70">
+          <tbody className="stagger divide-y divide-line/70">
             {filtered.map(item => {
               const minPrice = item.hasSize && item.sizes.length > 0
                 ? Math.min(...item.sizes.filter(s => s.isActive).map(s => s.price))
@@ -334,7 +334,13 @@ export default function MenuPage() {
       </div>
 
       {/* View Modal */}
-      <Modal open={!!viewTarget} onClose={() => setViewTarget(null)} title="Chi tiết món" size="md">
+      <Modal
+        open={!!viewTarget}
+        onClose={() => setViewTarget(null)}
+        title="Chi tiết món"
+        size="md"
+        footer={<button onClick={() => setViewTarget(null)} className="btn-secondary w-full">Đóng</button>}
+      >
         {viewTarget && (
           <div className="space-y-3 text-sm">
             {viewTarget.imageUrl && (
@@ -372,13 +378,27 @@ export default function MenuPage() {
                 </div>
               </div>
             )}
-            <button onClick={() => setViewTarget(null)} className="btn-secondary w-full mt-2">Đóng</button>
           </div>
         )}
       </Modal>
 
       {/* Add / Edit Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editTarget ? 'Chỉnh sửa món' : 'Thêm món mới'} size="lg">
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editTarget ? 'Chỉnh sửa món' : 'Thêm món mới'}
+        size="lg"
+        footer={
+          <div className="flex gap-2">
+            <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Hủy</button>
+            {managable ? (
+              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Đang lưu...' : editTarget ? 'Cập nhật' : 'Lưu'}</button>
+            ) : (
+              <LockedButton className="flex-1">{editTarget ? 'Cập nhật' : 'Lưu'}</LockedButton>
+            )}
+          </div>
+        }
+      >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
@@ -490,15 +510,6 @@ export default function MenuPage() {
               </div>
             </div>
           )}
-
-          <div className="flex gap-2 pt-2">
-            <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Hủy</button>
-            {managable ? (
-              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Đang lưu...' : editTarget ? 'Cập nhật' : 'Lưu'}</button>
-            ) : (
-              <LockedButton className="flex-1">{editTarget ? 'Cập nhật' : 'Lưu'}</LockedButton>
-            )}
-          </div>
         </div>
       </Modal>
 
@@ -512,7 +523,18 @@ export default function MenuPage() {
       />
 
       {/* Category Edit Modal */}
-      <Modal open={catEditModal.open} onClose={() => setCatEditModal({ open: false, target: { name: '', isActive: true } })} title={catEditModal.target?.id ? 'Chỉnh sửa danh mục' : 'Thêm danh mục'} size="md">
+      <Modal
+        open={catEditModal.open}
+        onClose={() => setCatEditModal({ open: false, target: { name: '', isActive: true } })}
+        title={catEditModal.target?.id ? 'Chỉnh sửa danh mục' : 'Thêm danh mục'}
+        size="md"
+        footer={
+          <div className="flex gap-2">
+            <button onClick={() => setCatEditModal({ open: false, target: { name: '', isActive: true } })} className="btn-secondary flex-1">Hủy</button>
+            <button onClick={handleCatSave} className="btn-primary flex-1">{catEditModal.target?.id ? 'Cập nhật' : 'Thêm'}</button>
+          </div>
+        }
+      >
         <div className="space-y-4">
           <div>
             <label className="label-funcafe">Tên danh mục <span className="text-red-500">*</span></label>
@@ -527,10 +549,6 @@ export default function MenuPage() {
               onChange={e => setCatEditModal(m => ({ ...m, target: { ...m.target!, isActive: e.target.checked } }))} />
             Đang hiển thị
           </label>
-          <div className="flex gap-2 pt-2">
-            <button onClick={() => setCatEditModal({ open: false, target: { name: '', isActive: true } })} className="btn-secondary flex-1">Hủy</button>
-            <button onClick={handleCatSave} className="btn-primary flex-1">{catEditModal.target?.id ? 'Cập nhật' : 'Thêm'}</button>
-          </div>
         </div>
       </Modal>
 

@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { tableService } from '@/services';
 import { canManage, packageLimits } from '@/lib/permission';
 import { formatTableStatus } from '@/lib/format';
+import { compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { CafeTable, TableStatus } from '@/types';
 import { Plus, Pencil, Trash2, Eye, RotateCcw, AlertCircle, Grid3X3 } from 'lucide-react';
@@ -51,7 +52,7 @@ export default function TablesPage() {
   const filtered = tables.filter(t =>
     (filterStatus === 'all' || t.status === filterStatus) &&
     t.name.toLowerCase().includes(search.toLowerCase())
-  );
+  ).sort((a, b) => compareByName(a.name, b.name));
 
   const counts = {
     all: tables.length,
@@ -134,7 +135,7 @@ export default function TablesPage() {
         </div>
       )}
       {/* Tổng quan nhanh */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="stagger grid grid-cols-3 gap-3 mb-5">
         <div className="rounded-2xl bg-white border border-line p-4 shadow-soft">
           <p className="text-2xl font-bold text-ink">{counts.all}</p>
           <p className="text-xs text-cafe-500 mt-0.5">Tổng số bàn</p>
@@ -169,7 +170,7 @@ export default function TablesPage() {
               <th className="text-right px-5 py-3 text-cafe-600 font-semibold">Hành động</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line/70">
+          <tbody className="stagger divide-y divide-line/70">
             {filtered.map(t => (
               <tr key={t.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-5 py-3 font-semibold text-ink">{t.name}</td>
@@ -201,19 +202,38 @@ export default function TablesPage() {
         </div>
       </div>
 
-      <Modal open={!!viewTarget} onClose={() => setViewTarget(null)} title="Chi tiết bàn" size="sm">
+      <Modal
+        open={!!viewTarget}
+        onClose={() => setViewTarget(null)}
+        title="Chi tiết bàn"
+        size="sm"
+        footer={<button onClick={() => setViewTarget(null)} className="btn-secondary w-full">Đóng</button>}
+      >
         {viewTarget && (
           <div className="space-y-1">
             <div className="flex justify-between py-2.5 border-b border-line"><span className="text-cafe-500 text-sm">Tên bàn</span><span className="font-semibold text-ink">{viewTarget.name}</span></div>
             <div className="flex justify-between py-2.5 border-b border-line"><span className="text-cafe-500 text-sm">Sức chứa</span><span className="font-semibold text-ink">{viewTarget.capacity} người</span></div>
             <div className="flex justify-between py-2.5 border-b border-line items-center"><span className="text-cafe-500 text-sm">Trạng thái</span><StatusBadge tone={tableStatusTone[viewTarget.status]}>{formatTableStatus(viewTarget.status)}</StatusBadge></div>
             <div className="flex justify-between py-2.5"><span className="text-cafe-500 text-sm">Order hiện tại</span><span className="font-mono text-xs text-bean">{viewTarget.currentOrderId ?? '—'}</span></div>
-            <button onClick={() => setViewTarget(null)} className="btn-secondary w-full mt-3">Đóng</button>
           </div>
         )}
       </Modal>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editTarget ? 'Chỉnh sửa bàn' : 'Thêm bàn mới'}>
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editTarget ? 'Chỉnh sửa bàn' : 'Thêm bàn mới'}
+        footer={
+          <div className="flex gap-2">
+            <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Hủy</button>
+            {managable ? (
+              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Đang lưu...' : editTarget ? 'Cập nhật' : 'Lưu'}</button>
+            ) : (
+              <LockedButton className="flex-1">{editTarget ? 'Cập nhật' : 'Lưu'}</LockedButton>
+            )}
+          </div>
+        }
+      >
         <div className="space-y-4">
           <div>
             <label className="label-funcafe">Tên bàn <span className="text-red-500">*</span></label>
@@ -228,14 +248,6 @@ export default function TablesPage() {
             <select className="input-funcafe" value={form.status ?? 'empty'} onChange={e => setForm({ ...form, status: e.target.value as TableStatus })}>
               {formStatusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Hủy</button>
-            {managable ? (
-              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Đang lưu...' : editTarget ? 'Cập nhật' : 'Lưu'}</button>
-            ) : (
-              <LockedButton className="flex-1">{editTarget ? 'Cập nhật' : 'Lưu'}</LockedButton>
-            )}
           </div>
         </div>
       </Modal>

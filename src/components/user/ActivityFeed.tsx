@@ -54,7 +54,7 @@ export default function ActivityFeed({
   }
 
   return (
-    <ul className="divide-y divide-line/70">
+    <ul className="stagger divide-y divide-line/70">
       {items.map(item => (
         <li key={item.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
           <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${toneCls[item.tone]}`}>

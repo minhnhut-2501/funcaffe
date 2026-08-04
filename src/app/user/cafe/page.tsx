@@ -335,7 +335,7 @@ export default function CafePage() {
           </div>
           {/* Chưa lọc thì hai mốc hôm nay/tháng này hữu ích hơn; đã lọc rồi thì
               chúng lạc quẻ, thay bằng số liệu của chính khoảng đang xem. */}
-          <dl className="flex-1 grid grid-cols-3 divide-x divide-line">
+          <dl className="stagger flex-1 grid grid-cols-3 divide-x divide-line">
             {hasRange ? (
               <>
                 <SummaryStat icon={Receipt} label="Số hóa đơn" value={String(ranged.length)} />
@@ -402,7 +402,7 @@ export default function CafePage() {
 
       {/* Danh sách dạng hàng: mỗi quán một dòng, chỉ giữ thông tin nhận diện và
           hành động. Phần tiền đã có băng tổng và bảng so sánh ở trên lo. */}
-      <div className="space-y-3">
+      <div className="stagger space-y-3">
         {visibleCafes.map((cafe) => {
           const pkg = pkgByCafe[cafe.id];
           const isActive = cafe.id === activeCafeId;

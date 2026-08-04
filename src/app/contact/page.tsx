@@ -7,11 +7,15 @@ import { useState } from 'react';
 import { contactService } from '@/services';
 import { Mail, Phone, MapPin, Clock, CheckCircle2 } from 'lucide-react';
 
+// Bốn ô cùng một loại thông tin nên cùng một màu. Trước đây tô xanh dương / xanh
+// lá xen kẽ cho đỡ đơn điệu, nhưng trong bộ màu FunCafe xanh lá (pine) mang nghĩa
+// "tích cực / đã xác nhận" — dùng nó để tô icon Điện thoại là gợi ý một sự phân
+// loại không tồn tại, và làm loãng nghĩa của màu ở những chỗ nó nói thật.
 const info = [
-  { icon: Mail, label: 'Email', value: 'support@funcafe.vn', tone: 'bean' as const },
-  { icon: Phone, label: 'Điện thoại', value: '1900 1234', tone: 'pine' as const },
-  { icon: Clock, label: 'Giờ hỗ trợ', value: 'Thứ 2 - Thứ 7, 8:00 - 22:00', tone: 'bean' as const },
-  { icon: MapPin, label: 'Địa chỉ', value: 'TP. Hồ Chí Minh', tone: 'pine' as const },
+  { icon: Mail, label: 'Email', value: 'support@funcafe.vn' },
+  { icon: Phone, label: 'Điện thoại', value: '1900 1234' },
+  { icon: Clock, label: 'Giờ hỗ trợ', value: 'Thứ 2 - Thứ 7, 8:00 - 22:00' },
+  { icon: MapPin, label: 'Địa chỉ', value: 'TP. Hồ Chí Minh' },
 ];
 
 export default function ContactPage() {
@@ -64,9 +68,7 @@ export default function ContactPage() {
             <div className="space-y-3">
               {info.map((c, i) => (
                 <Reveal key={c.label} delay={i * 70} className="flex items-start gap-3 bg-white rounded-2xl border border-line p-4 lift">
-                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    c.tone === 'pine' ? 'bg-pine/10 text-pine' : 'bg-bean/10 text-bean'
-                  }`}>
+                  <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-bean/10 text-bean">
                     <c.icon className="w-5 h-5" />
                   </span>
                   <div>

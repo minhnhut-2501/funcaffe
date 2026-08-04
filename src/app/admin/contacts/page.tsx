@@ -128,7 +128,7 @@ export default function AdminContactsPage() {
                 <th className="text-right px-4 py-3 text-cafe-600 font-semibold">Hành động</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line/70">
+            <tbody className="stagger divide-y divide-line/70">
               {filtered.map(m => {
                 const stage = stageOf(m);
                 return (
@@ -172,7 +172,25 @@ export default function AdminContactsPage() {
         </div>
       )}
 
-      <Modal open={!!detail} onClose={() => setDetail(null)} title="Chi tiết tin nhắn" size="lg">
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title="Chi tiết tin nhắn"
+        size="lg"
+        footer={detail && (
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+            <button onClick={() => setDetail(null)} className="btn-secondary">Đóng</button>
+            <button
+              onClick={handleSendReply}
+              disabled={sending || replyText.trim().length < 10}
+              className="btn-primary"
+            >
+              <Send className="w-4 h-4" />
+              {sending ? 'Đang gửi...' : 'Gửi trả lời'}
+            </button>
+          </div>
+        )}
+      >
         {detail && (
           <div className="space-y-5">
             {/* Nhãn nằm TRÊN giá trị: để cạnh nhau thì tên và email dài bị ngắt dòng giữa chừng */}
@@ -225,18 +243,6 @@ export default function AdminContactsPage() {
                 Gửi tới <span className="font-medium text-ink">{detail.email}</span>. Khách bấm Trả lời trong hộp thư
                 sẽ về hòm mail của FunCafe.
               </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:justify-end gap-2 pt-1">
-              <button onClick={() => setDetail(null)} className="btn-secondary">Đóng</button>
-              <button
-                onClick={handleSendReply}
-                disabled={sending || replyText.trim().length < 10}
-                className="btn-primary"
-              >
-                <Send className="w-4 h-4" />
-                {sending ? 'Đang gửi...' : 'Gửi trả lời'}
-              </button>
             </div>
           </div>
         )}

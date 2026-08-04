@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toppingService } from '@/services';
 import { canManage } from '@/lib/permission';
 import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
-import { generateId } from '@/lib/utils';
+import { generateId, compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ImageUpload from '@/components/ui/ImageUpload';
 import EmptyState from '@/components/ui/EmptyState';
@@ -35,7 +35,9 @@ export default function ToppingsPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const filtered = toppings.filter(t => t.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = toppings
+    .filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => compareByName(a.name, b.name));
   const openAdd = () => { setEditTarget(null); setForm({ name: '', price: 0, isAvailable: true }); setModalOpen(true); };
   const openEdit = (t: Topping) => { setEditTarget(t); setForm(t); setModalOpen(true); };
   const handleSave = async () => {
@@ -96,7 +98,7 @@ export default function ToppingsPage() {
               <th className="text-right px-4 py-3 text-cafe-600 font-semibold">Hành động</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line/70">
+          <tbody className="stagger divide-y divide-line/70">
             {filtered.map(t => (
               <tr key={t.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3">
@@ -136,7 +138,21 @@ export default function ToppingsPage() {
         </table>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editTarget ? 'Chỉnh sửa topping' : 'Thêm topping mới'}>
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editTarget ? 'Chỉnh sửa topping' : 'Thêm topping mới'}
+        footer={
+          <div className="flex gap-2">
+            <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Hủy</button>
+            {managable ? (
+              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Đang lưu...' : editTarget ? 'Cập nhật' : 'Thêm topping'}</button>
+            ) : (
+              <LockedButton className="flex-1">{editTarget ? 'Cập nhật' : 'Thêm topping'}</LockedButton>
+            )}
+          </div>
+        }
+      >
         <div className="space-y-4">
           <div>
             <label className="label-funcafe">Tên topping <span className="text-red-500">*</span></label>
@@ -155,14 +171,6 @@ export default function ToppingsPage() {
             <input type="checkbox" checked={form.isAvailable ?? true} onChange={e => setForm({ ...form, isAvailable: e.target.checked })} />
             Còn phục vụ
           </label>
-          <div className="flex gap-2 pt-2">
-            <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Hủy</button>
-            {managable ? (
-              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? 'Đang lưu...' : editTarget ? 'Cập nhật' : 'Thêm topping'}</button>
-            ) : (
-              <LockedButton className="flex-1">{editTarget ? 'Cập nhật' : 'Thêm topping'}</LockedButton>
-            )}
-          </div>
         </div>
       </Modal>
 

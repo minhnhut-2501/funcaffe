@@ -162,10 +162,10 @@ export default function AdminReviewsPage() {
                 <th className="text-left px-4 py-3 text-cafe-600 font-semibold">Nội dung</th>
                 <th className="text-left px-4 py-3 text-cafe-600 font-semibold">Trạng thái</th>
                 <th className="text-left px-4 py-3 text-cafe-600 font-semibold">Thời gian</th>
-                <th className="text-right px-4 py-3 text-cafe-600 font-semibold">Hành động</th>
+                <th className="text-right px-4 py-3 text-cafe-600 font-semibold whitespace-nowrap">Hành động</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line/70">
+            <tbody className="stagger divide-y divide-line/70">
               {filtered.map(r => {
                 const edits = r.history?.length ?? 0;
                 return (
@@ -206,13 +206,21 @@ export default function AdminReviewsPage() {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+                        {/* Nút này KHÔNG dùng icon con mắt: ngay bên trái đã có Eye
+                            (xem chi tiết) — hai glyph mắt cạnh nhau ở cỡ 16px nhìn
+                            như lặp lại chứ không phân biệt được. Chữ nói thẳng ra
+                            hành động sẽ xảy ra, khỏi phải đoán. */}
                         <button
                           onClick={() => handleToggle(r)}
-                          title={r.status === 'visible' ? 'Ẩn đánh giá' : 'Hiện đánh giá'}
-                          aria-label={r.status === 'visible' ? 'Ẩn đánh giá' : 'Hiện đánh giá'}
-                          className={`p-2 rounded-lg transition-colors ${r.status === 'visible' ? 'text-cafe-400 hover:text-red-600 hover:bg-red-50' : 'text-cafe-400 hover:text-pine hover:bg-pine/12'}`}
+                          title={r.status === 'visible' ? 'Gỡ đánh giá khỏi trang giới thiệu' : 'Đưa đánh giá lên trang giới thiệu'}
+                          aria-label={r.status === 'visible' ? `Ẩn đánh giá của ${r.userName || 'người dùng'}` : `Hiện đánh giá của ${r.userName || 'người dùng'}`}
+                          className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                            r.status === 'visible'
+                              ? 'border-line text-cafe-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50'
+                              : 'border-pine/30 text-pine hover:bg-pine/12'
+                          }`}
                         >
-                          {r.status === 'visible' ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {r.status === 'visible' ? 'Ẩn' : 'Hiện'}
                         </button>
                       </div>
                     </td>
@@ -224,7 +232,22 @@ export default function AdminReviewsPage() {
         </div>
       )}
 
-      <Modal open={!!detail} onClose={() => setDetail(null)} title="Chi tiết đánh giá" size="xl">
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title="Chi tiết đánh giá"
+        size="xl"
+        footer={detail && (
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+            <button onClick={() => setDetail(null)} className="btn-secondary">Đóng</button>
+            <button onClick={() => handleToggle(detail)} className="btn-primary">
+              {detail.status === 'visible'
+                ? <><EyeOff className="w-4 h-4" />Ẩn khỏi trang giới thiệu</>
+                : <><Eye className="w-4 h-4" />Hiện trên trang giới thiệu</>}
+            </button>
+          </div>
+        )}
+      >
         {detail && (
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-3">
@@ -303,15 +326,6 @@ export default function AdminReviewsPage() {
                 Đánh giá này chưa được sửa lần nào — hoặc được gửi trước khi hệ thống bắt đầu lưu lịch sử.
               </p>
             )}
-
-            <div className="flex flex-col sm:flex-row sm:justify-end gap-2 pt-1">
-              <button onClick={() => setDetail(null)} className="btn-secondary">Đóng</button>
-              <button onClick={() => handleToggle(detail)} className="btn-primary">
-                {detail.status === 'visible'
-                  ? <><EyeOff className="w-4 h-4" />Ẩn khỏi trang giới thiệu</>
-                  : <><Eye className="w-4 h-4" />Hiện trên trang giới thiệu</>}
-              </button>
-            </div>
           </div>
         )}
       </Modal>

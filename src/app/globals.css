@@ -138,11 +138,16 @@
   }
 
   /* ===================== Sidebar ===================== */
+  /* relative + z-10: nền của mục đang mở là một PILL trượt nằm phía sau
+     (xem SidebarNav) — chữ và icon phải nổi lên trên nó. */
   .sidebar-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150;
+    @apply relative z-10 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150;
   }
+  /* Không còn bg-bean ở đây: nền do pill đảm nhiệm để nó trượt được từ mục cũ
+     sang mục mới. Giữ lại màu chữ và bỏ transition màu — đổi màu chữ phải xảy ra
+     ngay khi bấm, nếu trễ theo pill sẽ có nhịp chữ trắng trên nền trắng. */
   .sidebar-item-active {
-    @apply bg-bean text-white shadow-soft;
+    @apply text-white transition-none;
   }
   .sidebar-item-inactive {
     @apply text-ink/65 hover:bg-bean-tint hover:text-bean;
@@ -247,6 +252,85 @@
   .anim-fade { animation: funcafe-fade 0.18s ease-out both; }
   .anim-pop  { animation: funcafe-pop 0.22s var(--ease-out-expo) both; }
 
+  /* ============================================================
+     Motion cho khu quản lý (/user, /admin)
+     Đây là màn hình làm việc hàng ngày: chuyển động chỉ để phản hồi thao tác
+     và giữ mạch khi đổi trang. Không có gì được phép làm chậm việc đọc số liệu,
+     nên mọi hiệu ứng dưới đây đều ≤ 340ms.
+     ============================================================ */
+
+  @keyframes funcafe-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* fill-mode `backwards` chứ KHÔNG phải `both`, và đây không phải chuyện thẩm mỹ:
+     `both` giữ trạng thái khung cuối vĩnh viễn, mà Chrome quy `transform: none`
+     trong keyframe thành ma trận đơn vị `matrix(1,0,0,1,0,0)`. Một transform dù là
+     đơn vị vẫn tạo containing block, nên MỌI `position: fixed` bên trong (modal,
+     widget chat) sẽ bám vào div này thay vì bám màn hình — modal từng bị căn giữa
+     theo chiều dài nội dung và lớp nền mờ chỉ phủ được vùng <main>.
+     `backwards` vẫn ghim trạng thái đầu trong lúc chờ animation-delay (thứ duy nhất
+     ta cần) nhưng buông hẳn sau khi chạy xong. */
+
+  /* Nhịp chuyển trang. Đặt trên một div key={pathname} trong <main> nên React
+     thay key mỗi lần đổi trang -> animation chạy lại. */
+  .anim-page { animation: funcafe-rise 0.24s var(--ease-out-expo) backwards; }
+
+  /* Danh sách / lưới hiện so le. Chỉ so le 8 phần tử đầu rồi dùng chung một độ
+     trễ: bảng 50 dòng mà nhân đều 40ms thì dòng cuối phải đợi 2 giây. */
+  .stagger > * { animation: funcafe-rise 0.3s var(--ease-out-expo) backwards; }
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .stagger > *:nth-child(6) { animation-delay: 200ms; }
+  .stagger > *:nth-child(7) { animation-delay: 240ms; }
+  .stagger > *:nth-child(n+8) { animation-delay: 280ms; }
+
+  /* Toast — kênh phản hồi chính của mọi thao tác lưu/xóa.
+     Trước đây file toast.tsx dùng animate-in / slide-in-from-* của plugin
+     tailwindcss-animate, mà plugin đó KHÔNG có trong package.json: toàn bộ chuỗi
+     class ấy vô nghĩa nên toast hiện ra và biến mất đột ngột.
+     Vị trí viewport đổi theo breakpoint (trên cùng ở mobile, góc phải dưới từ
+     sm:) nên hướng trượt cũng phải đổi theo. */
+  @keyframes funcafe-toast-in-top {
+    from { opacity: 0; transform: translateY(-120%); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes funcafe-toast-in-right {
+    from { opacity: 0; transform: translateX(120%); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes funcafe-toast-out {
+    from { opacity: 1; transform: none; }
+    to   { opacity: 0; transform: translateX(120%) scale(0.96); }
+  }
+  .toast-anim[data-state='open']   { animation: funcafe-toast-in-top 0.26s var(--ease-out-expo) both; }
+  /* Đi ra nhanh hơn đi vào: thứ đang biến mất không nên bắt người ta chờ. */
+  .toast-anim[data-state='closed'] { animation: funcafe-toast-out 0.16s ease-in both; }
+  @media (min-width: 40rem) {
+    .toast-anim[data-state='open'] { animation-name: funcafe-toast-in-right; }
+  }
+  /* Đang vuốt để gạt bỏ thì transform do Radix điều khiển — animation phải nhường. */
+  .toast-anim[data-swipe='move'] { animation: none; }
+
+  /* Skeleton: vệt sáng quét ngang thay cho nhấp nháy cả khối. */
+  @keyframes funcafe-sweep {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(100%); }
+  }
+  .skeleton-sweep { position: relative; overflow: hidden; }
+  .skeleton-sweep::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), transparent);
+    animation: funcafe-sweep 1.5s ease-in-out infinite;
+  }
+
   /* Scroll-reveal entrance, toggled by IntersectionObserver via .is-in */
   .reveal {
     opacity: 0;
@@ -263,6 +347,10 @@
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .lift { transition: none !important; }
+  /* Vệt quét skeleton chạy vô hạn — gỡ hẳn thay vì để nó nháy một lần rồi đứng. */
+  .skeleton-sweep::after { display: none !important; }
+  /* Pill sidebar đặt transition bằng style inline; !important dưới đây thắng
+     inline style nên pill nhảy thẳng tới mục mới, không trượt. */
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;

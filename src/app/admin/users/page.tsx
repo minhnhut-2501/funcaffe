@@ -89,7 +89,7 @@ export default function AdminUsersPage() {
               <th className="text-right px-4 py-3 text-cafe-600 font-semibold">Hành động</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line/70">
+          <tbody className="stagger divide-y divide-line/70">
             {filtered.map(u => (
               <tr key={u.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3 font-semibold text-ink">{u.fullName}</td>

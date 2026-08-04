@@ -95,7 +95,7 @@ export default function AiChatWidget() {
 
       {/* Panel */}
       {open && (
-        <div className="fixed bottom-24 right-5 z-[60] w-[calc(100vw-2.5rem)] sm:w-96 max-h-[70vh] bg-white rounded-2xl border border-line shadow-pop flex flex-col overflow-hidden">
+        <div className="fixed bottom-24 right-5 z-[60] w-[calc(100vw-2.5rem)] sm:w-96 max-h-[70vh] bg-white rounded-2xl border border-line shadow-pop flex flex-col overflow-hidden anim-pop origin-bottom-right">
           <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line bg-bean text-white">
             <Sparkles className="w-5 h-5" />
             <div className="min-w-0">

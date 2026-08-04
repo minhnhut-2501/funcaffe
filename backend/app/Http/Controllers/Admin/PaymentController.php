@@ -38,6 +38,8 @@ class PaymentController extends Controller
                 $q->whereNotIn('payment_method', PackagePayment::ONLINE_GATEWAYS)
                   ->orWhere('payment_status', '!=', 'pending');
             })
+            // Đối soát thì giao dịch mới nhất mới là thứ cần nhìn trước.
+            ->orderBy('created_at', 'desc')
             ->get();
 
         return response()->json($payments);

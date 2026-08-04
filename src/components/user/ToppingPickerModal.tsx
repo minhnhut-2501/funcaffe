@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check, Search, CupSoda } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import type { Topping } from '@/types';
@@ -18,11 +19,15 @@ interface Props {
  */
 export default function ToppingPickerModal({ open, onClose, toppings, selectedIds, onToggle }: Props) {
   const [q, setQ] = useState('');
-  if (!open) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!open || !mounted) return null;
 
   const filtered = toppings.filter(t => t.name.toLowerCase().includes(q.trim().toLowerCase()));
 
-  return (
+  // Portal ra <body> giống Modal: nếu để tại chỗ, chỉ cần một ancestor có transform
+  // là `position: fixed` bám vào ancestor đó thay vì bám màn hình.
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-ink/50 backdrop-blur-sm anim-fade" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-pop w-full max-w-xl max-h-[85vh] flex flex-col anim-pop">
@@ -88,6 +93,7 @@ export default function ToppingPickerModal({ open, onClose, toppings, selectedId
           <button onClick={onClose} className="btn-primary">Xong</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

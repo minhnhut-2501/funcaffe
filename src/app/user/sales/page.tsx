@@ -493,7 +493,7 @@ export default function SalesPage() {
               {tableStatusFilter.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
-          <div className="flex-1 overflow-y-auto p-2.5 grid grid-cols-2 gap-2 content-start">
+          <div className="stagger flex-1 overflow-y-auto p-2.5 grid grid-cols-2 gap-2 content-start">
             {filteredTables.map(t => (
               <TableTile key={t.id} table={t} selected={selectedTable?.id === t.id} onClick={() => { setSelectedTable(t); setMobileTab('menu'); }} />
             ))}
@@ -523,7 +523,7 @@ export default function SalesPage() {
           )}
 
           <div className="flex-1 overflow-y-auto p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            <div className="stagger grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {filteredMenu.map(item => (
                 <MenuCard key={item.id} item={item} onClick={() => openOption(item)} />
               ))}
@@ -552,7 +552,7 @@ export default function SalesPage() {
               Chưa có món nào
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
+            <div className="stagger flex-1 overflow-y-auto p-2.5 space-y-2">
               {cart.map(c => (
                 <div key={c.id} className="bg-sand/70 rounded-xl p-2.5 border border-line/60">
                   <div className="flex items-start justify-between gap-1">
@@ -644,7 +644,18 @@ export default function SalesPage() {
       )}
 
       {/* Option Modal */}
-      <Modal open={!!optionModal} onClose={() => { setOptionModal(null); setEditCartItemId(null); }} title={optionModal?.item.name ?? ''} size="md">
+      <Modal
+        open={!!optionModal}
+        onClose={() => { setOptionModal(null); setEditCartItemId(null); }}
+        title={optionModal?.item.name ?? ''}
+        size="md"
+        footer={optionModal && (
+          <div className="flex gap-2">
+            <button onClick={() => { setOptionModal(null); setEditCartItemId(null); }} className="btn-secondary flex-1">Hủy</button>
+            <button onClick={handleSaveCartItem} disabled={savingItem} className="btn-primary flex-1">{savingItem ? 'Đang lưu...' : editCartItemId ? 'Cập nhật' : 'Thêm vào order'}</button>
+          </div>
+        )}
+      >
         {optionModal && (
           <div className="space-y-4">
             {optionModal.item.hasSize && optionModal.item.sizes.length > 0 && (
@@ -696,17 +707,26 @@ export default function SalesPage() {
             <div className="pt-3 border-t border-line text-right text-sm text-cafe-600">
               Tạm tính: <span className="font-bold text-bean text-base">{formatCurrency(optTotal)}</span>
             </div>
-
-            <div className="flex gap-2">
-              <button onClick={() => { setOptionModal(null); setEditCartItemId(null); }} className="btn-secondary flex-1">Hủy</button>
-              <button onClick={handleSaveCartItem} disabled={savingItem} className="btn-primary flex-1">{savingItem ? 'Đang lưu...' : editCartItemId ? 'Cập nhật' : 'Thêm vào order'}</button>
-            </div>
           </div>
         )}
       </Modal>
 
       {/* Payment Modal */}
-      <Modal open={paymentModal} onClose={() => setPaymentModal(false)} title="Thanh toán" size="md">
+      <Modal
+        open={paymentModal}
+        onClose={() => setPaymentModal(false)}
+        title="Thanh toán"
+        size="md"
+        footer={
+          <div className="flex gap-2">
+            <button onClick={() => setPaymentModal(false)} className="btn-secondary flex-1">Hủy</button>
+            <button onClick={handlePayment}
+              disabled={processing || (paymentMethod === 'cash' && Number(cashGiven.replace(/\D/g, '')) > 0 && cashChange < 0)}
+              className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed">
+              <CreditCard className="w-4 h-4" />{processing ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</button>
+          </div>
+        }
+      >
         <div className="space-y-4">
           <div className="bg-sand/70 border border-line rounded-2xl p-4 space-y-1.5">
             <p className="text-xs text-cafe-500">Bàn: <span className="font-semibold text-ink">{selectedTable?.name}</span></p>
@@ -782,14 +802,6 @@ export default function SalesPage() {
               </div>
             )
           )}
-
-          <div className="flex gap-2 pt-1">
-            <button onClick={() => setPaymentModal(false)} className="btn-secondary flex-1">Hủy</button>
-            <button onClick={handlePayment}
-              disabled={processing || (paymentMethod === 'cash' && Number(cashGiven.replace(/\D/g, '')) > 0 && cashChange < 0)}
-              className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed">
-              <CreditCard className="w-4 h-4" />{processing ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</button>
-          </div>
         </div>
       </Modal>
 
@@ -818,7 +830,18 @@ export default function SalesPage() {
       />
 
       {/* Success Modal */}
-      <Modal open={!!successModal} onClose={() => setSuccessModal(null)} title="Thanh toán thành công" size="sm">
+      <Modal
+        open={!!successModal}
+        onClose={() => setSuccessModal(null)}
+        title="Thanh toán thành công"
+        size="sm"
+        footer={
+          <div className="flex gap-2">
+            <button onClick={() => { setSuccessModal(null); window.open('/user/invoices', '_blank'); }} className="btn-secondary flex-1 text-sm"><Receipt className="w-4 h-4" />In hóa đơn</button>
+            <button onClick={() => setSuccessModal(null)} className="btn-primary flex-1 text-sm">Tạo order mới</button>
+          </div>
+        }
+      >
         {successModal && (
           <div className="text-center space-y-4">
             <div className="flex justify-center">
@@ -844,10 +867,6 @@ export default function SalesPage() {
                 <span className="font-bold text-pine">{formatCurrency(successModal.change)}</span>
               </div>
             )}
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => { setSuccessModal(null); window.open('/user/invoices', '_blank'); }} className="btn-secondary flex-1 text-sm"><Receipt className="w-4 h-4" />In hóa đơn</button>
-              <button onClick={() => setSuccessModal(null)} className="btn-primary flex-1 text-sm">Tạo order mới</button>
-            </div>
           </div>
         )}
       </Modal>

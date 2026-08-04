@@ -9,6 +9,16 @@ export function generateId(prefix = 'id') {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/**
+ * So sánh tên có nhận biết số, dùng cho danh mục cấu hình (bàn, món, topping).
+ * `numeric: true` là phần quan trọng: so sánh chuỗi thuần sẽ xếp "Bàn 10" đứng
+ * trước "Bàn 2" vì nó đọc từng ký tự, thấy '1' < '2' là chốt luôn.
+ * Những danh sách này KHÔNG sắp theo thời gian tạo — thêm một món mới mà cả thực
+ * đơn xáo lại thì còn khó tìm hơn.
+ */
+export const compareByName = (a: string, b: string) =>
+  a.localeCompare(b, 'vi', { numeric: true, sensitivity: 'base' });
+
 function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

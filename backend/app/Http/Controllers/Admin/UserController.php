@@ -19,7 +19,9 @@ class UserController extends Controller
     // BUG-16 FIX: Trả về thông tin gói dịch vụ và tên quán cho mỗi user
     public function index()
     {
-        $users = User::paginate(50);
+        // Sắp ở CSDL chứ không sắp sau khi lấy: có phân trang nên sắp phía PHP chỉ
+        // đảo được đúng 50 bản ghi của trang hiện tại.
+        $users = User::orderBy('created_at', 'desc')->paginate(50);
 
         $userIds = $users->pluck('_id')->map(fn($id) => (string) $id)->toArray();
 

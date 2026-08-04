@@ -98,7 +98,7 @@ export default function DashboardPage() {
   if (loadingInv || loadingOrd || loadingTbl) {
     return (
       <div className="max-w-6xl">
-        <div className="h-24 rounded-3xl bg-sand animate-pulse mb-6" />
+        <div className="h-24 rounded-3xl bg-sand skeleton-sweep mb-6" />
         <LoadingSkeleton variant="card" rows={4} />
       </div>
     );
@@ -158,7 +158,7 @@ export default function DashboardPage() {
       )}
 
       {/* KPI */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Link href="/user/revenue" className="group rounded-2xl bg-bean text-white shadow-card p-4 sm:p-5 flex flex-col lift">
           <div className="flex items-start justify-between">
             <span className="w-10 h-10 rounded-xl bg-white/15 grid place-items-center"><TrendingUp className="w-5 h-5" /></span>
@@ -214,7 +214,7 @@ export default function DashboardPage() {
           <Zap className="w-4 h-4 text-bean" />
           <h2 className="text-base font-bold text-ink">Lối tắt</h2>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {quickActions.map((a) => (
             <Link key={a.href} href={a.href} className="group rounded-2xl bg-white border border-line p-4 shadow-soft transition-all duration-200 hover:shadow-card hover:-translate-y-0.5 hover:border-bean/40">
               <div className="flex items-center justify-between">

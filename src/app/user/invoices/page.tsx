@@ -81,7 +81,7 @@ export default function InvoicesPage() {
               <th className="text-right px-4 py-3 text-cafe-600 font-semibold">Hành động</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line/70">
+          <tbody className="stagger divide-y divide-line/70">
             {filtered.map(inv => (
               <tr key={inv.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs font-bold text-bean">{inv.invoiceCode}</td>
@@ -127,7 +127,43 @@ export default function InvoicesPage() {
         </table>
       </div>
 
-      <Modal open={!!viewInvoice} onClose={() => setViewInvoice(null)} title={`Chi tiết hóa đơn ${viewInvoice?.invoiceCode ?? ''}`} size="lg">
+      <Modal
+        open={!!viewInvoice}
+        onClose={() => setViewInvoice(null)}
+        title={`Chi tiết hóa đơn ${viewInvoice?.invoiceCode ?? ''}`}
+        size="lg"
+        footer={
+          // no-print: footer nằm ngoài .print-area nên khi in đã bị ẩn sẵn, nhưng
+          // giữ class để nó không chiếm chỗ trên bản in.
+          <div className="flex gap-2 no-print">
+            {canPrint(pkg) ? (
+              <button onClick={() => window.print()} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
+                <Printer className="w-4 h-4" />In hóa đơn
+              </button>
+            ) : (
+              <LockedButton variant="secondary" className="flex-1 flex items-center justify-center gap-2 text-sm">
+                <Printer className="w-4 h-4" />In hóa đơn
+              </LockedButton>
+            )}
+            {canPrint(pkg) ? (
+              // BUG-18 FIX: Tải PDF dùng print-to-PDF thay vì cùng hành động với nút In
+              <button onClick={() => {
+                const originalTitle = document.title;
+                document.title = `HoaDon-${viewInvoice?.invoiceCode ?? 'invoice'}`;
+                window.print();
+                document.title = originalTitle;
+              }} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
+                <FileDown className="w-4 h-4" />Tải PDF
+              </button>
+            ) : (
+              <LockedButton variant="secondary" className="flex-1 flex items-center justify-center gap-2 text-sm">
+                <FileDown className="w-4 h-4" />Tải PDF
+              </LockedButton>
+            )}
+            <button onClick={() => setViewInvoice(null)} className="btn-primary flex-1 text-sm">Đóng</button>
+          </div>
+        }
+      >
         {viewInvoice && (
           <div className="space-y-4 print-area">
             <div className="text-center pb-4 border-b-2 border-dashed border-cafe-200">
@@ -211,34 +247,6 @@ export default function InvoicesPage() {
             )}
 
             <p className="text-center text-cafe-500 text-xs pt-1">Cảm ơn quý khách và hẹn gặp lại!</p>
-
-            <div className="flex gap-2 pt-2 border-t border-cafe-100 no-print">
-              {canPrint(pkg) ? (
-                <button onClick={() => window.print()} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
-                  <Printer className="w-4 h-4" />In hóa đơn
-                </button>
-              ) : (
-                <LockedButton variant="secondary" className="flex-1 flex items-center justify-center gap-2 text-sm">
-                  <Printer className="w-4 h-4" />In hóa đơn
-                </LockedButton>
-              )}
-              {canPrint(pkg) ? (
-                // BUG-18 FIX: Tải PDF dùng print-to-PDF thay vì cùng hành động với nút In
-                <button onClick={() => {
-                  const originalTitle = document.title;
-                  document.title = `HoaDon-${viewInvoice?.invoiceCode ?? 'invoice'}`;
-                  window.print();
-                  document.title = originalTitle;
-                }} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
-                  <FileDown className="w-4 h-4" />Tải PDF
-                </button>
-              ) : (
-                <LockedButton variant="secondary" className="flex-1 flex items-center justify-center gap-2 text-sm">
-                  <FileDown className="w-4 h-4" />Tải PDF
-                </LockedButton>
-              )}
-              <button onClick={() => setViewInvoice(null)} className="btn-primary flex-1 text-sm">Đóng</button>
-            </div>
           </div>
         )}
       </Modal>
