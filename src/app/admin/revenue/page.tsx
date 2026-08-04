@@ -6,11 +6,14 @@ import { userService, paymentService } from '@/services';
 import { formatCurrency } from '@/lib/format';
 import type { User, Payment } from '@/types';
 import { DollarSign, TrendingUp, Users, BarChart3, AlertCircle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { ComposedChart, Bar, Line, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import SectionCard from '@/components/user/SectionCard';
 import { FilterBar } from '@/components/user/FilterBar';
 import DateRangePicker from '@/components/ui/DateRangePicker';
+import RevenueChart, { type RevenuePoint } from '@/components/user/RevenueChart';
+import ChartModePicker from '@/components/user/ChartModePicker';
+import { fillGaps, keyLength, axisLabel, fullLabel, axisInterval, suggestMode, type ChartMode } from '@/lib/chart';
 
 export default function AdminRevenuePage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -19,7 +22,9 @@ export default function AdminRevenuePage() {
   const [error, setError] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [viewMode, setViewMode] = useState('month');
+  // null = chưa tự chọn mốc -> bám theo độ dài khoảng đang lọc (xem ChartModePicker).
+  const [viewMode, setViewMode] = useState<ChartMode | null>(null);
+  const effectiveMode = viewMode ?? suggestMode(fromDate, toDate);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,21 +61,52 @@ export default function AdminRevenuePage() {
     if (toDate) r = r.filter(p => day(p) <= toDate);
     return r;
   }, [approvedPayments, fromDate, toDate]);
-  const monthlyData = useMemo(() => {
-    const sliceLen = viewMode === 'day' ? 10 : viewMode === 'year' ? 4 : 7;
-    const groups: Record<string, { revenue: number; users: Set<string> }> = {};
+  // Doanh thu theo mốc. KHÔNG còn .slice(-12): người dùng lọc 30 ngày rồi chọn xem
+  // theo ngày mà biểu đồ chỉ vẽ 12 ngày cuối, 18 ngày đầu biến mất không báo gì —
+  // bộ lọc nói một đằng, biểu đồ hiện một nẻo. Khoảng lọc là thứ quyết định vẽ bao
+  // nhiêu, còn số mốc quá dày thì ChartModePicker đã chặn từ đầu vào.
+  const revenueSeries = useMemo<RevenuePoint[]>(() => {
+    const groups: Record<string, number> = {};
     filteredPayments.forEach(p => {
-      const k = p.createdAt.slice(0, sliceLen);
-      if (!groups[k]) groups[k] = { revenue: 0, users: new Set() };
-      groups[k].revenue += p.amount;
-      groups[k].users.add(p.userId);
+      const k = p.createdAt.slice(0, keyLength(effectiveMode));
+      groups[k] = (groups[k] ?? 0) + p.amount;
     });
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([k, v]) => ({
-      month: viewMode === 'day' ? k.slice(5) : viewMode === 'year' ? k : `T${k.slice(5)}`,
-      revenue: v.revenue,
-      users: v.users.size,
+    return fillGaps(groups, effectiveMode, 0, fromDate, toDate).map(({ key, value }) => ({
+      label: axisLabel(key, effectiveMode),
+      full: fullLabel(key, effectiveMode),
+      value,
     }));
-  }, [filteredPayments, viewMode]);
+  }, [filteredPayments, effectiveMode, fromDate, toDate]);
+
+  // Tăng trưởng người dùng — tính từ NGÀY ĐĂNG KÝ, không phải từ giao dịch.
+  // Trước đây chỗ này đếm số user distinct có giao dịch trong kỳ, mà đó là "khách có
+  // phát sinh giao dịch": một tháng không ai đăng ký mới nhưng 50 người gia hạn thì
+  // đường vẫn vọt lên, đọc thành "tăng trưởng" là sai hẳn bản chất.
+  // `users` đã tải sẵn ở trên nên không cần gọi thêm API nào.
+  const growthSeries = useMemo(() => {
+    const groups: Record<string, number> = {};
+    users.forEach(u => {
+      if (!u.createdAt) return;
+      const k = u.createdAt.slice(0, keyLength(effectiveMode));
+      groups[k] = (groups[k] ?? 0) + 1;
+    });
+    const rows = fillGaps(groups, effectiveMode, 0, fromDate, toDate);
+    // Lũy kế phải tính từ TOÀN BỘ tài khoản, không chỉ trong khoảng lọc: xem 3 tháng
+    // gần đây mà đường lũy kế bắt đầu từ 0 thì thành "hệ thống mới có người dùng".
+    const firstKey = rows[0]?.key ?? '';
+    let running = firstKey
+      ? users.filter(u => u.createdAt && u.createdAt.slice(0, keyLength(effectiveMode)) < firstKey).length
+      : 0;
+    return rows.map(({ key, value }) => {
+      running += value;
+      return {
+        label: axisLabel(key, effectiveMode),
+        full: fullLabel(key, effectiveMode),
+        newUsers: value,
+        cumulative: running,
+      };
+    });
+  }, [users, effectiveMode, fromDate, toDate]);
 
   if (loading) return <div><PageHeader title="Doanh thu hệ thống" description="Thống kê doanh thu từ các gói dịch vụ" /><LoadingSkeleton variant="card" rows={4} /></div>;
   if (error) return <div><PageHeader title="Doanh thu hệ thống" /><div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-2xl p-4"><AlertCircle className="w-5 h-5" /><span>Không thể tải dữ liệu.</span></div></div>;
@@ -88,7 +124,7 @@ export default function AdminRevenuePage() {
     <div className="space-y-6">
       <PageHeader title="Doanh thu hệ thống" description="Thống kê doanh thu từ các gói dịch vụ" />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Tổng doanh thu" value={formatCurrency(totalRevenue)} icon={DollarSign} featured />
         <StatCard label="Doanh thu tháng này" value={formatCurrency(thisMonthRevenue)} icon={TrendingUp} color="green" />
         <StatCard label="Giao dịch thành công" value={approvedPayments.length} icon={BarChart3} color="blue" />
@@ -103,29 +139,56 @@ export default function AdminRevenuePage() {
         </div>
         <FilterBar>
           <DateRangePicker from={fromDate} to={toDate} onChange={(f, t) => { setFromDate(f); setToDate(t); }} />
-          <select className="input-funcafe !w-auto min-w-[150px]" value={viewMode} onChange={e => setViewMode(e.target.value)}>
-            <option value="day">Theo ngày</option>
-            <option value="month">Theo tháng</option>
-            <option value="year">Theo năm</option>
-          </select>
-          <button onClick={() => { setFromDate(''); setToDate(''); }} className="btn-secondary">Xóa lọc</button>
+          <ChartModePicker value={effectiveMode} onChange={setViewMode} from={fromDate} to={toDate} />
+          <button onClick={() => { setFromDate(''); setToDate(''); setViewMode(null); }} className="btn-secondary">Xóa lọc</button>
         </FilterBar>
       </div>
 
+      <SectionCard
+        title={`Doanh thu ${effectiveMode === 'day' ? 'theo ngày' : effectiveMode === 'year' ? 'theo năm' : 'theo tháng'}`}
+        subtitle={`${revenueSeries.length} mốc · chỉ tính giao dịch đã thanh toán`}
+        icon={BarChart3}
+      >
+        <RevenueChart data={revenueSeries} />
+      </SectionCard>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <SectionCard title={`Doanh thu ${viewMode === 'day' ? 'theo ngày' : viewMode === 'year' ? 'theo năm' : 'theo tháng'}`} icon={BarChart3} className="lg:col-span-2">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
-              <XAxis dataKey="month" tick={axis} axisLine={{ stroke: grid }} tickLine={false} />
-              <YAxis tickFormatter={(v) => `${(v / 1000000).toFixed(0)}tr`} tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-              <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={tipStyle} cursor={{ fill: 'rgba(37,99,235,0.06)' }} />
-              <Bar dataKey="revenue" fill="#2563EB" radius={[6, 6, 0, 0]} maxBarSize={48} />
-            </BarChart>
-          </ResponsiveContainer>
+        <SectionCard
+          title={`Tăng trưởng người dùng ${effectiveMode === 'day' ? 'theo ngày' : effectiveMode === 'year' ? 'theo năm' : 'theo tháng'}`}
+          subtitle="Cột: tài khoản mới trong kỳ · Đường: tổng tài khoản tích lũy"
+          icon={TrendingUp}
+          className="lg:col-span-2"
+        >
+          {growthSeries.length === 0 ? (
+            <p className="text-sm text-cafe-500 text-center py-12">Không có dữ liệu trong khoảng đã lọc.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <ComposedChart data={growthSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+                <XAxis dataKey="label" interval={axisInterval(growthSeries.length)} tick={axis} axisLine={{ stroke: grid }} tickLine={false} minTickGap={24} />
+                {/* Hai trục: số tài khoản mới mỗi kỳ (vài cái) và tổng tích lũy (hàng
+                    trăm) chênh nhau cả bậc — ép chung một trục thì cột mới bẹp dí. */}
+                <YAxis yAxisId="new" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={36} allowDecimals={false} />
+                <YAxis yAxisId="total" orientation="right" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={40} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={tipStyle}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.full ?? ''}
+                  labelStyle={{ color: '#1F2933', fontWeight: 600 }}
+                  cursor={{ fill: 'rgba(37,99,235,0.06)' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Bar yAxisId="new" dataKey="newUsers" name="Tài khoản mới" fill="#93B4F5" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                <Line yAxisId="total" type="monotone" dataKey="cumulative" name="Tổng tích lũy" stroke="#2563EB" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
         </SectionCard>
 
-        <SectionCard title="Phân bố gói" icon={Users}>
+        <SectionCard
+          title="Phân bố gói"
+          subtitle="Hiện tại · không theo bộ lọc thời gian"
+          icon={Users}
+        >
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie data={pkgData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={2}>
@@ -146,19 +209,7 @@ export default function AdminRevenuePage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Tăng trưởng người dùng theo tháng" icon={TrendingUp}>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={monthlyData}>
-            <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
-            <XAxis dataKey="month" tick={axis} axisLine={{ stroke: grid }} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={tipStyle} />
-            <Line type="monotone" dataKey="users" stroke="#2563EB" strokeWidth={2.5} dot={{ fill: '#2563EB', r: 3 }} activeDot={{ r: 5 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </SectionCard>
-
-      {/* Đã bỏ bảng "Giao dịch đã duyệt": trùng hoàn toàn với trang Quản lý thanh toán
+      {/* Đã bỏ bảng "Giao dịch đã duyệt": trùng hoàn toàn với trang Giao dịch thanh toán
           (nơi có cả tìm kiếm, lọc theo gói và xem chi tiết), lại còn dùng chữ "đã duyệt"
           trong khi hệ thống không còn khâu duyệt tay nào. Trang này giữ đúng vai trò
           thống kê: chỉ số, biểu đồ và phân bố gói. */}

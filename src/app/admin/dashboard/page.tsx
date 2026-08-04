@@ -10,10 +10,11 @@ import {
   Users, CreditCard, TrendingUp, PackageCheck, AlertCircle, BarChart3, Package,
   UserPlus, History, ArrowRight,
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import SectionCard from '@/components/user/SectionCard';
 import ActivityFeed, { type ActivityItem, type ActivityTone } from '@/components/user/ActivityFeed';
+import { fillGaps, axisLabel, fullLabel } from '@/lib/chart';
+import RevenueChart from '@/components/user/RevenueChart';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const monthKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
@@ -85,9 +86,12 @@ export default function AdminDashboard() {
       const m = p.createdAt.slice(0, 7);
       groups[m] = (groups[m] ?? 0) + p.amount;
     });
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([k, v]) => ({
-      month: `T${k.slice(5)}`,
-      revenue: v,
+    // Điền tháng trống trước rồi mới lấy 6 tháng CUỐI: nếu không, tháng không có
+    // giao dịch nào bị bỏ hẳn khỏi trục và biểu đồ trông như tháng nào cũng có tiền về.
+    return fillGaps(groups, 'month', 0).slice(-6).map(({ key, value }) => ({
+      label: axisLabel(key, 'month'),
+      full: fullLabel(key, 'month'),
+      value,
     }));
   }, [paidPayments]);
 
@@ -127,7 +131,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <PageHeader title="Tổng quan hệ thống" description="Thống kê và hoạt động toàn hệ thống FunCafe" />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Link href="/admin/users" className="block">
           <StatCard
             label="Tổng người dùng"
@@ -175,16 +179,8 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <SectionCard title="Doanh thu theo tháng" icon={BarChart3} className="lg:col-span-2">
-          <ResponsiveContainer width="100%" height={230}>
-            <BarChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={{ stroke: '#E2E8F0' }} tickLine={false} />
-              <YAxis tickFormatter={(v) => `${(v / 1000000).toFixed(0)}tr`} tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-              <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={{ borderRadius: 12, border: '1px solid #E2E8F0', boxShadow: '0 12px 30px -16px rgba(15,23,42,.3)' }} cursor={{ fill: 'rgba(37,99,235,0.06)' }} />
-              <Bar dataKey="revenue" name="Doanh thu" fill="#2563EB" radius={[6, 6, 0, 0]} maxBarSize={48} />
-            </BarChart>
-          </ResponsiveContainer>
+        <SectionCard title="Doanh thu 6 tháng gần nhất" icon={BarChart3} className="lg:col-span-2">
+          <RevenueChart data={revenueData} height={230} emptyText="Chưa có giao dịch nào." />
         </SectionCard>
 
         <SectionCard title="Phân bố gói dịch vụ" icon={Package}>

@@ -17,25 +17,32 @@ import { formatCurrency, formatPaymentMethod } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { Download, TrendingUp, Receipt, DollarSign, BarChart3, AlertCircle, Store, Trophy } from 'lucide-react';
 import { downloadExcel, toExcelDate } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import RevenueChart, { type RevenuePoint } from '@/components/user/RevenueChart';
+import ChartModePicker from '@/components/user/ChartModePicker';
 import type { Invoice } from '@/types';
+import { fillGaps, keyLength, axisLabel, fullLabel, suggestMode, type ChartMode } from '@/lib/chart';
 
 /** Ngày thanh toán dạng 'YYYY-MM-DD'; hóa đơn cũ thiếu paid_at thì lấy ngày tạo. */
 const dayOf = (i: Invoice) => (i.paidAt || i.createdAt).slice(0, 10);
 
-function groupBy(invoices: Invoice[], mode: string): { month: string; revenue: number }[] {
-  const len = mode === 'day' ? 10 : mode === 'year' ? 4 : 7;
+function groupBy(
+  invoices: Invoice[],
+  mode: ChartMode,
+  from?: string,
+  to?: string,
+): RevenuePoint[] {
+  const len = keyLength(mode);
   const groups: Record<string, number> = {};
   invoices.forEach(inv => {
     const k = (inv.paidAt || inv.createdAt).slice(0, len);
     groups[k] = (groups[k] ?? 0) + inv.totalAmount;
   });
-  return Object.entries(groups)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => ({
-      month: mode === 'day' ? k.slice(5) : mode === 'year' ? k : `T${k.slice(5)}`,
-      revenue: v,
-    }));
+  // fillGaps: ngày nghỉ / ngày ế phải hiện cột 0 chứ không được biến mất khỏi trục.
+  return fillGaps(groups, mode, 0, from, to).map(({ key, value }) => ({
+    label: axisLabel(key, mode),
+    full: fullLabel(key, mode),
+    value,
+  }));
 }
 
 function computeTopItems(invoices: Invoice[]): { name: string; count: number; revenue: number }[] {
@@ -57,12 +64,21 @@ const today = new Date();
 const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
 export default function RevenuePage() {
-  const { user, cafes } = useAuth();
+  const { user, cafes, activeCafeId } = useAuth();
   const { toast } = useToast();
-  const [scope, setScope] = useState('all');
+  // null = người dùng CHƯA tự chọn quán -> bám theo quán đang quản lý. Đã chọn rồi
+  // (kể cả chọn "Tất cả quán") thì giữ nguyên lựa chọn đó.
+  // Không dùng useState(activeCafeId): lần render đầu AuthProvider chưa hydrate xong
+  // nên activeCafeId còn null, mà giá trị khởi tạo của useState chỉ dùng đúng một lần.
+  const [scope, setScope] = useState<string | null>(null);
+  const effectiveScope = scope ?? activeCafeId ?? 'all';
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [viewMode, setViewMode] = useState('day');
+  // Cùng mẫu ba trạng thái với `scope` ở trên: null = chưa tự chọn mốc -> bám theo
+  // độ dài khoảng đang lọc. Chọn "12 tháng qua" mà biểu đồ vẫn vẽ 365 cột theo ngày
+  // thì không đọc được gì; ngược lại chọn "7 ngày qua" mà gom theo tháng thì ra 1 cột.
+  const [viewMode, setViewMode] = useState<ChartMode | null>(null);
+  const effectiveMode = viewMode ?? suggestMode(fromDate, toDate);
   const [exporting, setExporting] = useState(false);
 
   // Gộp hóa đơn của TẤT CẢ quán người dùng sở hữu. /revenue/overview chỉ trả về
@@ -80,8 +96,8 @@ export default function RevenuePage() {
 
   const all = useMemo(() => invoices ?? [], [invoices]);
   const scoped = useMemo(
-    () => (scope === 'all' ? all : all.filter(i => i.cafeId === scope)),
-    [all, scope],
+    () => (effectiveScope === 'all' ? all : all.filter(i => i.cafeId === effectiveScope)),
+    [all, effectiveScope],
   );
   const filtered = useMemo(() => {
     let r = scoped;
@@ -96,7 +112,10 @@ export default function RevenuePage() {
     () => scoped.filter(i => dayOf(i) === todayStr).reduce((s, i) => s + i.totalAmount, 0),
     [scoped],
   );
-  const chartData = useMemo(() => groupBy(filtered, viewMode), [filtered, viewMode]);
+  const chartData = useMemo(
+    () => groupBy(filtered, effectiveMode, fromDate, toDate),
+    [filtered, effectiveMode, fromDate, toDate],
+  );
   const topItems = useMemo(() => computeTopItems(filtered), [filtered]);
 
   // Xếp hạng doanh thu từng quán trong khoảng đang lọc.
@@ -112,12 +131,12 @@ export default function RevenuePage() {
     });
     return rows.sort((a, b) => b.revenue - a.revenue);
   }, [cafes, filtered]);
-  const showComparison = scope === 'all' && cafes.length > 1;
+  const showComparison = effectiveScope === 'all' && cafes.length > 1;
 
   const rangeLabel = fromDate || toDate
     ? `${fromDate || 'đầu kỳ'} → ${toDate || 'nay'}`
     : 'toàn bộ thời gian';
-  const scopeLabel = scope === 'all' ? 'tất cả quán' : cafes.find(c => c.id === scope)?.name ?? '';
+  const scopeLabel = effectiveScope === 'all' ? 'tất cả quán' : cafes.find(c => c.id === effectiveScope)?.name ?? '';
 
   const handleExport = async () => {
     if (filtered.length === 0) {
@@ -126,7 +145,9 @@ export default function RevenuePage() {
     }
     setExporting(true);
     try {
-      const multi = cafes.length > 1;
+      // Cột "Quán" chỉ có nghĩa khi file gộp nhiều quán; đang xem riêng một quán mà
+      // vẫn xuất thì cả cột lặp lại đúng một cái tên.
+      const multi = effectiveScope === 'all' && cafes.length > 1;
       await downloadExcel(
         `doanh-thu-${todayStr}.xlsx`,
         'Doanh thu',
@@ -189,7 +210,7 @@ export default function RevenuePage() {
     <div>
       <PageHeader
         title="Doanh thu"
-        description={cafes.length > 1 ? 'Thống kê gộp mọi quán, có thể xem riêng từng quán' : 'Thống kê doanh thu chi tiết'}
+        description={cafes.length > 1 ? 'Thống kê quán đang quản lý, có thể xem gộp mọi quán' : 'Thống kê doanh thu chi tiết'}
         actions={
           <button onClick={handleExport} disabled={exporting} className="btn-secondary flex items-center gap-2 text-sm">
             <Download className="w-4 h-4" />{exporting ? 'Đang xuất...' : 'Xuất Excel'}
@@ -201,7 +222,7 @@ export default function RevenuePage() {
         {cafes.length > 1 && (
           <select
             className="input-funcafe !w-auto min-w-[170px]"
-            value={scope}
+            value={effectiveScope}
             onChange={e => setScope(e.target.value)}
             aria-label="Chọn quán"
           >
@@ -210,19 +231,15 @@ export default function RevenuePage() {
           </select>
         )}
         <DateRangePicker from={fromDate} to={toDate} onChange={(f, t) => { setFromDate(f); setToDate(t); }} />
-        <select className="input-funcafe !w-auto min-w-[150px]" value={viewMode} onChange={e => setViewMode(e.target.value)}>
-          <option value="day">Theo ngày</option>
-          <option value="month">Theo tháng</option>
-          <option value="year">Theo năm</option>
-        </select>
-        <button onClick={() => { setScope('all'); setFromDate(''); setToDate(''); }} className="btn-secondary">Xóa lọc</button>
+        <ChartModePicker value={effectiveMode} onChange={setViewMode} from={fromDate} to={toDate} />
+        <button onClick={() => { setScope(null); setFromDate(''); setToDate(''); setViewMode(null); }} className="btn-secondary">Xóa lọc</button>
       </FilterBar>
 
       <p className="text-sm text-cafe-500 mb-4">
         Đang xem <span className="font-semibold text-ink">{scopeLabel}</span> · {rangeLabel} · {filtered.length} hóa đơn
       </p>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Doanh thu" value={formatCurrency(revenue)} icon={DollarSign} featured hint={`${filtered.length} hóa đơn`} />
         <StatCard label="Doanh thu hôm nay" value={formatCurrency(todayRevenue)} icon={TrendingUp} color="green" />
         <StatCard label="Trung bình/hóa đơn" value={formatCurrency(avgPerInvoice)} icon={BarChart3} color="blue" />
@@ -242,23 +259,20 @@ export default function RevenuePage() {
       {/* Phân tích doanh thu bằng AI (gói Pro Max) */}
       <RevenueAiInsights />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <SectionCard title={`Doanh thu ${viewMode === 'day' ? 'theo ngày' : viewMode === 'year' ? 'theo năm' : 'theo tháng'}`} icon={BarChart3}>
-          {chartData.length === 0 ? (
-            <p className="text-sm text-cafe-500 text-center py-12">Không có dữ liệu trong khoảng đã lọc.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={{ stroke: '#E2E8F0' }} tickLine={false} />
-                <YAxis tickFormatter={(v) => `${(v / 1000000).toFixed(0)}tr`} tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v) => formatCurrency(Number(v))} labelStyle={{ color: '#1F2933', fontWeight: 600 }} contentStyle={{ borderRadius: 12, border: '1px solid #E2E8F0', boxShadow: '0 12px 30px -16px rgba(15,23,42,.3)' }} cursor={{ fill: 'rgba(37,99,235,0.06)' }} />
-                <Bar dataKey="revenue" name="Doanh thu" fill="#2563EB" radius={[6, 6, 0, 0]} maxBarSize={48} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </SectionCard>
+      {/* Biểu đồ chiếm HÀNG RIÊNG. Trước đây nó chia đôi hàng với "Top 5 món", mà một
+          chuỗi 62 ngày nhét trong nửa chiều rộng thì mỗi mốc chỉ còn vài pixel. */}
+      <SectionCard
+        title={`Doanh thu ${effectiveMode === 'day' ? 'theo ngày' : effectiveMode === 'year' ? 'theo năm' : 'theo tháng'}`}
+        subtitle={`${chartData.length} mốc · ${rangeLabel}`}
+        icon={BarChart3}
+        className="mb-6"
+      >
+        <RevenueChart data={chartData} />
+      </SectionCard>
 
+      {/* Top 5 đứng một mình sẽ để trống nửa hàng -> ghép với bảng so sánh quán khi
+          có nhiều quán; chỉ một quán thì cho nó chiếm trọn hàng. */}
+      <div className={`grid grid-cols-1 gap-6 mb-6 ${showComparison ? 'lg:grid-cols-2' : ''}`}>
         <SectionCard title="Top 5 món bán chạy" icon={TrendingUp}>
           <div className="space-y-3.5">
             {topItems.length === 0 && (
@@ -280,17 +294,17 @@ export default function RevenuePage() {
             ))}
           </div>
         </SectionCard>
-      </div>
 
-      {showComparison && (
-        <SectionCard
-          title="So sánh doanh thu giữa các quán"
-          subtitle={`Trong khoảng đang lọc · ${rangeLabel}`}
-          icon={Store}
-        >
-          <CafeRevenueComparison rows={cafeRanking} />
-        </SectionCard>
-      )}
+        {showComparison && (
+          <SectionCard
+            title="So sánh doanh thu giữa các quán"
+            subtitle={`Trong khoảng đang lọc · ${rangeLabel}`}
+            icon={Store}
+          >
+            <CafeRevenueComparison rows={cafeRanking} />
+          </SectionCard>
+        )}
+      </div>
     </div>
   );
 }

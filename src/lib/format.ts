@@ -11,6 +11,38 @@ export function formatCurrency(amount: number): string {
   return formatted + '\u00a0₫';
 }
 
+/**
+ * Tiền rút gọn cho nhãn trục biểu đồ: 400k · 1,5tr · 12tr · 1,2 tỷ.
+ *
+ * Trước đây trục Y dùng cứng `(v / 1000000).toFixed(0) + 'tr'`, nên quán bán
+ * 400k/ngày thì MỌI nhãn đều là "0tr" — biểu đồ vô dụng với đúng nhóm khách hàng
+ * chính của FunCafe. Ở đây đơn vị co giãn theo độ lớn.
+ *
+ * Tự dựng chuỗi thay vì dùng Intl.NumberFormat: xem chú thích đầu file — các
+ * formatter phải cho ra kết quả giống hệt nhau giữa server và client.
+ */
+export function formatCompactCurrency(amount: number): string {
+  const n = Math.round(amount);
+  const abs = Math.abs(n);
+  if (abs < 1_000) return String(n);
+
+  // Giữ 1 chữ số thập phân tới mốc 100 đơn vị. Ngưỡng phải rộng vì đây là nhãn của
+  // ĐƯỜNG LƯỚI: recharts hay chia trục thành 0 / 4,5 / 9 / 13,5 / 18 triệu, làm tròn
+  // sớm thì vạch 13,5tr bị ghi thành "14tr" — nhãn nói sai vị trí của chính nó.
+  // Số nguyên vẫn ra gọn: .toFixed(1) của 12 là "12.0", đuôi ",0" bị cắt bên dưới.
+  const scaled = (value: number, unit: string) => {
+    const v = n / value;
+    const text = Math.abs(v) < 100
+      ? v.toFixed(1).replace(/\.0$/, '').replace('.', ',')
+      : String(Math.round(v));
+    return text + unit;
+  };
+
+  if (abs < 1_000_000) return scaled(1_000, 'k');
+  if (abs < 1_000_000_000) return scaled(1_000_000, 'tr');
+  return scaled(1_000_000_000, ' tỷ');
+}
+
 /** Nhóm hàng nghìn bằng dấu chấm (không kèm ký hiệu tiền) — dùng cho ô nhập giá. */
 export function formatThousands(amount: number): string {
   if (!Number.isFinite(amount) || amount === 0) return '';
