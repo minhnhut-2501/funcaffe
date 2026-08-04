@@ -24,8 +24,14 @@ function hash(s: string) {
 }
 
 /**
- * Avatar người review: ưu tiên ảnh thật (nếu có avatarUrl), nếu không dùng ảnh
- * chân dung deterministic theo tên; lỗi tải thì rơi về avatar chữ cái có màu brand.
+ * Avatar người review: CHỈ hiện ảnh do chính người đó tải lên. Không có ảnh —
+ * hoặc ảnh tải lỗi — thì dùng avatar chữ cái màu brand.
+ *
+ * Trước đây chỗ này gọi `i.pravatar.cc` để "cho đẹp": dịch vụ đó trả ảnh chân
+ * dung NGƯỜI THẬT ngẫu nhiên theo tên, nên mọi khuôn mặt trên trang chủ đều là
+ * người lạ không liên quan, gán vào lời khen của người khác. Nó còn gửi IP của
+ * mọi khách vào trang sang máy chủ bên thứ ba, trái với điều Chính sách bảo mật
+ * đang cam kết. Không có ảnh thì thà để chữ cái.
  */
 export default function Avatar({
   name,
@@ -36,12 +42,10 @@ export default function Avatar({
   src?: string;
   size?: number;
 }) {
-  const seed = encodeURIComponent(name || 'cafe');
-  const photo = src || `https://i.pravatar.cc/${size * 2}?u=${seed}`;
   const [failed, setFailed] = useState(false);
   const tone = tones[hash(name) % tones.length];
 
-  if (failed) {
+  if (!src || failed) {
     return (
       <span
         className={`inline-flex items-center justify-center rounded-full font-semibold shrink-0 ${tone}`}
@@ -56,7 +60,7 @@ export default function Avatar({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={photo}
+      src={src}
       alt={name}
       width={size}
       height={size}

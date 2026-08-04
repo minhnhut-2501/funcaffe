@@ -285,6 +285,8 @@ export interface Review {
 export interface PublicReview extends Review {
   cafeName: string;
   userName: string;
+  /** Ảnh đại diện chủ quán tự tải lên; chỉ API công khai trả field này. */
+  avatarUrl?: string;
 }
 
 export interface CurrentUser {

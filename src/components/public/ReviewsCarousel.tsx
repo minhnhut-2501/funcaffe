@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Star, ChevronLeft, ChevronRight, Quote } from 'lucide-react';
+import Link from 'next/link';
+import { Star, ChevronLeft, ChevronRight, Quote, MessageSquarePlus } from 'lucide-react';
 import { reviewService } from '@/services';
 import type { PublicReview } from '@/types';
 import Avatar from './Avatar';
@@ -16,16 +17,17 @@ type Item = {
   avatar?: string;
 };
 
-const sample: Item[] = [
-  { key: 's1', rating: 5, text: 'Giao diện dễ dùng, nhân viên mới làm quen chỉ trong buổi đầu. Order nhanh hơn hẳn lúc ghi giấy.', name: 'Trần Minh Hùng', cafe: 'Cafe Góc Nhỏ' },
-  { key: 's2', rating: 5, text: 'Quản lý bàn và hóa đơn rõ ràng, cuối ngày không phải ngồi cộng tay nữa.', name: 'Nguyễn Thị Lan', cafe: 'Trà sữa MiMi' },
-  { key: 's3', rating: 4, text: 'Thêm size với topping cho từng món rất tiện, khách đổi món cũng không bị nhầm.', name: 'Lê Đăng Khoa', cafe: 'Cafe Sân Vườn' },
-  { key: 's4', rating: 5, text: 'Báo cáo doanh thu theo ngày giúp mình biết món nào nên giữ, món nào nên bỏ.', name: 'Phạm Thu Hà', cafe: 'The Brew House' },
-  { key: 's5', rating: 5, text: 'Một màn hình thấy hết bàn trống bàn bận, giờ cao điểm đỡ rối hẳn.', name: 'Võ Quốc Bảo', cafe: 'Nắng Coffee' },
-];
-
+/**
+ * Đánh giá thật, hoặc không có gì cả.
+ *
+ * Chỗ này từng có mảng `sample` gồm 5 lời khen bịa (tên người + tên quán tự nghĩ
+ * ra) làm giá trị khởi tạo, và chỉ thay bằng dữ liệu thật khi API trả về từ 3 bản
+ * ghi trở lên. Hệ quả: quán có 1-2 đánh giá thật thì trang chủ hiện 5 cái giả và
+ * GIẤU luôn cái thật; admin thì trống trơn. Nay `null` = đang tải, `[]` = chưa ai
+ * đánh giá, và lỗi mạng cũng rơi vào `[]` — không có đường nào dẫn tới dữ liệu bịa.
+ */
 export default function ReviewsCarousel() {
-  const [items, setItems] = useState<Item[]>(sample);
+  const [items, setItems] = useState<Item[] | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
@@ -33,7 +35,7 @@ export default function ReviewsCarousel() {
   useEffect(() => {
     reviewService.getPublicReviews()
       .then((rs: PublicReview[]) => {
-        const mapped = rs
+        setItems(rs
           .filter(r => r.comment)
           .slice(0, 12)
           .map((r): Item => ({
@@ -43,10 +45,10 @@ export default function ReviewsCarousel() {
             text: r.comment as string,
             name: r.userName || 'Chủ quán',
             cafe: r.cafeName,
-          }));
-        if (mapped.length >= 3) setItems(mapped);
+            avatar: r.avatarUrl,
+          })));
       })
-      .catch(() => {});
+      .catch(() => setItems([]));
   }, []);
 
   const updateEdges = () => {
@@ -84,6 +86,42 @@ export default function ReviewsCarousel() {
   };
   const endDrag = () => { drag.current.active = false; };
 
+  if (items === null) {
+    return (
+      <div className="flex gap-5 overflow-hidden" aria-hidden>
+        {[0, 1, 2].map(i => (
+          // Cùng bề ngang và bề cao với thẻ thật để nội dung dưới không nhảy khi tải xong.
+          <div key={i} className="shrink-0 w-[85%] sm:w-[360px] h-64 rounded-2xl border border-line bg-white p-6 skeleton-sweep">
+            <div className="w-7 h-7 rounded bg-cafe-100 mb-3" />
+            <div className="h-3 w-24 rounded bg-cafe-100 mb-4" />
+            <div className="space-y-2">
+              <div className="h-3 w-full rounded bg-cafe-50" />
+              <div className="h-3 w-full rounded bg-cafe-50" />
+              <div className="h-3 w-3/5 rounded bg-cafe-50" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="max-w-xl mx-auto bg-white rounded-2xl border border-line p-8 text-center">
+        <span className="w-12 h-12 rounded-xl bg-bean-tint text-bean grid place-items-center mx-auto mb-4">
+          <MessageSquarePlus className="w-6 h-6" />
+        </span>
+        <p className="font-semibold text-ink mb-1.5">Chưa có đánh giá nào</p>
+        <p className="text-sm text-ink/70 leading-relaxed mb-5">
+          Bạn đang dùng FunCafe cho quán của mình? Hãy là người đầu tiên chia sẻ trải nghiệm.
+        </p>
+        <Link href="/support#danh-gia" className="btn-cafe-outline inline-flex py-2.5 px-5 text-sm">
+          Viết đánh giá
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="relative">
       <div
@@ -120,7 +158,9 @@ export default function ReviewsCarousel() {
         ))}
       </div>
 
-      <div className="flex justify-end gap-2 mt-5">
+      {/* Mọi thẻ đã nằm vừa khung (1-2 đánh giá) thì hai nút chỉ còn là hai vòng tròn
+          mờ bấm không được — ẩn hẳn thay vì để chúng vô hiệu hóa. */}
+      <div className={`justify-end gap-2 mt-5 ${atStart && atEnd ? 'hidden' : 'flex'}`}>
         <button
           onClick={() => scrollByCards(-1)}
           disabled={atStart}

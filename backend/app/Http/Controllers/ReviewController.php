@@ -33,6 +33,10 @@ class ReviewController extends Controller
                     'comment'      => $review->comment,
                     'created_at'   => $review->created_at,
                     'user_name'    => $review->user?->full_name ?? '',
+                    // Ảnh đại diện do chính chủ quán tải lên. Người viết đã biết đánh giá
+                    // này công khai kèm tên và tên quán, nên avatar cùng mức công khai.
+                    // Chưa tải ảnh -> null, frontend rơi về avatar chữ cái.
+                    'avatar'       => $review->user?->avatar ?: null,
                     'cafe_name'    => $review->cafe?->name ?? '',
                     'package_name' => $review->package?->name ?? '',
                 ];

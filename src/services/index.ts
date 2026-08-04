@@ -933,6 +933,7 @@ export const reviewService = {
       id: raw.id ?? raw._id,
       userId: raw.user_id,
       userName: raw.user_name ?? raw.user?.full_name ?? '',
+      avatarUrl: raw.avatar ?? undefined,
       cafeId: raw.cafe_id,
       cafeName: raw.cafe_name ?? raw.cafe?.name ?? '',
       packageId: raw.package_id,

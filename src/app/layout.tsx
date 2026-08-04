@@ -14,6 +14,9 @@ const beVietnamPro = Be_Vietnam_Pro({
 export const metadata: Metadata = {
   title: 'FunCafe - Nền tảng quản lý quán cafe',
   description: 'Hệ thống quản lý quán cafe thông minh dành cho chủ quán tại Việt Nam',
+  // public/favicon.svg vốn có sẵn nhưng không được khai báo, nên trình duyệt tự
+  // đòi /favicon.ico và ăn 404 ở mọi lượt tải trang.
+  icons: { icon: '/favicon.svg' },
 };
 
 export default function RootLayout({

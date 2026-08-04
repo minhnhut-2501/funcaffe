@@ -415,7 +415,9 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
           <Reveal className="max-w-2xl mb-10">
             <h2 className="text-2xl md:text-3xl font-bold text-ink mb-3">Chủ quán nói gì về FunCafe</h2>
-            <p className="text-ink/70">Lướt qua để xem thêm phản hồi từ những quán đang dùng hệ thống.</p>
+            {/* Câu này phải đúng ở cả trạng thái rỗng lẫn khi mới có 1 đánh giá —
+                "lướt qua để xem thêm" đọc rất kỳ khi chỉ có một thẻ. */}
+            <p className="text-ink/70">Toàn bộ đánh giá dưới đây do chính chủ quán đang dùng FunCafe gửi lên.</p>
           </Reveal>
           <ReviewsCarousel />
         </div>

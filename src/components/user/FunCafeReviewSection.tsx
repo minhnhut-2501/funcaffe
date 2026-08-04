@@ -110,7 +110,9 @@ export default function FunCafeReviewSection() {
   };
 
   return (
-    <div className="rounded-2xl bg-white border border-line p-6 sm:p-8 shadow-sm">
+    // id: đích của liên kết "Viết đánh giá" ở trang chủ khi chưa có đánh giá nào.
+    // scroll-mt-24 để header sticky không che mất tiêu đề khi nhảy tới neo.
+    <div id="danh-gia" className="scroll-mt-24 rounded-2xl bg-white border border-line p-6 sm:p-8 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
         <Star className="w-5 h-5 text-gold" />
         <h3 className="text-lg font-bold text-ink">Đánh giá FunCafe</h3>
