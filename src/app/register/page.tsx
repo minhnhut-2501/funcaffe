@@ -180,8 +180,27 @@ export default function RegisterPage() {
           className="w-4 h-4 mt-0.5 shrink-0 rounded border-cafe-300 accent-bean focus:ring-2 focus:ring-bean/35"
         />
         <span>
-          Tôi đồng ý với <span className="text-bean underline">Điều khoản dịch vụ</span> và{' '}
-          <span className="text-bean underline">Chính sách bảo mật</span>
+          {/* stopPropagation là BẮT BUỘC: hai link này nằm trong <label htmlFor="reg-agree">,
+              mà bấm bất cứ đâu trong label đều toggle checkbox. Thiếu nó thì bấm xem điều
+              khoản vừa mở tab mới vừa lặng lẽ bỏ tick ô đồng ý. */}
+          Tôi đồng ý với{' '}
+          <Link
+            href="/terms"
+            target="_blank"
+            onClick={e => e.stopPropagation()}
+            className="text-bean font-medium underline hover:text-bean-dark"
+          >
+            Điều khoản dịch vụ
+          </Link>{' '}
+          và{' '}
+          <Link
+            href="/privacy"
+            target="_blank"
+            onClick={e => e.stopPropagation()}
+            className="text-bean font-medium underline hover:text-bean-dark"
+          >
+            Chính sách bảo mật
+          </Link>
         </span>
       </label>
 

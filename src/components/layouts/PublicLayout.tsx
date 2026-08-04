@@ -242,9 +242,16 @@ function PublicFooter() {
           </div>
         </div>
 
-        <div className="border-t border-white/15 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-white/55">
+        {/* Chỗ bên phải trước đây là "Phần mềm quản lý quán cafe" — lặp lại nguyên ý
+            của đoạn giới thiệu ngay phía trên. Nhường chỗ cho hai link pháp lý, vốn
+            theo lệ chung vẫn nằm ở hàng cuối footer. */}
+        <div className="border-t border-white/15 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-white/55">
           <p>© {year} FunCafe. Đồ án tốt nghiệp.</p>
-          <p>Phần mềm quản lý quán cafe</p>
+          <nav aria-label="Pháp lý" className="flex items-center gap-3">
+            <Link href="/terms" className="hover:text-white transition-colors">Điều khoản dịch vụ</Link>
+            <span aria-hidden className="h-3 w-px bg-white/25" />
+            <Link href="/privacy" className="hover:text-white transition-colors">Chính sách bảo mật</Link>
+          </nav>
         </div>
       </div>
     </footer>

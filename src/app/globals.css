@@ -191,6 +191,43 @@
   .chip-pine {
     @apply inline-flex items-center gap-1.5 rounded-full bg-pine/10 px-3 py-1 text-xs font-medium text-pine;
   }
+
+  /* Thân văn bản pháp lý (/terms, /privacy): danh sách và bảng ở đây chỉ là văn
+     xuôi có cấu trúc, không phải thành phần giao diện — gom kiểu vào một chỗ để
+     mỗi mục không phải mang theo cả nắm class. */
+  .legal-body ul {
+    @apply space-y-2 pl-5;
+  }
+  .legal-body ul > li {
+    @apply relative;
+  }
+  .legal-body ul > li::before {
+    content: '';
+    @apply absolute -left-4 top-2.5 w-1.5 h-1.5 rounded-full bg-bean/45;
+  }
+  .legal-body strong {
+    @apply font-semibold text-ink;
+  }
+  .legal-body a {
+    @apply text-bean font-medium hover:underline;
+  }
+  /* Bảng dài (danh sách bên thứ ba) phải tự cuộn trong khung của nó, tuyệt đối
+     không được đẩy cả trang cuộn ngang trên điện thoại. */
+  .legal-table {
+    @apply overflow-x-auto rounded-xl border border-line bg-white;
+  }
+  .legal-table table {
+    @apply w-full text-sm min-w-[34rem];
+  }
+  .legal-table th {
+    @apply text-left font-semibold text-ink bg-sand px-4 py-2.5 border-b border-line;
+  }
+  .legal-table td {
+    @apply align-top px-4 py-3 border-b border-line last:border-b-0 text-ink/80;
+  }
+  .legal-table tr:last-child td {
+    @apply border-b-0;
+  }
 }
 
 @layer utilities {
