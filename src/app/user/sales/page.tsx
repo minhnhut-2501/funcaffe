@@ -81,6 +81,17 @@ export default function SalesPage() {
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [draftOrderIds, setDraftOrderIds] = useState<Record<string, string>>({});
   const [cafeInfo, setCafeInfo] = useState<CafeInfo | null>(null);
+  // Chuỗi đang gõ trong ô số lượng, theo từng dòng giỏ. Ô số lượng KHÔNG bám thẳng
+  // vào c.quantity: gõ số bao giờ cũng đi qua trạng thái dở dang (rỗng khi xóa để
+  // gõ lại, "1" trên đường tới "10"). Ép ô hiển thị số thật ở mọi lần gõ thì không
+  // xóa trắng ô được, mà nhận thẳng số dở dang thì dòng bị xóa lúc chạm 0.
+  const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
+  const clearQtyDraft = (id: string) =>
+    setQtyDraft(prev => {
+      if (!(id in prev)) return prev;
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
 
   const cartToOrderItems = (items: CartItem[]): OrderItem[] =>
     items.map(c => ({
@@ -350,6 +361,7 @@ export default function SalesPage() {
 
   const removeCartItem = (id: string) => {
     if (!selectedTable) return;
+    clearQtyDraft(id);
     setCart(prev => {
       const next = prev.filter(c => c.id !== id);
       persistCart(selectedTable.id, next);
@@ -357,13 +369,19 @@ export default function SalesPage() {
     });
   };
 
+  /** Số lượng hợp lệ của một dòng: ít nhất 1, và chặn trên để một lần lỡ tay không
+   *  đẻ ra hóa đơn hàng tỉ đồng. Bấm nút trừ xuống dưới 1 thì xóa dòng (như cũ),
+   *  còn GÕ thì không bao giờ xóa — xóa dòng chỉ bằng nút X. */
+  const MAX_QTY = 999;
+
   const updateQty = (id: string, delta: number) => {
     if (!selectedTable) return;
+    clearQtyDraft(id);
     setCart(prev => {
       const next = prev.map(c => {
         if (c.id !== id) return c;
         const newQty = c.quantity + delta;
-        return newQty <= 0 ? null : { ...c, quantity: newQty };
+        return newQty <= 0 ? null : { ...c, quantity: Math.min(MAX_QTY, newQty) };
       }).filter(Boolean) as CartItem[];
       persistCart(selectedTable.id, next);
       return next;
@@ -372,11 +390,9 @@ export default function SalesPage() {
 
   const setQty = (id: string, qty: number) => {
     if (!selectedTable) return;
+    const safe = Math.min(MAX_QTY, Math.max(1, Math.trunc(qty)));
     setCart(prev => {
-      const next = prev.map(c => {
-        if (c.id !== id) return c;
-        return { ...c, quantity: qty };
-      }).filter(c => c.quantity > 0) as CartItem[];
+      const next = prev.map(c => (c.id === id ? { ...c, quantity: safe } : c));
       persistCart(selectedTable.id, next);
       return next;
     });
@@ -495,7 +511,7 @@ export default function SalesPage() {
           </div>
           <div className="stagger flex-1 overflow-y-auto p-2.5 grid grid-cols-2 gap-2 content-start">
             {filteredTables.map(t => (
-              <TableTile key={t.id} table={t} selected={selectedTable?.id === t.id} onClick={() => { setSelectedTable(t); setMobileTab('menu'); }} />
+              <TableTile key={t.id} table={t} selected={selectedTable?.id === t.id} onClick={() => { setSelectedTable(t); setQtyDraft({}); setMobileTab('menu'); }} />
             ))}
             {filteredTables.length === 0 && <p className="col-span-2 text-xs text-cafe-400 text-center py-6">{tables.length === 0 ? 'Bạn chưa thêm bàn nào' : 'Không tìm thấy bàn'}</p>}
           </div>
@@ -580,14 +596,23 @@ export default function SalesPage() {
                         type="number"
                         inputMode="numeric"
                         min={1}
-                        value={c.quantity}
+                        max={MAX_QTY}
+                        value={qtyDraft[c.id] ?? String(c.quantity)}
                         onChange={(e) => {
-                          const n = parseInt(e.target.value, 10);
-                          if (!Number.isNaN(n)) setQty(c.id, n);
+                          // Chỉ giữ chữ số: type="number" vẫn cho gõ '-', 'e', '.' và
+                          // khi đó e.target.value về rỗng, không phân biệt được với xóa trắng.
+                          const raw = e.target.value.replace(/\D/g, '').slice(0, 3);
+                          setQtyDraft(prev => ({ ...prev, [c.id]: raw }));
+                          const n = parseInt(raw, 10);
+                          // Rỗng hoặc 0 là trạng thái dở dang trên đường gõ '10' —
+                          // giữ nguyên số cũ trong giỏ, chờ gõ xong.
+                          if (n >= 1) setQty(c.id, n);
                         }}
-                        onBlur={(e) => {
-                          if (!e.target.value || parseInt(e.target.value, 10) < 1) setQty(c.id, 1);
+                        onBlur={() => {
+                          // Rời ô mà đang để trống/0: trả về đúng số lượng thật, KHÔNG xóa dòng.
+                          clearQtyDraft(c.id);
                         }}
+                        onFocus={(e) => e.currentTarget.select()}
                         className="text-xs font-bold w-11 h-9 md:w-9 md:h-6 text-center rounded-lg border border-line bg-white focus:outline-none focus:ring-1 focus:ring-bean focus:border-bean [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button onClick={() => updateQty(c.id, 1)} className="w-9 h-9 md:w-6 md:h-6 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Plus className="w-3.5 h-3.5 md:w-3 md:h-3" /></button>
