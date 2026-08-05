@@ -25,8 +25,21 @@ class PackagePayment extends Model
         // (khách chỉ trả phần chênh lệch, lưu như một dòng biên lai). Đây KHÔNG phải hoàn
         // tiền mặt; đã "applied" hay chưa suy trực tiếp từ credit_amount > 0.
         'credit_amount',
-        // Thông tin từ cổng thanh toán online (VNPay)
+        // Thông tin từ cổng thanh toán online (VNPay/MoMo)
         'gateway_txn_no', 'gateway_bank_code',
+        /*
+         * Mã đơn ĐÃ GỬI SANG CỔNG, khi nó khác transaction_code.
+         *
+         * Cần cho MoMo: MoMo bắt mã đơn duy nhất theo partner code, mà partner code
+         * của môi trường thử nghiệm là dùng chung. Trong khi đó transaction_code lại
+         * được sinh bằng cách đếm giao dịch TRONG CHÍNH CSDL này, nên máy local và
+         * máy production đều đẻ ra 'TXN-<ngày>-0001' cho giao dịch đầu tiên trong
+         * ngày — gửi cái thứ hai sang là MoMo từ chối vì trùng.
+         *
+         * Vì vậy gửi đi kèm đuôi ngẫu nhiên và lưu lại đây để callback tra đúng đơn.
+         * transaction_code giữ nguyên định dạng cũ cho hóa đơn và trang quản trị.
+         */
+        'gateway_order_id',
     ];
 
     public function subscription()

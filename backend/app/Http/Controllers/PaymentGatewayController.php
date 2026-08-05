@@ -31,6 +31,22 @@ class PaymentGatewayController extends Controller
     }
 
     /**
+     * Tìm đơn theo mã MoMo trả về. Mã gửi sang MoMo có đuôi ngẫu nhiên nên nằm ở
+     * gateway_order_id chứ không phải transaction_code — xem chú thích trong
+     * PackagePayment. Vẫn dò tiếp theo transaction_code để các đơn tạo TRƯỚC khi
+     * có trường này (chưa có đuôi) không thành mồ côi.
+     */
+    private function findMomoPayment(?string $orderId): ?PackagePayment
+    {
+        if (!$orderId) {
+            return null;
+        }
+
+        return PackagePayment::where('gateway_order_id', $orderId)->first()
+            ?? PackagePayment::where('transaction_code', $orderId)->first();
+    }
+
+    /**
      * Return URL: trình duyệt người dùng được VNPay chuyển hướng về đây sau khi trả tiền.
      * Backend xác thực chữ ký, kích hoạt gói, rồi redirect về trang kết quả của frontend.
      *
@@ -134,7 +150,7 @@ class PaymentGatewayController extends Controller
             return redirect()->away($resultBase . '&status=fail&code=invalid_signature');
         }
 
-        $payment = PackagePayment::where('transaction_code', $data['orderId'] ?? '')->first();
+        $payment = $this->findMomoPayment($data['orderId'] ?? null);
         if (!$payment) {
             return redirect()->away($resultBase . '&status=fail&code=not_found');
         }
@@ -169,7 +185,7 @@ class PaymentGatewayController extends Controller
             return response()->noContent();
         }
 
-        $payment = PackagePayment::where('transaction_code', $data['orderId'] ?? '')->first();
+        $payment = $this->findMomoPayment($data['orderId'] ?? null);
         if (!$payment) {
             return response()->noContent();
         }

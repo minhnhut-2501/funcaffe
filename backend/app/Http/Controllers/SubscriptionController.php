@@ -14,6 +14,7 @@ use App\Services\MomoService;
 use App\Services\SubscriptionActivator;
 use App\Services\VnpayService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class SubscriptionController extends Controller
 {
@@ -52,10 +53,18 @@ class SubscriptionController extends Controller
                     (string) $request->ip()
                 );
             } else {
+                $payment = PackagePayment::where('transaction_code', $txnCode)->first();
+
+                // Đuôi ngẫu nhiên: MoMo bắt mã đơn duy nhất theo PARTNER CODE, mà mã
+                // partner của môi trường thử nghiệm là dùng chung. transaction_code lại
+                // đếm theo từng CSDL, nên local và production cùng đẻ ra 'TXN-<ngày>-0001'
+                // cho giao dịch đầu ngày — cái gửi sau bị MoMo từ chối vì trùng.
+                $gatewayOrderId = $txnCode . '-' . strtolower(Str::random(6));
+                $payment?->update(['gateway_order_id' => $gatewayOrderId]);
+
                 try {
-                    $data['payment_url'] = app(MomoService::class)->createPayment($txnCode, $payable, $orderInfo);
+                    $data['payment_url'] = app(MomoService::class)->createPayment($gatewayOrderId, $payable, $orderInfo);
                 } catch (\Throwable $e) {
-                    $payment = PackagePayment::where('transaction_code', $txnCode)->first();
                     if ($payment) {
                         $this->atomic(fn () => app(SubscriptionActivator::class)->rejectAndRollback($payment));
                     }
