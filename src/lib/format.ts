@@ -83,6 +83,7 @@ export function formatPaymentMethod(method: string): string {
     cash: 'Tiền mặt',
     vietqr: 'Chuyển khoản',
     vnpay: 'VNPay',
+    momo: 'MoMo',
     cancel: 'Hủy gói',
     bank_transfer: 'Chuyển khoản',
     transfer: 'Chuyển khoản',

@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Models\Cafe;
 use App\Http\Controllers\Concerns\RunsAtomically;
 use App\Http\Controllers\Concerns\ChecksCafeOwnership;
+use App\Services\MomoService;
+use App\Services\SubscriptionActivator;
 use App\Services\VnpayService;
 use Illuminate\Http\Request;
 
@@ -24,21 +26,45 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Trả về subscription cho client. Nếu phương thức là VNPay và có số tiền phải trả,
-     * đính kèm payment_url để frontend chuyển hướng sang cổng thanh toán.
+     * Trả về subscription cho client. Với cổng online và có số tiền phải trả, đính
+     * kèm payment_url để frontend chuyển hướng sang cổng.
+     *
+     * VNPay chỉ dựng URL đã ký (không đi mạng, không hỏng được). MoMo phải gọi API
+     * server-to-server nên CÓ THỂ HỎNG — hỏng thì phải dọn đơn ngay tại đây, nếu
+     * không người dùng còn lại một đơn 'pending' treo chặn luôn lần mua kế tiếp.
      */
     private function respondSubscription($subscription, int $statusCode, float $amount, string $txnCode, Request $request)
     {
         $data = $subscription->load('package')->toArray();
+        $method = $request->input('payment_method');
 
-        if (($request->input('payment_method') === 'vnpay') && $amount > 0) {
+        if ($amount > 0 && in_array($method, PackagePayment::ONLINE_GATEWAYS, true)) {
+            // Bỏ dấu tiếng Việt khỏi mô tả: cả hai cổng đều đưa chuỗi này vào chữ ký,
+            // ký tự ngoài ASCII rất dễ lệch encoding giữa lúc ký và lúc gửi.
             $orderInfo = 'Thanh toan goi ' . preg_replace('/[^A-Za-z0-9 ]/', '', $subscription->package_name_snapshot ?? 'FunCafe');
-            $data['payment_url'] = app(VnpayService::class)->buildPaymentUrl(
-                $txnCode,
-                (int) round($amount),
-                $orderInfo,
-                (string) $request->ip()
-            );
+            $payable = (int) round($amount);
+
+            if ($method === 'vnpay') {
+                $data['payment_url'] = app(VnpayService::class)->buildPaymentUrl(
+                    $txnCode,
+                    $payable,
+                    $orderInfo,
+                    (string) $request->ip()
+                );
+            } else {
+                try {
+                    $data['payment_url'] = app(MomoService::class)->createPayment($txnCode, $payable, $orderInfo);
+                } catch (\Throwable $e) {
+                    $payment = PackagePayment::where('transaction_code', $txnCode)->first();
+                    if ($payment) {
+                        $this->atomic(fn () => app(SubscriptionActivator::class)->rejectAndRollback($payment));
+                    }
+
+                    return response()->json([
+                        'message' => 'Không kết nối được cổng MoMo: ' . $e->getMessage(),
+                    ], 502);
+                }
+            }
         }
 
         return response()->json($data, $statusCode);
@@ -148,7 +174,7 @@ class SubscriptionController extends Controller
         $validated = $request->validate([
             'package_id' => 'required|string',
             'time_subscription_id' => 'nullable|string',
-            'payment_method' => 'required|string|in:cash,bank_transfer,qr_code,e_wallet,vnpay',
+            'payment_method' => 'required|string|in:cash,bank_transfer,qr_code,e_wallet,vnpay,momo',
             'note' => 'nullable|string|max:500',
         ]);
 

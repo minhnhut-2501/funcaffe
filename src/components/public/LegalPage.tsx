@@ -74,8 +74,8 @@ export default function LegalPage({
             <div className="text-sm text-ink/80 leading-relaxed space-y-1.5">
               <p className="font-semibold text-ink">FunCafe là sản phẩm đồ án tốt nghiệp</p>
               <p>
-                Hệ thống chưa vận hành thương mại. Cổng thanh toán đang chạy trên môi trường thử
-                nghiệm (sandbox) của VNPay, nên <strong>không phát sinh giao dịch tiền thật</strong>.
+                Hệ thống chưa vận hành thương mại. Các cổng thanh toán (VNPay, MoMo) đều đang chạy
+                trên môi trường thử nghiệm, nên <strong>không phát sinh giao dịch tiền thật</strong>.
               </p>
               <p>
                 Tài liệu này mô tả đúng cách hệ thống đang hoạt động, không phải cam kết pháp lý của

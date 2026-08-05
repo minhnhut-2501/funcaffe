@@ -49,4 +49,15 @@ return [
         'return_url'  => env('VNPAY_RETURN_URL', env('APP_URL', 'http://localhost:8000') . '/api/payments/vnpay/return'),
     ],
 
+    // Cổng thanh toán MoMo (môi trường thử nghiệm) — luồng chủ quán trả tiền gói.
+    // Khác VNPay ở chỗ phải gọi API server-to-server để lấy payUrl, nên có endpoint.
+    'momo' => [
+        'partner_code' => env('MOMO_PARTNER_CODE'),
+        'access_key'   => env('MOMO_ACCESS_KEY'),
+        'secret_key'   => env('MOMO_SECRET_KEY'),
+        'endpoint'     => env('MOMO_ENDPOINT', 'https://test-payment.momo.vn/v2/gateway/api/create'),
+        'redirect_url' => env('MOMO_REDIRECT_URL', env('APP_URL', 'http://localhost:8000') . '/api/payments/momo/return'),
+        'ipn_url'      => env('MOMO_IPN_URL', env('APP_URL', 'http://localhost:8000') . '/api/payments/momo/ipn'),
+    ],
+
 ];

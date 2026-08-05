@@ -130,7 +130,8 @@ export const sections: LegalSection[] = [
             ['Google Gemini', 'Nội dung hội thoại bạn gõ và số liệu tổng hợp về quán', 'Sinh câu trả lời cho trợ lý AI — chỉ chạy khi bạn chủ động dùng tính năng này (gói Pro Max)'],
             ['Cloudinary', 'Ảnh bạn tải lên (logo quán, ảnh món, ảnh đại diện)', 'Lưu trữ và phân phối hình ảnh'],
             ['MongoDB Atlas', 'Toàn bộ cơ sở dữ liệu của hệ thống', 'Lưu trữ dữ liệu'],
-            ['VNPay (sandbox)', 'Mã giao dịch, số tiền, nội dung thanh toán', 'Xử lý luồng thanh toán mô phỏng'],
+            ['VNPay (thử nghiệm)', 'Mã giao dịch, số tiền, nội dung thanh toán', 'Xử lý luồng thanh toán mô phỏng khi bạn chọn cổng này'],
+            ['MoMo (thử nghiệm)', 'Mã giao dịch, số tiền, nội dung thanh toán', 'Xử lý luồng thanh toán mô phỏng khi bạn chọn cổng này'],
             ['Vercel, Render', 'Dữ liệu đi qua trong quá trình xử lý yêu cầu', 'Hạ tầng chạy giao diện và máy chủ'],
           ]}
         />

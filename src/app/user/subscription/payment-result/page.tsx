@@ -9,6 +9,9 @@ function Result() {
   const params = useSearchParams();
   const status = params.get('status');
   const code = params.get('code');
+  // Cổng nào trả về — backend đính kèm ?gateway=vnpay|momo. Thiếu thì không nêu tên
+  // cổng chứ không đoán bừa.
+  const gatewayName = ({ vnpay: 'VNPay', momo: 'MoMo' } as Record<string, string>)[params.get('gateway') ?? ''] ?? '';
   const { refreshUser } = useAuth();
   const [refreshing, setRefreshing] = useState(true);
 
@@ -32,7 +35,7 @@ function Result() {
             <div className="w-16 h-16 rounded-full bg-pine/12 grid place-items-center mx-auto mb-4"><CheckCircle2 className="w-9 h-9 text-pine" /></div>
             <h1 className="text-xl font-bold text-ink mb-2">Thanh toán thành công</h1>
             <p className="text-sm text-cafe-600 mb-1">
-              Gói dịch vụ của bạn đã được kích hoạt tự động.
+              {gatewayName ? `Đã nhận thanh toán qua ${gatewayName}. ` : ''}Gói dịch vụ của bạn đã được kích hoạt tự động.
             </p>
             {refreshing && (
               <p className="text-xs text-cafe-400 flex items-center justify-center gap-1 mt-2">
@@ -45,7 +48,7 @@ function Result() {
             <div className="w-16 h-16 rounded-full bg-red-50 grid place-items-center mx-auto mb-4"><XCircle className="w-9 h-9 text-red-500" /></div>
             <h1 className="text-xl font-bold text-ink mb-2">Thanh toán không thành công</h1>
             <p className="text-sm text-cafe-600">
-              Giao dịch chưa hoàn tất hoặc đã bị hủy. Bạn có thể thử lại.
+              Giao dịch {gatewayName && `qua ${gatewayName} `}chưa hoàn tất hoặc đã bị hủy. Bạn có thể thử lại.
             </p>
             {code && <p className="text-xs text-cafe-400 mt-2">Mã lỗi: {code}</p>}
           </>

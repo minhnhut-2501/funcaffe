@@ -2,7 +2,9 @@ export type UserPackageType = 'none' | 'free' | 'pro' | 'promax';
 
 export type TableStatus = 'empty' | 'serving';
 export type OrderStatus = 'active' | 'paid' | 'cancelled';
-export type PaymentMethod = 'cash' | 'bank_transfer' | 'qr_code' | 'e_wallet' | 'vietqr' | 'vnpay';
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'qr_code' | 'e_wallet' | 'vietqr' | 'vnpay' | 'momo';
+/** Cổng online tự kích hoạt gói qua callback — khớp PackagePayment::ONLINE_GATEWAYS ở backend. */
+export type OnlineGateway = 'vnpay' | 'momo';
 export type InvoiceStatus = 'paid';
 export type MenuItemStatus = 'available' | 'unavailable';
 export type ToppingStatus = 'available' | 'unavailable';

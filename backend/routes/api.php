@@ -107,9 +107,12 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('packages', [PackageController::class, 'index']);
 Route::get('packages/{package}/time-subscriptions', [TimeSubscriptionController::class, 'index']);
 
-// Cổng thanh toán VNPay (public - VNPay/trình duyệt gọi không kèm token)
+// Cổng thanh toán (public - cổng/trình duyệt gọi không kèm token)
 Route::get('payments/vnpay/return', [\App\Http\Controllers\PaymentGatewayController::class, 'vnpayReturn']);
 Route::get('payments/vnpay/ipn', [\App\Http\Controllers\PaymentGatewayController::class, 'vnpayIpn']);
+// MoMo: IPN là POST với thân JSON, không phải GET như VNPay.
+Route::get('payments/momo/return', [\App\Http\Controllers\PaymentGatewayController::class, 'momoReturn']);
+Route::post('payments/momo/ipn', [\App\Http\Controllers\PaymentGatewayController::class, 'momoIpn']);
 
 // Subscriptions — ĐA QUÁN: gói/thanh toán độc lập theo từng quán (cafes/{cafe}/...)
 Route::middleware('auth:sanctum')->group(function () {

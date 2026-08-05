@@ -21,6 +21,27 @@ export function VnpayLogo({ className }: { className?: string }) {
   );
 }
 
+/** Wordmark MoMo — chữ "momo" trên nền bo tròn hồng cánh sen (#A50064). */
+export function MomoLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 96 28" className={className} role="img" aria-label="MoMo" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="96" height="28" rx="7" fill="#A50064" />
+      <text
+        x="48"
+        y="20"
+        textAnchor="middle"
+        fontFamily="Arial, Helvetica, sans-serif"
+        fontWeight="800"
+        fontSize="17"
+        letterSpacing="-0.3"
+        fill="#FFFFFF"
+      >
+        momo
+      </text>
+    </svg>
+  );
+}
+
 /** Icon QR kiểu VietQR — ba ô định vị xanh + khối dữ liệu đỏ (màu NAPAS/VietQR). */
 export function VietQrMark({ className }: { className?: string }) {
   return (

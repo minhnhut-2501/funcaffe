@@ -89,11 +89,13 @@ export const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          <strong>Cổng thanh toán đang chạy ở môi trường thử nghiệm (sandbox) của VNPay.</strong> Mọi
-          giao dịch trên hệ thống là giao dịch mô phỏng và không phát sinh tiền thật. Đây là hệ quả
-          trực tiếp của việc FunCafe là đồ án tốt nghiệp chưa vận hành thương mại.
+          Khi mua gói, bạn chọn thanh toán qua <strong>VNPay</strong> hoặc <strong>MoMo</strong>. Cả
+          hai đều <strong>đang chạy ở môi trường thử nghiệm</strong> của nhà cung cấp: mọi giao dịch
+          trên hệ thống là giao dịch mô phỏng và <strong>không phát sinh tiền thật</strong>. Đây là hệ
+          quả trực tiếp của việc FunCafe là đồ án tốt nghiệp chưa vận hành thương mại.
         </p>
         <ul>
+          <li>Thanh toán qua cổng online được <strong>kích hoạt tự động</strong> sau khi cổng xác nhận, không cần quản trị viên duyệt tay.</li>
           <li>Giá gói hiển thị đã bao gồm thuế giá trị gia tăng theo mức do quản trị viên cấu hình; gói dùng thử không tính thuế.</li>
           <li>Với hình thức chuyển khoản, giao dịch ở trạng thái <strong>chờ xác nhận</strong> cho tới khi quản trị viên đối chiếu và xác nhận. Gói chỉ được kích hoạt sau bước này.</li>
           <li>Toàn bộ giao dịch của bạn được lưu lại và xem được trong mục Gói dịch vụ.</li>

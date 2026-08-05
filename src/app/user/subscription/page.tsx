@@ -2,13 +2,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
-import { VnpayLogo } from '@/components/ui/PaymentLogos';
+import { VnpayLogo, MomoLogo } from '@/components/ui/PaymentLogos';
 import { useAuth } from '@/context/AuthContext';
 import { packageService, subscriptionService, timeSubscriptionService } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDate, formatDuration, formatDateTime, formatPaymentMethod } from '@/lib/format';
 import { Check, CreditCard, AlertCircle, ArrowUp, RotateCcw, History, Store } from 'lucide-react';
-import type { Package, DurationMonths, TimeSubscription, MyPayment } from '@/types';
+import type { Package, DurationMonths, TimeSubscription, MyPayment, OnlineGateway } from '@/types';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import { isSubscriptionExpired } from '@/lib/permission';
@@ -17,6 +17,16 @@ const durations: { value: DurationMonths; label: string }[] = [
   { value: 1, label: '1 tháng' },
   { value: 3, label: '3 tháng' },
   { value: 12, label: '12 tháng' },
+];
+
+/**
+ * Các cổng thanh toán online. Cả hai đều tự kích hoạt gói qua callback nên không
+ * cần admin duyệt — khớp PackagePayment::ONLINE_GATEWAYS ở backend.
+ * Khai ngoài component: mảng này bất biến, dựng lại mỗi lần render là vô ích.
+ */
+const GATEWAYS: { id: OnlineGateway; name: string; hint: string; Logo: (p: { className?: string }) => React.JSX.Element }[] = [
+  { id: 'vnpay', name: 'VNPay', hint: 'ATM / QR / Visa', Logo: VnpayLogo },
+  { id: 'momo',  name: 'MoMo',  hint: 'Ví MoMo · quét QR', Logo: MomoLogo },
 ];
 
 function getPrice(timeSubs: TimeSubscription[], dur: DurationMonths) {
@@ -87,13 +97,14 @@ export default function SubscriptionPage() {
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
   const [selectedDur, setSelectedDur] = useState<DurationMonths>(1);
   const [paymentModal, setPaymentModal] = useState(false);
-  // Subscription chỉ hỗ trợ VNPay (cổng thật, kích hoạt tự động).
-  const paymentMethod = 'vnpay';
+  // Hai cổng online, cả hai đều kích hoạt gói tự động qua callback (không admin duyệt).
+  const [paymentMethod, setPaymentMethod] = useState<OnlineGateway>('vnpay');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(''); // lỗi hiển thị NGAY TRONG modal (không chỉ toast)
   const [flowAction, setFlowAction] = useState<FlowAction>(null);
 
   const selected = (packages ?? []).find(p => p.id === selectedPkg);
+  const gateway = GATEWAYS.find(g => g.id === paymentMethod) ?? GATEWAYS[0];
 
   // Hành động tương ứng khi chọn 1 gói, dựa trên gói đang dùng (khớp logic backend):
   // chưa có gói -> mua mới; cao hơn -> nâng cấp; bằng -> gia hạn; thấp hơn -> KHÔNG cho (hạ gói).
@@ -125,6 +136,7 @@ export default function SubscriptionPage() {
     setSelectedDur(1);
     setFlowAction(null);
     setSubmitError('');
+    setPaymentMethod('vnpay');
   };
 
   const openPayment = (action: FlowAction, pkgId?: string) => {
@@ -148,7 +160,7 @@ export default function SubscriptionPage() {
         time_subscription_id: tsId,
         payment_method: paymentMethod,
       });
-      // VNPay: backend trả payment_url -> chuyển hướng sang cổng thanh toán
+      // Cổng online (VNPay/MoMo): backend trả payment_url -> chuyển hướng sang cổng
       if (res?.payment_url) {
         window.location.href = res.payment_url;
         return;
@@ -373,7 +385,7 @@ export default function SubscriptionPage() {
           <div className="flex gap-2">
             <button onClick={() => { setPaymentModal(false); resetSelection(); setSubmitError(''); }} className="btn-secondary flex-1" disabled={submitting}>Hủy</button>
             <button onClick={handleSubmit} className="btn-primary flex-1" disabled={submitting}>
-              {submitting ? 'Đang xử lý...' : (selected.isTrial ? 'Kích hoạt Fun Free' : 'Thanh toán qua VNPay')}
+              {submitting ? 'Đang xử lý...' : (selected.isTrial ? 'Kích hoạt Fun Free' : `Thanh toán qua ${gateway.name}`)}
             </button>
           </div>
         )}
@@ -429,19 +441,50 @@ export default function SubscriptionPage() {
               );
             })()}
 
-            {/* Phương thức: VNPay (gói trả phí) */}
+            {/* Phương thức: chọn cổng online (gói trả phí) */}
             {!selected.isTrial && (
-              <div className="space-y-2">
-                <label className="label-funcafe">Phương thức thanh toán</label>
-                <div className="flex items-center gap-3 p-3 rounded-xl border border-bean bg-bean-tint">
-                  <span className="h-9 px-2.5 rounded-lg bg-white border border-line grid place-items-center shrink-0"><VnpayLogo className="h-4 w-auto" /></span>
-                  <div>
-                    <p className="text-sm font-semibold text-ink">Thanh toán online qua VNPay</p>
-                    <p className="text-xs text-cafe-500">ATM / QR / Visa · kích hoạt tự động</p>
-                  </div>
+              <fieldset className="space-y-2">
+                {/* fieldset + input[type=radio] thật (ẩn bằng sr-only) thay vì <div onClick>:
+                    được luôn ngữ nghĩa nhóm chọn một, di chuyển bằng phím mũi tên và
+                    đọc màn hình hiểu đúng — thứ mà div bắt sự kiện click không có. */}
+                <legend className="label-funcafe">Phương thức thanh toán</legend>
+                {/* Xếp dọc, KHÔNG chia hai cột theo breakpoint: breakpoint đo bề rộng
+                    màn hình chứ không đo bề rộng modal — modal này hẹp nên chia đôi ra
+                    thì dòng mô tả bị vắt thành ba dòng ngay cả trên màn hình lớn. */}
+                <div className="grid gap-2">
+                  {GATEWAYS.map(g => {
+                    const active = paymentMethod === g.id;
+                    return (
+                      <label
+                        key={g.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                          active ? 'border-bean bg-bean-tint' : 'border-line hover:bg-sand'
+                        } focus-within:ring-2 focus-within:ring-bean/35`}
+                      >
+                        <input
+                          type="radio"
+                          name="payment-gateway"
+                          value={g.id}
+                          checked={active}
+                          onChange={() => setPaymentMethod(g.id)}
+                          className="sr-only"
+                        />
+                        <span className="h-9 px-2.5 rounded-lg bg-white border border-line grid place-items-center shrink-0">
+                          <g.Logo className="h-4 w-auto" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-ink">{g.name}</span>
+                          <span className="block text-xs text-cafe-500">{g.hint}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
-                <p className="text-xs text-cafe-500">Bạn sẽ được chuyển sang cổng VNPay. Sau khi thanh toán thành công, gói được <strong>kích hoạt tự động</strong> mà không cần admin duyệt.</p>
-              </div>
+                <p className="text-xs text-cafe-500">
+                  Bạn sẽ được chuyển sang cổng {gateway.name}. Sau khi thanh toán thành công, gói được{' '}
+                  <strong>kích hoạt tự động</strong> mà không cần admin duyệt.
+                </p>
+              </fieldset>
             )}
 
             {submitError && (
