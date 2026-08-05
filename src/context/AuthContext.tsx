@@ -21,7 +21,15 @@ interface AuthContextType {
 }
 
 function mapSubscription(subs: SubscriptionData[]): UserSubscription {
-  const active = subs.find((s) => s.status === 'active');
+  // Một quán có thể có NHIỀU subscription status 'active': không có tác vụ nào đổi
+  // status sang 'expired' khi hết hạn (xem chú thích Subscription::scopeEffective),
+  // nên gói cũ đã quá hạn vẫn nằm lại với status 'active'. Lấy phần tử ĐẦU TIÊN là
+  // lấy nhầm gói cũ — quán vừa mua gói mới vẫn bị báo "đã hết hạn" và bị khóa thao tác.
+  // Chọn gói có end_date MUỘN NHẤT: còn hạn thì luôn thắng gói đã hết, và khi mọi gói
+  // đều hết thì lấy đúng gói hết gần đây nhất. Khớp cách CafeController@index chọn gói.
+  const active = [...subs]
+    .filter((s) => s.status === 'active')
+    .sort((a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime())[0];
   if (!active) {
     return { packageType: 'none', packageName: 'Chưa đăng ký', startDate: '', endDate: '', daysLeft: 0 };
   }
