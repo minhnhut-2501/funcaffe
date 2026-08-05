@@ -151,7 +151,13 @@ export const api = {
 };
 
 export interface AuthUser {
-  _id: string;
+  /**
+   * Laravel serialize model Mongo ra khóa `id`, KHÔNG phải `_id`. Khai cả hai và
+   * để nơi dùng lấy `id ?? _id` — giống hệt cách mọi mapper khác trong services
+   * đang làm. Trước đây chỗ này chỉ khai `_id` nên `user.id` luôn undefined.
+   */
+  id?: string;
+  _id?: string;
   full_name: string;
   email: string;
   phone: string;

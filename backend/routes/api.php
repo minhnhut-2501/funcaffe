@@ -87,6 +87,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('cafes/{cafe}/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('subscription');
 
     // Reviews
+    // Đánh giá là về PHẦN MỀM, mỗi tài khoản một cái — nên route đọc "của tôi" KHÔNG
+    // đi qua {cafe}. Frontend hỏi theo quán thì đổi sang quán chưa đánh giá sẽ tưởng
+    // là chưa từng viết và mời viết lại.
+    Route::get('reviews/mine', [ReviewController::class, 'mine']);
     Route::get('cafes/{cafe}/reviews', [ReviewController::class, 'index']);
     Route::post('cafes/{cafe}/reviews', [ReviewController::class, 'store'])->middleware('subscription');
 

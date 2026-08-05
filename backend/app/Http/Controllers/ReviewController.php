@@ -45,6 +45,32 @@ class ReviewController extends Controller
         return response()->json($reviews);
     }
 
+    /**
+     * GET reviews/mine — đánh giá của chính người đang đăng nhập.
+     *
+     * Không nhận cafe: mỗi tài khoản chỉ có MỘT đánh giá về FunCafe, nên frontend
+     * không được phép hỏi "đánh giá của tôi ở quán này" — hỏi vậy thì đổi sang quán
+     * chưa từng đánh giá sẽ tưởng là chưa viết bao giờ.
+     * Trả về null (không phải 404) khi chưa có: "chưa viết" là trạng thái bình thường.
+     */
+    public function mine(Request $request)
+    {
+        $review = Review::where('user_id', (string) $request->user()->id)
+            ->with('package')
+            ->first();
+
+        if (!$review) {
+            return response()->json(null);
+        }
+
+        $data = $review->toArray();
+        unset($data['user'], $data['package']);
+        $data['user_name'] = $request->user()->full_name;
+        $data['package_name'] = $review->package?->name ?? '';
+
+        return response()->json($data);
+    }
+
     public function index(Cafe $cafe)
     {
         $this->authorizeCafe($cafe);
@@ -81,11 +107,12 @@ class ReviewController extends Controller
             ->where('status', 'active')
             ->first();
 
-        // UPSERT: mỗi chủ quán chỉ có 1 đánh giá — gửi lại thì cập nhật đánh giá cũ
-        // (giữ trạng thái hiển thị do admin quyết định nếu đã bị ẩn).
-        $existing = Review::where('user_id', (string) $user->id)
-            ->where('cafe_id', (string) $cafe->id)
-            ->first();
+        // UPSERT theo NGƯỜI DÙNG, không theo cặp (người dùng + quán). Đây là đánh giá
+        // về PHẦN MỀM FunCafe chứ không phải về từng quán, nên một chủ quán có 3 quán
+        // vẫn chỉ có một tiếng nói. Trước đây truy vấn này lọc thêm cafe_id nên ai có
+        // 3 quán viết được 3 đánh giá, và cả 3 cùng lên trang chủ.
+        // cafe_id vẫn được GHI lại làm ngữ cảnh (đánh giá viết khi đang đứng ở quán nào).
+        $existing = Review::where('user_id', (string) $user->id)->first();
 
         if ($existing) {
             $history = (array) ($existing->history ?? []);
@@ -111,6 +138,9 @@ class ReviewController extends Controller
             }
 
             $existing->update(array_merge($validated, [
+                // Cập nhật cả cafe_id: ngữ cảnh phải là quán mà chủ quán đang đứng lúc
+                // sửa, nếu không trang chủ vẫn ghi tên quán đầu tiên họ từng dùng.
+                'cafe_id'    => (string) $cafe->id,
                 'package_id' => $package ? (string) $package->package_id : $existing->package_id,
                 'history'    => $history,
             ]));

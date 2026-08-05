@@ -945,6 +945,37 @@ export const reviewService = {
       createdAt: raw.created_at,
     } as PublicReview));
   },
+  /**
+   * Đánh giá FunCafe của chính người đang đăng nhập — KHÔNG đi qua quán đang chọn.
+   * Mỗi tài khoản chỉ có một đánh giá, nên hỏi theo quán thì đổi sang quán chưa
+   * đánh giá sẽ tưởng là chưa từng viết. Trả về null khi chưa viết.
+   */
+  mine: async (): Promise<Review | null> => {
+    const raw = await api.get<any>('/reviews/mine');
+    if (!raw) return null;
+    return {
+      id: raw.id ?? raw._id,
+      userId: raw.user_id,
+      userName: raw.user_name ?? '',
+      cafeId: raw.cafe_id,
+      cafeName: raw.cafe_name ?? '',
+      packageId: raw.package_id,
+      packageName: raw.package_name ?? '',
+      rating: raw.rating,
+      title: raw.title ?? undefined,
+      comment: raw.comment ?? undefined,
+      status: raw.status,
+      createdAt: raw.created_at,
+      updatedAt: raw.updated_at ?? raw.created_at,
+      history: (raw.history ?? []).map((h: any) => ({
+        rating: h.rating,
+        title: h.title ?? undefined,
+        comment: h.comment ?? undefined,
+        writtenAt: h.written_at ?? undefined,
+        replacedAt: h.replaced_at ?? undefined,
+      })),
+    } as Review;
+  },
   listByCafe: async () => {
     const cafeId = await getCafeId();
     const items = await api.get<any[]>(`/cafes/${cafeId}/reviews`);

@@ -15,7 +15,7 @@ import type { Review } from '@/types';
  * 'subscription' của route tạo đánh giá).
  */
 export default function FunCafeReviewSection() {
-  const { user, activeCafeId } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const sub = user?.subscription;
   const pkg = sub?.packageType ?? 'none';
@@ -26,21 +26,30 @@ export default function FunCafeReviewSection() {
   const [submitting, setSubmitting] = useState(false);
   const [reviewReady, setReviewReady] = useState(false); // đã có quán -> mới gọi được API review
 
+  // Gọi VÔ ĐIỀU KIỆN, kể cả khi mine === null: null nghĩa là chưa viết đánh giá nào,
+  // và trạng thái đó phải xóa được nội dung cũ đang nằm trên form.
+  const applyMine = (mine: Review | null) => {
+    setMyReview(mine);
+    setReviewForm({
+      rating: mine?.rating ?? 5,
+      title: mine?.title ?? '',
+      comment: mine?.comment ?? '',
+    });
+  };
+
+  // Không phụ thuộc activeCafeId: đánh giá là về FunCafe, mỗi tài khoản một cái,
+  // nên đổi quán không làm đổi đánh giá. Trước đây hook này gọi listByCafe() theo
+  // quán đang chọn và CHỈ setMyReview khi tìm thấy — nên chuyển sang quán chưa
+  // đánh giá thì form vẫn giữ nội dung của quán trước và nút vẫn ghi "Cập nhật".
   useEffect(() => {
     if (!user) return;
     hasCafe().then(exists => {
       if (!exists) return;
       setReviewReady(true);
-      reviewService.listByCafe().then(list => {
-        const mine = list.find(r => r.userId === user?.id) ?? list[0] ?? null;
-        if (mine) {
-          setMyReview(mine);
-          setReviewForm({ rating: mine.rating, title: mine.title ?? '', comment: mine.comment ?? '' });
-        }
-      }).catch(() => {});
+      reviewService.mine().then(applyMine).catch(() => {});
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, activeCafeId]);
+  }, [user?.id]);
 
   const handleSubmit = async () => {
     if (reviewForm.rating < 1) return;
@@ -52,9 +61,7 @@ export default function FunCafeReviewSection() {
         comment: reviewForm.comment.trim() || undefined,
       });
       toast({ description: myReview ? 'Đã cập nhật đánh giá của bạn. Cảm ơn bạn!' : 'Đã gửi đánh giá. Cảm ơn bạn!' });
-      const list = await reviewService.listByCafe().catch(() => [] as Review[]);
-      const mine = list.find(r => r.userId === user?.id) ?? list[0] ?? null;
-      setMyReview(mine);
+      applyMine(await reviewService.mine().catch(() => null));
     } catch (err: any) {
       toast({ description: err?.message || 'Không thể gửi đánh giá, vui lòng thử lại.', variant: 'destructive' });
     } finally {

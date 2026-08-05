@@ -60,7 +60,9 @@ function mapSubscription(subs: SubscriptionData[]): UserSubscription {
 
 function mapUser(u: AuthUser, subs: SubscriptionData[]): CurrentUser {
   return {
-    id: u._id,
+    // `id ?? _id`: API trả `id`. Chỉ đọc `_id` thì user.id là undefined, và mọi
+    // useEffect phụ thuộc user.id sẽ không bao giờ chạy lại khi user nạp xong.
+    id: u.id ?? u._id ?? '',
     fullName: u.full_name,
     email: u.email,
     phone: u.phone || '',
