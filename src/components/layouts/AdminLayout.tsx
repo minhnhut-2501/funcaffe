@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Coffee, LayoutDashboard, Users, Package, CreditCard,
-  BarChart3, LogOut, Menu, X, Bell, Search, DollarSign,
+  BarChart3, LogOut, Menu, X, Bell, DollarSign,
   Star, PanelLeft, ShieldCheck, Mail as MailIcon,
 } from 'lucide-react';
 import { paymentService, userService } from '@/services';
@@ -43,15 +43,10 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-const searchRoutes: Record<string, string> = {
-  user: '/admin/users', users: '/admin/users', 'người dùng': '/admin/users', 'tài khoản': '/admin/users',
-  payment: '/admin/payments', payments: '/admin/payments', 'thanh toán': '/admin/payments', 'giao dịch': '/admin/payments',
-  package: '/admin/packages', packages: '/admin/packages', 'gói': '/admin/packages', 'dịch vụ': '/admin/packages',
-  revenue: '/admin/revenue', 'doanh thu': '/admin/revenue', 'thống kê': '/admin/revenue',
-  dashboard: '/admin/dashboard', 'tổng quan': '/admin/dashboard',
-  review: '/admin/reviews', reviews: '/admin/reviews', 'đánh giá': '/admin/reviews',
-  contact: '/admin/contacts', contacts: '/admin/contacts', 'liên hệ': '/admin/contacts', 'tin nhắn': '/admin/contacts',
-};
+// Ô tìm kiếm trên thanh đầu trang đã bị gỡ. Nó không tìm gì cả: chỉ so từ khóa
+// với một bảng cố định rồi chuyển trang — đúng những trang mà sidebar bên trái
+// vốn đã luôn hiện. Gõ bất cứ thứ gì ngoài bảng đó (tên người dùng, mã giao
+// dịch) thì nhấn Enter không xảy ra gì và cũng không báo gì.
 
 function AdminSidebar({ collapsed, mobileOpen, onClose, onToggle, onLogout }: { collapsed: boolean; mobileOpen: boolean; onClose: () => void; onToggle: () => void; onLogout: () => void }) {
   const handleLogout = onLogout;
@@ -98,9 +93,7 @@ function AdminSidebar({ collapsed, mobileOpen, onClose, onToggle, onLogout }: { 
 }
 
 function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
-  const router = useRouter();
   const { user } = useAuth();
-  const [searchText, setSearchText] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<{ id: string; type: string; message: string; href: string }[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -129,32 +122,11 @@ function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const handleSearch = (e: React.KeyboardEvent) => {
-    if (e.key !== 'Enter') return;
-    const q = searchText.toLowerCase().trim();
-    for (const [key, route] of Object.entries(searchRoutes)) {
-      if (q.includes(key)) { router.push(route); setSearchText(''); return; }
-    }
-  };
-
   return (
     <header className="bg-paper/85 backdrop-blur-md border-b border-line px-4 sm:px-6 h-16 flex items-center gap-3 sticky top-0 z-30">
       <button onClick={onMenuClick} className="md:hidden grid place-items-center text-cafe-500 hover:text-bean hover:bg-sand w-9 h-9 rounded-lg -ml-1" aria-label="Mở menu">
         <Menu className="w-5 h-5" />
       </button>
-
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-cafe-400 pointer-events-none" />
-          <input
-            placeholder="Tìm nhanh: user, thanh toán, gói..."
-            className="input-funcafe !pl-10 py-2 text-sm"
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            onKeyDown={handleSearch}
-          />
-        </div>
-      </div>
 
       <div className="flex-1" />
 
