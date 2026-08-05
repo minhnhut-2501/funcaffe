@@ -22,14 +22,13 @@ class ProductionSeeder extends Seeder
         $this->seedIfEmpty('packages', __DIR__ . '/data/packages.json');
         $this->seedIfEmpty('time_subscriptions', __DIR__ . '/data/time_subscriptions.json');
 
-        // Tài khoản admin + chủ quán (đã idempotent sẵn: chỉ tạo nếu chưa có).
-        // Tạo trước để _id chủ quán khớp user_id của quán demo bên dưới.
+        // Tài khoản admin + chủ quán (chỉ tạo nếu chưa có, không bao giờ ghi đè/xóa).
         $this->call(TestUserSeeder::class);
 
-        // Dữ liệu demo cho chủ quán nphec4007@gmail.com: quán + thực đơn + bàn.
-        foreach (['cafes', 'categories', 'items', 'item_prices', 'toppings', 'item_toppings', 'tables'] as $col) {
-            $this->seedIfEmpty($col, __DIR__ . "/data/{$col}.json");
-        }
+        // KHÔNG nạp quán/thực đơn/bàn demo ở đây nữa. Bộ JSON cũ ghi khóa ngoại
+        // (cafe_id, item_id...) dưới dạng ObjectId, trong khi ứng dụng ghi và truy
+        // vấn bằng CHUỖI — nạp vào là quan hệ đứt ngầm: dữ liệu nằm đó nhưng
+        // không màn hình nào đọc ra. Dữ liệu mẫu nay do DemoSeeder lo (chạy tay).
     }
 
     private function seedIfEmpty(string $collection, string $file): void
