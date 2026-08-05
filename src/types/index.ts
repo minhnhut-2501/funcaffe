@@ -136,6 +136,14 @@ export interface CafeInfo {
   bankBin?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
+  /**
+   * Gói còn hiệu lực của CHÍNH quán này — chỉ có ở danh sách GET /cafes.
+   * Dùng để cảnh báo sắp hết hạn cho cả những quán người dùng không đang đứng.
+   * undefined = endpoint không trả (không phải "chưa có gói"; 'none' mới là vậy).
+   */
+  packageType?: UserPackageType;
+  packageName?: string;
+  packageEndDate?: string;
 }
 
 export interface Package {

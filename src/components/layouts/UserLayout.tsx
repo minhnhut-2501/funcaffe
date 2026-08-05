@@ -6,11 +6,12 @@ import {
   Coffee, LayoutDashboard, Store, Grid3X3, UtensilsCrossed,
   CupSoda, ShoppingCart, Receipt,
   BarChart3, CreditCard, User, LogOut, Menu, X, Bell, Clock, PanelLeft,
-  ChevronDown, Check, Plus,
+  ChevronDown, Check, Plus, AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { isSubscriptionExpired } from '@/lib/permission';
+import { isSubscriptionExpired, expiryState, daysLeftUntil, EXPIRY_SOON_DAYS, type ExpiryState } from '@/lib/permission';
 import { invoiceService } from '@/services';
+import type { CafeInfo } from '@/types';
 import AiChatWidget from '@/components/user/AiChatWidget';
 import SidebarNav, { type NavGroup } from '@/components/layouts/SidebarNav';
 
@@ -57,6 +58,31 @@ const packageMeta: Record<string, { label: string; cls: string }> = {
 function PackageBadge({ type }: { type: string }) {
   const m = packageMeta[type] ?? packageMeta.none;
   return <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${m.cls}`}>{m.label}</span>;
+}
+
+/**
+ * Các quán cần chú ý về hạn gói, quán ĐÃ hết xếp trước quán sắp hết.
+ * Dùng chung cho chuông và cho chấm cảnh báo ở dropdown chuyển quán, để hai chỗ
+ * không bao giờ nói khác nhau.
+ */
+function cafesNeedingAttention(cafes: CafeInfo[]) {
+  return cafes
+    .map((c) => ({ cafe: c, state: expiryState(c.packageEndDate) }))
+    .filter((x): x is { cafe: CafeInfo; state: 'soon' | 'expired' } => x.state === 'soon' || x.state === 'expired')
+    .sort((a, b) => (a.state === b.state ? 0 : a.state === 'expired' ? -1 : 1));
+}
+
+/** Chấm cảnh báo cạnh tên quán: đỏ = đã hết hạn, hổ phách = sắp hết. */
+function ExpiryDot({ state, className = '' }: { state: ExpiryState; className?: string }) {
+  if (state !== 'soon' && state !== 'expired') return null;
+  const expired = state === 'expired';
+  return (
+    <span
+      aria-hidden
+      title={expired ? 'Gói đã hết hạn' : 'Gói sắp hết hạn'}
+      className={`w-2 h-2 rounded-full shrink-0 ${expired ? 'bg-red-500' : 'bg-gold'} ${className}`}
+    />
+  );
 }
 
 function Sidebar({ collapsed, mobileOpen, onClose, onToggle, onLogout }: { collapsed: boolean; mobileOpen: boolean; onClose: () => void; onToggle: () => void; onLogout: () => void }) {
@@ -133,11 +159,18 @@ function CafeSwitcher() {
   }, []);
   const active = cafes.find((c) => c.id === activeCafeId);
   if (cafes.length === 0) return null;
+  // Chấm trên chính nút mở dropdown: cảnh báo phải thấy được KHI ĐANG ĐÓNG, vì
+  // quán sắp hết hạn thường là quán người dùng không đứng ở đó nên chẳng bao giờ mở ra.
+  const needAttention = cafesNeedingAttention(cafes);
+  const worst: ExpiryState = needAttention.some((x) => x.state === 'expired')
+    ? 'expired'
+    : needAttention.length > 0 ? 'soon' : 'ok';
   return (
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen(!open)} className="flex items-center gap-2 h-9 px-3 rounded-lg border border-line bg-white hover:bg-sand transition-colors max-w-[9rem] sm:max-w-[14rem]">
         <Store className="w-4 h-4 text-bean shrink-0" />
         <span className="text-sm font-semibold text-ink truncate">{active?.name ?? 'Chọn quán'}</span>
+        <ExpiryDot state={worst} />
         <ChevronDown className="w-4 h-4 text-cafe-400 shrink-0" />
       </button>
       {open && (
@@ -152,6 +185,7 @@ function CafeSwitcher() {
               >
                 <Store className="w-4 h-4 text-bean shrink-0" />
                 <span className="flex-1 text-sm text-ink truncate">{c.name}</span>
+                <ExpiryDot state={expiryState(c.packageEndDate)} />
                 {c.id === activeCafeId && <Check className="w-4 h-4 text-pine shrink-0" />}
               </button>
             ))}
@@ -165,8 +199,10 @@ function CafeSwitcher() {
   );
 }
 
+type Notif = { id: string; kind: 'invoice' | 'soon' | 'expired'; message: string; href: string };
+
 function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
-  const { user, activeCafeId } = useAuth();
+  const { user, activeCafeId, cafes } = useAuth();
   const sub = user?.subscription;
   const pathname = usePathname();
   const current = navGroups
@@ -175,20 +211,31 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const shortName = user?.fullName.split(' ').slice(-1)[0] ?? '';
   const avatarChar = user?.fullName.charAt(0) ?? 'U';
   const [showNotif, setShowNotif] = useState(false);
-  const [notifs, setNotifs] = useState<{ id: string; type: string; message: string; href: string }[]>([]);
+  const [invoiceNotif, setInvoiceNotif] = useState<Notif[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     invoiceService.list().then(invoices => {
       const today = new Date().toDateString();
       const todayInvoices = (invoices ?? []).filter(inv => new Date(inv.createdAt).toDateString() === today);
-      if (todayInvoices.length > 0) {
-        setNotifs([{ id: 'inv-today', type: 'invoice', message: `Hôm nay có ${todayInvoices.length} hóa đơn mới`, href: '/user/invoices' }]);
-      } else {
-        setNotifs([]);
-      }
+      setInvoiceNotif(todayInvoices.length > 0
+        ? [{ id: 'inv-today', kind: 'invoice', message: `Hôm nay có ${todayInvoices.length} hóa đơn mới`, href: '/user/invoices' }]
+        : []);
     }).catch(() => {});
   }, [activeCafeId]);
+
+  // Cảnh báo hạn gói của MỌI quán, không riêng quán đang chọn — quán bị bỏ quên
+  // mới là quán dễ hết hạn mà không ai hay. Quán đã hết hạn xếp trên quán sắp hết.
+  const expiryNotifs: Notif[] = cafesNeedingAttention(cafes).map(({ cafe, state }) => ({
+    id: `exp-${cafe.id}`,
+    kind: state,
+    message: state === 'expired'
+      ? `Gói của “${cafe.name}” đã hết hạn — quán đang ở chế độ chỉ xem`
+      : `Gói của “${cafe.name}” còn ${daysLeftUntil(cafe.packageEndDate as string)} ngày`,
+    href: '/user/subscription',
+  }));
+
+  const notifs: Notif[] = [...expiryNotifs, ...invoiceNotif];
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -223,8 +270,14 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         <div className="relative" ref={notifRef}>
           <button onClick={() => setShowNotif(!showNotif)} className="relative grid place-items-center w-9 h-9 rounded-lg text-cafe-500 hover:text-bean hover:bg-sand transition-colors" aria-label="Thông báo">
             <Bell className="w-5 h-5" />
+            {/* Màu chấm theo mục nặng nhất: đỏ chỉ dành cho việc đang CHẶN bán hàng.
+                Để hóa đơn mới cũng nổi chấm đỏ thì vài hôm là người dùng hết sợ màu đỏ. */}
             {notifs.length > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-paper" />
+              <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ring-2 ring-paper ${
+                notifs.some(n => n.kind === 'expired') ? 'bg-red-500'
+                  : notifs.some(n => n.kind === 'soon') ? 'bg-gold'
+                    : 'bg-bean'
+              }`} />
             )}
           </button>
           {showNotif && (
@@ -235,17 +288,26 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
               {notifs.length === 0 ? (
                 <div className="px-4 py-8 text-center text-cafe-400 text-sm">Không có thông báo mới</div>
               ) : (
-                notifs.map(n => (
-                  <Link key={n.id} href={n.href} onClick={() => setShowNotif(false)}
-                    className="flex items-start gap-3 px-4 py-3 hover:bg-sand border-b border-line/60 last:border-0">
-                    <div className="w-9 h-9 bg-bean-tint rounded-xl flex items-center justify-center shrink-0">
-                      <Clock className="w-4 h-4 text-bean" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-ink/85 line-clamp-2">{n.message}</p>
-                    </div>
-                  </Link>
-                ))
+                notifs.map(n => {
+                  // Ba loại thông báo phải phân biệt được ngay: hết hạn là việc chặn
+                  // bán hàng, sắp hết hạn là việc cần làm sớm, hóa đơn chỉ là tin tức.
+                  const look = n.kind === 'expired'
+                    ? { box: 'bg-red-100 text-red-600', Icon: AlertTriangle }
+                    : n.kind === 'soon'
+                      ? { box: 'bg-gold/20 text-gold-deep', Icon: AlertTriangle }
+                      : { box: 'bg-bean-tint text-bean', Icon: Clock };
+                  return (
+                    <Link key={n.id} href={n.href} onClick={() => setShowNotif(false)}
+                      className="flex items-start gap-3 px-4 py-3 hover:bg-sand border-b border-line/60 last:border-0">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${look.box}`}>
+                        <look.Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-ink/85 line-clamp-2">{n.message}</p>
+                      </div>
+                    </Link>
+                  );
+                })
               )}
             </div>
           )}
@@ -282,6 +344,10 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const { user, isLoading, cafes, activeCafeId, logout } = useAuth();
   const hasPackage = user?.subscription.packageType !== 'none';
   const expired = isSubscriptionExpired(user?.subscription);
+  // Sắp hết hạn của QUÁN ĐANG CHỌN. Các quán khác đã được chuông và chấm ở dropdown
+  // lo — banner chiếm cả bề ngang nên chỉ dành cho quán người dùng đang làm việc.
+  const activeExpiry = expiryState(user?.subscription?.endDate);
+  const soon = hasPackage && activeExpiry === 'soon';
 
   // Đăng xuất phải nằm ở ĐÂY, cùng chỗ với route guard bên dưới. logout() xoá
   // `user`, guard thấy vậy liền bắn router.replace('/login') — tranh chấp với
@@ -337,6 +403,20 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
             </p>
             <Link href="/user/subscription" className="text-xs font-semibold bg-gold/25 text-gold-deep px-3 py-1.5 rounded-full hover:bg-gold/35 transition-colors">
               Kích hoạt Fun Free
+            </Link>
+          </div>
+        )}
+        {soon && (
+          <div className="bg-gold/12 border-b border-gold/25 px-4 sm:px-6 py-2.5 flex items-center justify-between flex-wrap gap-2">
+            <p className="text-sm text-gold-deep">
+              Gói của quán này còn{' '}
+              <span className="font-semibold">
+                {user?.subscription?.endDate ? daysLeftUntil(user.subscription.endDate) : EXPIRY_SOON_DAYS} ngày
+              </span>
+              . Gia hạn trước khi hết để không phải dừng bán hàng.
+            </p>
+            <Link href="/user/subscription" className="text-xs font-semibold bg-gold/25 text-gold-deep px-3 py-1.5 rounded-full hover:bg-gold/35 transition-colors">
+              Gia hạn ngay
             </Link>
           </div>
         )}

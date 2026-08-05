@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cafe;
+use App\Models\Subscription;
 use Illuminate\Http\Request;
 
 class CafeController extends Controller
@@ -18,7 +19,35 @@ class CafeController extends Controller
         if (!$user) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
-        return response()->json($user->cafes);
+
+        $cafes = $user->cafes;
+
+        // Đính kèm gói CÒN HIỆU LỰC của TỪNG quán. Không có phần này thì frontend
+        // chỉ biết hạn của quán đang chọn, nên không thể cảnh báo "quán khác của bạn
+        // sắp hết hạn" — mà đó mới là trường hợp dễ quên nhất.
+        // Một truy vấn cho tất cả các quán (lặp lại cách làm ở Admin/UserController).
+        // KHÔNG dùng scope effective(): nó loại luôn gói đã quá hạn, mà quán hết hạn
+        // mới chính là quán cần cảnh báo gấp nhất. Lấy gói MỚI NHẤT của mỗi quán rồi
+        // để frontend tự phân loại theo end_date (còn hạn / sắp hết / đã hết).
+        // Sắp xếp TĂNG DẦN vì keyBy giữ phần tử cuối khi trùng khóa -> quán nào cũng
+        // giữ lại đúng gói có end_date lớn nhất.
+        $subs = Subscription::whereIn('cafe_id', $cafes->pluck('id')->map(fn ($id) => (string) $id)->toArray())
+            ->where('status', 'active')
+            ->orderBy('end_date', 'asc')
+            ->with('package')
+            ->get()
+            ->keyBy(fn ($s) => (string) $s->cafe_id);
+
+        $result = $cafes->map(function ($cafe) use ($subs) {
+            $sub = $subs->get((string) $cafe->id);
+            $data = $cafe->toArray();
+            $data['package_type'] = $sub ? ($sub->package->type ?? 'free') : 'none';
+            $data['package_name'] = $sub ? ($sub->package->name ?? '') : '';
+            $data['package_end_date'] = $sub?->end_date;
+            return $data;
+        })->values();
+
+        return response()->json($result);
     }
 
     public function store(Request $request)

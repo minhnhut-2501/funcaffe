@@ -206,6 +206,11 @@ function mapCafe(raw: any): CafeInfo {
     bankBin: raw.bank_bin ?? undefined,
     bankAccountNumber: raw.bank_account_number ?? undefined,
     bankAccountName: raw.bank_account_name ?? undefined,
+    // Chỉ có ở GET /cafes (danh sách). Các endpoint trả về một quán đơn lẻ không
+    // đính kèm gói, nên undefined ở đó là bình thường chứ không phải "chưa có gói".
+    packageType: raw.package_type ?? undefined,
+    packageName: raw.package_name ?? undefined,
+    packageEndDate: raw.package_end_date ?? undefined,
   };
 }
 
