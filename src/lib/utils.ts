@@ -28,12 +28,8 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function downloadCSV(filename: string, headers: string[], rows: string[][]) {
-  const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(','))].join('\n');
-  // ﻿ (BOM): thiếu nó Excel trên Windows đọc file theo bảng mã hệ thống
-  // và toàn bộ tiếng Việt biến thành ô vuông.
-  saveBlob(new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' }), filename);
-}
+// Không còn downloadCSV(): mọi nơi xuất dữ liệu đã chuyển sang Excel thật qua
+// exportToExcel() bên dưới (giữ được định dạng số, ngày và độ rộng cột).
 
 /**
  * Đổi chuỗi ngày của API thành Date để ghi vào ô Excel.

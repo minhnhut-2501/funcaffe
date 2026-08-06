@@ -15,16 +15,33 @@ use App\Models\User;
  *  - Admin duyệt tay (Admin/PaymentController::approve)
  *  - Callback tự động từ cổng thanh toán (VNPay return/IPN)
  *
- * Idempotent: chỉ xử lý khi payment đang ở trạng thái 'pending'.
+ * Idempotent: gọi lại trên một giao dịch đã 'paid' sẽ không cộng hạn lần nữa.
  */
 class SubscriptionActivator
 {
     /**
-     * @return bool true nếu vừa kích hoạt; false nếu đã xử lý trước đó (không phải pending).
+     * Các trạng thái CÒN kích hoạt được khi cổng thanh toán xác nhận đã thu tiền.
+     *
+     * 'failed' có mặt ở đây là CÓ CHỦ Ý. Trạng thái đó do CHÍNH HỆ THỐNG đặt khi dọn
+     * các đơn cổng bị bỏ dở (SubscriptionController::store) — nó chỉ là phỏng đoán
+     * "khách chắc đã bỏ", không phải sự thật về dòng tiền. Khi cổng gửi callback đã
+     * ký báo thu tiền thành công thì đó mới là sự thật, và nó phải thắng phỏng đoán.
+     *
+     * Nếu không cho 'failed' đi qua, kịch bản sau làm khách mất tiền: khách bấm mua
+     * lần hai trong lúc tab cổng thanh toán còn mở -> đơn đầu bị đánh 'failed' ->
+     * khách trả tiền trên tab cũ -> tiền vào mà gói không được cấp.
+     *
+     * 'paid' và 'rejected' vẫn bị chặn: 'paid' để không cộng hạn hai lần, 'rejected'
+     * vì đó là quyết định dứt khoát (khách huỷ trên cổng / admin từ chối).
+     */
+    private const ACTIVATABLE_STATUSES = ['pending', 'failed'];
+
+    /**
+     * @return bool true nếu vừa kích hoạt; false nếu đã xử lý dứt điểm trước đó.
      */
     public function markPaidAndActivate(PackagePayment $payment): bool
     {
-        if ($payment->payment_status !== 'pending') {
+        if (!in_array($payment->payment_status, self::ACTIVATABLE_STATUSES, true)) {
             return false; // đã paid/rejected rồi -> không làm lại
         }
 
@@ -57,13 +74,19 @@ class SubscriptionActivator
             }
 
             // BUG-05 FIX: Set has_used_free_trial khi kích hoạt gói trial dạng 'new'.
-            // ĐA QUÁN: cờ trial nằm trên QUÁN (mỗi quán dùng thử 1 lần), không trên tài khoản.
+            // Đánh dấu ở CẢ hai cấp: trên QUÁN (mỗi quán một lần) và trên TÀI KHOẢN
+            // (mỗi tài khoản một lần). Thiếu vế tài khoản thì chủ quán chỉ cần tạo
+            // quán mới là lại được 7 ngày Pro Max, lặp vô hạn.
             if ($payment->action_type === 'new') {
                 $pkg = $sub->package;
                 if ($pkg && $pkg->is_trial) {
                     $cafe = Cafe::find($payment->cafe_id ?? $sub->cafe_id);
                     if ($cafe) {
                         $cafe->update(['has_used_free_trial' => true]);
+                    }
+                    $user = User::find($payment->user_id);
+                    if ($user) {
+                        $user->update(['has_used_free_trial' => true]);
                     }
                 }
             }

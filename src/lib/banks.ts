@@ -31,11 +31,6 @@ export const VN_BANKS: BankOption[] = [
   { bin: '963388', code: 'TIMO', name: 'Timo' },
 ];
 
-export function findBank(bin?: string): BankOption | undefined {
-  if (!bin) return undefined;
-  return VN_BANKS.find((b) => b.bin === bin);
-}
-
 /**
  * Dựng URL ảnh VietQR (img.vietqr.io) - không cần API key.
  * template: compact2 hiển thị logo ngân hàng + số tiền + nội dung.

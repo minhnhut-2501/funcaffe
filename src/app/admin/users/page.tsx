@@ -31,7 +31,14 @@ export default function AdminUsersPage() {
 
   const load = () => {
     setLoading(true);
-    userService.list().then(setUsers).catch(() => toast({ description: 'Không thể tải người dùng', variant: 'destructive' })).finally(() => setLoading(false));
+    // listAll chứ không list: backend phân trang 50 bản ghi/trang, mà `list` chỉ lấy
+    // trang đầu. Tài khoản thứ 51 trở đi sẽ không hiện ra ở đây, cũng không lọt vào
+    // ô tìm kiếm bên dưới — tức là admin mất khả năng xem và khóa chúng.
+    //
+    // Gom hết về rồi lọc tại chỗ (thay vì tìm kiếm phía máy chủ) là đủ cho quy mô
+    // hiện tại: mỗi 50 tài khoản thêm một lượt gọi. Khi số tài khoản lên tới hàng
+    // nghìn thì mới cần chuyển tìm kiếm + phân trang xuống backend.
+    userService.listAll().then(setUsers).catch(() => toast({ description: 'Không thể tải người dùng', variant: 'destructive' })).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 

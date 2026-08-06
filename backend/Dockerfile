@@ -34,5 +34,6 @@ EXPOSE 8000
 CMD php artisan config:cache \
     && touch database/database.sqlite \
     && php artisan migrate --force \
+    && php artisan db:indexes \
     && php artisan db:seed --class=ProductionSeeder --force ; \
     php artisan serve --host=0.0.0.0 --port=${PORT:-8000}

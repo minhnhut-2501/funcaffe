@@ -234,7 +234,13 @@ export interface Payment {
   userEmail: string;
   packageName: string;
   packageType: PackageType;
-  duration: number;
+  /**
+   * Thời hạn đã mua, lấy từ quan hệ time_subscription của giao dịch.
+   * Phải đi theo CẶP giá trị + đơn vị: gói dùng thử tính bằng NGÀY, gói trả phí
+   * tính bằng THÁNG. undefined = giao dịch cũ không gắn mốc thời hạn nào.
+   */
+  durationValue?: number;
+  durationUnit?: 'day' | 'month';
   amount: number;
   status: PaymentStatus;
   createdAt: string;

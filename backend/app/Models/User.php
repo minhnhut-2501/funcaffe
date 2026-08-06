@@ -36,6 +36,10 @@ class User extends Authenticatable
         'avatar',
         'role',
         'status',
+        // Gói dùng thử tính theo TÀI KHOẢN (mỗi tài khoản một lần), song song với cờ
+        // cùng tên trên quán. Chỉ đặt trên quán là không đủ: số quán một tài khoản
+        // được tạo không bị giới hạn, nên cứ tạo quán mới là lại có 7 ngày Pro Max.
+        'has_used_free_trial',
         'reset_token',
         'reset_token_expires_at',
     ];

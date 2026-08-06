@@ -39,7 +39,7 @@ class CategoryController extends Controller
     {
         $this->authorizeCafe($cafe);
 
-        if ($category->cafe_id !== $cafe->id) {
+        if ((string) $category->cafe_id !== (string) $cafe->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 

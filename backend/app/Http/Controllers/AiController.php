@@ -153,23 +153,29 @@ class AiController extends Controller
     /** Gom số liệu doanh thu (chỉ hóa đơn đã thanh toán, loại hoàn tiền). */
     private function buildRevenueStats(Cafe $cafe): array
     {
-        // Doanh thu đọc thẳng từ order đã thanh toán (bỏ bảng invoices); dòng món
-        // lấy từ order_details. Loại đơn đã hoàn tiền.
-        $invoices = Order::where('cafe_id', $cafe->id)
-            ->where('status', 'paid')
-            ->where('payment_status', 'paid')
+        // Tổng và số hóa đơn TOÀN THỜI GIAN tính bằng phép gộp ở CSDL — không cần
+        // nạp document nào về PHP cho hai con số này.
+        $total = (int) $this->paidOrders($cafe)->sum('total_amount');
+        $invoiceCount = $this->paidOrders($cafe)->count();
+
+        // Phần chi tiết (theo tháng / theo ngày / top món) chỉ cần 12 THÁNG gần đây:
+        // kết quả trả về chỉ lấy 6 tháng và 30 ngày cuối. Nạp cả lịch sử kèm dòng món
+        // để rồi cắt bớt là chỗ tốn kém nhất của endpoint này.
+        $since = Carbon::now()->subMonths(12)->startOfMonth();
+        $invoices = $this->paidOrders($cafe)
+            ->where(function ($q) use ($since) {
+                $q->where('paid_at', '>=', $since)
+                  ->orWhere(fn ($q2) => $q2->whereNull('paid_at')->where('created_at', '>=', $since));
+            })
             ->with('orderDetails')
             ->get();
 
         $byMonth = [];
         $byDay = [];
         $topItems = [];
-        $total = 0;
 
         foreach ($invoices as $inv) {
             $amount = (int) ($inv->total_amount ?? 0);
-            $total += $amount;
-
             $date = $this->toCarbon($inv->paid_at ?? $inv->created_at);
             if ($date) {
                 $mKey = $date->format('Y-m');
@@ -200,7 +206,7 @@ class AiController extends Controller
 
         return [
             'total_revenue'   => $total,
-            'invoice_count'   => $invoices->count(),
+            'invoice_count'   => $invoiceCount,
             'revenue_by_month'=> array_slice($byMonth, -6, 6, true),
             'revenue_by_day'  => array_slice($byDay, -30, 30, true),
             'top_items'       => array_slice(array_values($topItems), 0, 8),
@@ -209,17 +215,31 @@ class AiController extends Controller
         ];
     }
 
+    /**
+     * Doanh thu trong một khoảng, LỌC Ở CSDL.
+     *
+     * Hàm này chạy mỗi lần người dùng gửi một tin nhắn cho trợ lý AI (qua
+     * cafeContext), mà nó chỉ cần tổng tiền của ĐÚNG MỘT NGÀY. Trước đây nó lấy
+     * toàn bộ đơn đã thanh toán từ ngày khai trương về rồi lọc bằng PHP.
+     */
     private function sumPaid(Cafe $cafe, Carbon $from, Carbon $to): int
     {
-        return (int) Order::where('cafe_id', $cafe->id)
-            ->where('status', 'paid')
-            ->where('payment_status', 'paid')
-            ->get()
-            ->filter(function ($inv) use ($from, $to) {
-                $d = $this->toCarbon($inv->paid_at ?? $inv->created_at);
-                return $d && $d->betweenIncluded($from, $to);
+        return (int) $this->paidOrders($cafe)
+            ->where(function ($q) use ($from, $to) {
+                $q->whereBetween('paid_at', [$from, $to])
+                  // Đơn cũ có thể thiếu paid_at (trước khi trường này được ghi);
+                  // với chúng thì ngày tạo là mốc duy nhất bám được.
+                  ->orWhere(fn ($q2) => $q2->whereNull('paid_at')->whereBetween('created_at', [$from, $to]));
             })
-            ->sum(fn($inv) => (int) ($inv->total_amount ?? 0));
+            ->sum('total_amount');
+    }
+
+    /** Truy vấn gốc cho mọi thống kê doanh thu: chỉ đơn đã thu tiền. */
+    private function paidOrders(Cafe $cafe)
+    {
+        return Order::where('cafe_id', $cafe->id)
+            ->where('status', 'paid')
+            ->where('payment_status', 'paid');
     }
 
     private function toCarbon($date): ?Carbon

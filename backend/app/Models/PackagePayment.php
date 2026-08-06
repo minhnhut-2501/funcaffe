@@ -52,6 +52,12 @@ class PackagePayment extends Model
         return $this->belongsTo(Package::class);
     }
 
+    /** Mốc thời hạn đã mua — nguồn của "12 tháng" / "7 ngày" trên bảng đối soát. */
+    public function timeSubscription()
+    {
+        return $this->belongsTo(TimeSubscription::class);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

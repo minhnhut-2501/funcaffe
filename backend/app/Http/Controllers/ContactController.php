@@ -17,7 +17,7 @@ class ContactController extends Controller
             'content' => 'required|string|max:2000',
         ]);
 
-        $message = ContactMessage::create($validated + ['is_read' => false]);
+        ContactMessage::create($validated + ['is_read' => false]);
 
         return response()->json(['message' => 'Tin nhắn của bạn đã được gửi. Chúng tôi sẽ phản hồi trong vòng 24 giờ làm việc.'], 201);
     }

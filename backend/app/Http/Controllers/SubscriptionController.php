@@ -21,9 +21,24 @@ class SubscriptionController extends Controller
     use RunsAtomically;
     use ChecksCafeOwnership;
 
+    /**
+     * Bao lâu thì coi một đơn cổng thanh toán 'pending' là đã bị bỏ dở.
+     *
+     * Phải dài hơn thời gian một người thật cần để trả tiền trên cổng (mở app ngân
+     * hàng, nhập OTP, xác thực sinh trắc học...). 30 phút là rộng rãi cho việc đó
+     * mà vẫn không để đơn rác tồn quá lâu trong sổ.
+     */
+    private const GATEWAY_PENDING_TTL_MINUTES = 30;
+
     public function __construct()
     {
         $this->middleware('auth:sanctum');
+    }
+
+    /** Mốc thời gian mà trước đó mọi đơn cổng 'pending' bị coi là đã bỏ. */
+    private function gatewayPendingDeadline(): \Illuminate\Support\Carbon
+    {
+        return now()->subMinutes(self::GATEWAY_PENDING_TTL_MINUTES);
     }
 
     /**
@@ -140,14 +155,18 @@ class SubscriptionController extends Controller
         return response()->json($subscriptions);
     }
 
+    /**
+     * Gói MỚI NHẤT của quán, kể cả khi đã quá hạn.
+     *
+     * Cố ý KHÔNG dùng scope effective(): frontend cần thấy cả gói đã hết hạn để hiện
+     * chế độ "chỉ xem" và mời gia hạn. Xem Subscription::scopeLatestForCafe().
+     */
     public function active(Request $request, Cafe $cafe)
     {
         $this->authorizeCafe($cafe);
 
-        $subscription = Subscription::where('cafe_id', (string) $cafe->id)
-            ->where('status', 'active')
+        $subscription = Subscription::latestForCafe((string) $cafe->id)
             ->with('package', 'packagePayments')
-            ->latest()
             ->first();
 
         return response()->json($subscription);
@@ -191,19 +210,38 @@ class SubscriptionController extends Controller
         $user = $request->user();
         $cafeId = (string) $cafe->id;
 
-        // Dọn đơn cổng online (VNPay/MoMo) 'pending' bị bỏ dở CỦA CHÍNH QUÁN NÀY: chúng tự
-        // kích hoạt qua callback, KHÔNG chờ admin — nên không được chặn thao tác mới. Bắt đầu
-        // đăng ký mới = từ bỏ lần thử cũ: đánh dấu 'failed' và hủy subscription 'pending' treo.
+        // Dọn đơn cổng online (VNPay/MoMo) bị bỏ dở CỦA CHÍNH QUÁN NÀY: chúng tự kích hoạt
+        // qua callback, KHÔNG chờ admin — nên không được chặn thao tác mới.
         // ĐA QUÁN: chỉ tác động quán này, tránh làm hỏng đơn pending của quán khác cùng chủ.
-        PackagePayment::where('cafe_id', $cafeId)
+        //
+        // CHỈ dọn đơn đã QUÁ HẠN CHỜ. Trước đây chỗ này dọn sạch mọi đơn 'pending', kể cả
+        // đơn khách ĐANG trả tiền ở tab cổng thanh toán bên cạnh — khách bấm mua lần hai là
+        // đơn đầu bị đánh 'failed', trả tiền xong thì tiền vào mà gói không được cấp.
+        // Hai lớp bảo vệ cho tình huống đó: ngưỡng thời gian ở đây, và
+        // SubscriptionActivator vẫn kích hoạt được đơn 'failed' khi cổng xác nhận thu tiền.
+        $staleBefore = $this->gatewayPendingDeadline();
+        $stalePayments = PackagePayment::where('cafe_id', $cafeId)
             ->where('payment_status', 'pending')
             ->whereIn('payment_method', PackagePayment::ONLINE_GATEWAYS)
-            ->update(['payment_status' => 'failed']);
-        Subscription::where('cafe_id', $cafeId)->where('status', 'pending')->update(['status' => 'cancelled']);
+            ->where('created_at', '<', $staleBefore)
+            ->get();
 
-        // Chỉ còn đơn 'pending' THỰC SỰ chờ admin (tiền mặt/chuyển khoản) của quán này mới chặn.
+        foreach ($stalePayments as $stale) {
+            $stale->update(['payment_status' => 'failed']);
+            // Chỉ hủy subscription ĐI KÈM đơn quá hạn đó, không quét sạch mọi sub 'pending'
+            // của quán (một sub 'pending' khác có thể đang chờ đơn vẫn còn hiệu lực).
+            $staleSub = $stale->subscription;
+            if ($staleSub && $staleSub->status === 'pending') {
+                $staleSub->update(['status' => 'cancelled']);
+            }
+        }
+
+        // Chỉ đơn 'pending' THỰC SỰ chờ admin (tiền mặt/chuyển khoản) mới chặn thao tác mới.
+        // Đơn cổng còn trong hạn chờ thì KHÔNG chặn: khách quay lại mua tiếp là chuyện bình
+        // thường, và nếu sau đó họ vẫn trả tiền cho đơn cũ thì callback vẫn cấp gói đúng.
         $hasPendingPayment = PackagePayment::where('cafe_id', $cafeId)
             ->where('payment_status', 'pending')
+            ->whereNotIn('payment_method', PackagePayment::ONLINE_GATEWAYS)
             ->exists();
 
         if ($hasPendingPayment) {
@@ -239,18 +277,26 @@ class SubscriptionController extends Controller
                 : $startDate->copy()->addMonths($durationValue);
         }
 
-        // Kiểm tra trial usage — ĐA QUÁN: dùng thử tính theo QUÁN (mỗi quán 1 lần), không theo tài khoản.
+        // Kiểm tra quyền dùng thử. HAI cổng, cả hai đều cần:
+        //  - theo QUÁN: một quán không xin dùng thử hai lần.
+        //  - theo TÀI KHOẢN: số quán mỗi tài khoản tạo được không bị giới hạn, nên chỉ
+        //    chặn theo quán là mở đường dùng Pro Max miễn phí vĩnh viễn — hết 7 ngày
+        //    thì tạo quán mới, lại được 7 ngày nữa.
         if ($package->is_trial) {
             if ($cafe->has_used_free_trial) {
                 return response()->json(['message' => 'Quán này đã sử dụng gói dùng thử trước đó.'], 400);
             }
+            if ($user->has_used_free_trial) {
+                return response()->json([
+                    'message' => 'Tài khoản của bạn đã dùng gói dùng thử miễn phí rồi. Mỗi tài khoản chỉ được dùng thử một lần — vui lòng chọn gói trả phí cho quán này.',
+                ], 400);
+            }
         }
 
-        // Tìm subscription active hiện tại CỦA QUÁN NÀY
-        $activeSub = Subscription::where('cafe_id', $cafeId)
-            ->where('status', 'active')
-            ->latest()
-            ->first();
+        // Gói hiện hành của QUÁN NÀY để so cấp bậc (mua mới / nâng cấp / gia hạn).
+        // latestForCafe sắp theo end_date: quán có nhiều bản ghi 'active' thì gói còn
+        // hạn phải thắng gói đã hết, kể cả khi bản ghi của nó được tạo trước.
+        $activeSub = Subscription::latestForCafe($cafeId)->first();
 
         $now = now();
 
@@ -308,9 +354,10 @@ class SubscriptionController extends Controller
                     'credit_amount' => 0,
                 ]);
 
-                // Set has_used_free_trial = true khi quán dùng Fun Free (trial theo QUÁN)
+                // Đánh dấu đã dùng thử ở CẢ HAI cấp — xem hai cổng kiểm tra ở trên.
                 if ($isTrial) {
                     $cafe->update(['has_used_free_trial' => true]);
+                    $user->update(['has_used_free_trial' => true]);
                 }
 
                 return $subscription;
@@ -336,10 +383,17 @@ class SubscriptionController extends Controller
             // kích hoạt ngay như luồng duyệt tay (admin xác nhận giao dịch 0đ).
             $gatewayCharge = $isGateway && $payable > 0;
 
+            // Cấn trừ phủ hết giá gói mới (payable = 0) thì KHÔNG có gì để thu: gói được
+            // cấp ngay, nên giao dịch phải ghi là ĐÃ THANH TOÁN luôn. Để 'pending' thì
+            // không luồng nào chuyển nó sang 'paid' (cổng không được gọi vì không có
+            // tiền, admin thì không còn nút duyệt tay), và tới lần mua sau nó bị đoạn
+            // dọn dẹp đánh dấu 'failed' — sổ sách ghi "thất bại" cho một gói đang chạy.
+            $upgradePaymentStatus = $payable > 0 ? 'pending' : 'paid';
+
             $subscription = $this->atomic(function () use (
                 $user, $cafeId, $package, $timeSub, $startDate, $endDate, $payable,
-                $subtotal, $vatRate, $vatAmount,
-                $txnCode, $validated, $activeSub, $credit, $gatewayCharge
+                $subtotal, $vatRate, $vatAmount, $now,
+                $txnCode, $validated, $activeSub, $credit, $gatewayCharge, $upgradePaymentStatus
             ) {
                 // VNPay (có thu tiền): HOÃN hủy gói cũ tới khi thanh toán xác nhận (khách back lại -> giữ nguyên gói cũ).
                 if (!$gatewayCharge) {
@@ -369,9 +423,9 @@ class SubscriptionController extends Controller
                     'vat_amount' => $vatAmount,
                     'amount' => $payable,
                     'payment_method' => $validated['payment_method'],
-                    'payment_status' => 'pending',
+                    'payment_status' => $upgradePaymentStatus,
                     'transaction_code' => $txnCode,
-                    'paid_at' => null,
+                    'paid_at' => $upgradePaymentStatus === 'paid' ? $now : null,
                     'note' => $validated['note'] ?? null,
                     'action_type' => 'upgrade',
                     'previous_subscription_id' => (string) $activeSub->id,

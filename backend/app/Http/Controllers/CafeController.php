@@ -22,15 +22,17 @@ class CafeController extends Controller
 
         $cafes = $user->cafes;
 
-        // Đính kèm gói CÒN HIỆU LỰC của TỪNG quán. Không có phần này thì frontend
-        // chỉ biết hạn của quán đang chọn, nên không thể cảnh báo "quán khác của bạn
-        // sắp hết hạn" — mà đó mới là trường hợp dễ quên nhất.
-        // Một truy vấn cho tất cả các quán (lặp lại cách làm ở Admin/UserController).
+        // Đính kèm gói MỚI NHẤT của TỪNG quán. Không có phần này thì frontend chỉ biết
+        // hạn của quán đang chọn, nên không thể cảnh báo "quán khác của bạn sắp hết
+        // hạn" — mà đó mới là trường hợp dễ quên nhất.
+        //
         // KHÔNG dùng scope effective(): nó loại luôn gói đã quá hạn, mà quán hết hạn
-        // mới chính là quán cần cảnh báo gấp nhất. Lấy gói MỚI NHẤT của mỗi quán rồi
-        // để frontend tự phân loại theo end_date (còn hạn / sắp hết / đã hết).
-        // Sắp xếp TĂNG DẦN vì keyBy giữ phần tử cuối khi trùng khóa -> quán nào cũng
-        // giữ lại đúng gói có end_date lớn nhất.
+        // mới chính là quán cần cảnh báo gấp nhất. Frontend tự phân loại theo end_date.
+        // Xem Subscription::scopeLatestForCafe() để biết vì sao hai khái niệm này khác
+        // nhau và khi nào dùng cái nào.
+        //
+        // Một truy vấn cho tất cả các quán. Sắp xếp TĂNG DẦN vì keyBy giữ phần tử cuối
+        // khi trùng khóa -> quán nào cũng giữ lại đúng gói có end_date lớn nhất.
         $subs = Subscription::whereIn('cafe_id', $cafes->pluck('id')->map(fn ($id) => (string) $id)->toArray())
             ->where('status', 'active')
             ->orderBy('end_date', 'asc')
@@ -41,7 +43,10 @@ class CafeController extends Controller
         $result = $cafes->map(function ($cafe) use ($subs) {
             $sub = $subs->get((string) $cafe->id);
             $data = $cafe->toArray();
-            $data['package_type'] = $sub ? ($sub->package->type ?? 'free') : 'none';
+            // 'none' chứ không 'free' khi không đọc được loại gói: gói Fun Free là bản
+            // dùng thử Pro Max (không giới hạn bàn/món, có AI), nên lấy nó làm giá trị
+            // dự phòng là cấp quyền cao nhất cho đúng lúc dữ liệu hỏng.
+            $data['package_type'] = $sub ? ($sub->package->type ?? 'none') : 'none';
             $data['package_name'] = $sub ? ($sub->package->name ?? '') : '';
             $data['package_end_date'] = $sub?->end_date;
             return $data;

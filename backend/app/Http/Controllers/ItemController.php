@@ -222,39 +222,8 @@ class ItemController extends Controller
     // destroy() đã bị GỠ BỎ có chủ đích: món từng bán được tham chiếu trong
     // order/hóa đơn cũ nên không cho xóa — chủ quán ẩn món qua is_available.
 
-    public function toppings(Cafe $cafe, Item $item)
-    {
-        $this->authorizeCafe($cafe);
-
-        if ((string) $item->cafe_id !== (string) $cafe->id) {
-            return response()->json(['message' => 'Not found'], 404);
-        }
-
-        $toppingIds = $item->itemToppings()->pluck('topping_id');
-        return response()->json($toppingIds);
-    }
-
-    public function updateToppings(Request $request, Cafe $cafe, Item $item)
-    {
-        $this->authorizeCafe($cafe);
-
-        if ((string) $item->cafe_id !== (string) $cafe->id) {
-            return response()->json(['message' => 'Not found'], 404);
-        }
-
-        $validated = $request->validate([
-            'topping_ids'   => 'required|array',
-            'topping_ids.*' => 'required|string',
-        ]);
-
-        // C2: topping gắn vào món PHẢI thuộc quán này — chặn id lạ/quán khác
-        if (!$this->syncItemToppings($cafe, $item, $validated['topping_ids'])) {
-            return response()->json(['message' => 'Có topping không hợp lệ hoặc không thuộc quán của bạn.'], 422);
-        }
-
-        return response()->json([
-            'message'     => 'Đã lưu cấu hình topping.',
-            'topping_ids' => $item->itemToppings()->pluck('topping_id'),
-        ]);
-    }
+    // toppings() và updateToppings() đã bị GỠ BỎ cùng hai route của chúng.
+    // Trang Thực đơn gắn topping cho món bằng trường `topping_ids` gửi kèm ngay
+    // trong body của store()/update() — hai endpoint riêng chưa từng được gọi lần
+    // nào. Việc đồng bộ vẫn do syncItemToppings() ở trên đảm nhiệm.
 }

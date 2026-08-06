@@ -7,7 +7,7 @@ import { packageService, timeSubscriptionService } from '@/services';
 import { formatCurrency } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import type { Package, TimeSubscription } from '@/types';
-import { Check, X, Pencil, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Check, X, Pencil, Plus, EyeOff, AlertCircle } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/user/StatusBadge';
@@ -30,7 +30,10 @@ export default function AdminPackagesPage() {
 
   const loadPackages = () => {
     setLoading(true);
-    packageService.list().then(setPackages).catch(() => setError(true)).finally(() => setLoading(false));
+    // adminList (KHÔNG phải list): endpoint công khai /packages lọc status='active',
+    // nên đặt một gói thành 'inactive' là nó biến mất khỏi chính trang quản lý gói
+    // và không còn đường bật lại.
+    packageService.adminList().then(setPackages).catch(() => setError(true)).finally(() => setLoading(false));
   };
   useEffect(() => { loadPackages(); }, []);
 
@@ -38,7 +41,8 @@ export default function AdminPackagesPage() {
     setEditTarget(pkg);
     setForm(pkg);
     setTimeSubs([]);
-    timeSubscriptionService.listByPackage(pkg.id).then(setTimeSubs).catch(() => toast({ description: 'Không thể tải thời hạn', variant: 'destructive' }));
+    // adminListByPackage: cần thấy cả mốc thời hạn đã ẩn để bật lại được.
+    timeSubscriptionService.adminListByPackage(pkg.id).then(setTimeSubs).catch(() => toast({ description: 'Không thể tải thời hạn', variant: 'destructive' }));
   };
 
   const handleSave = async () => {
@@ -109,12 +113,14 @@ export default function AdminPackagesPage() {
     if (!tsDelete) return;
     setSaving(true);
     try {
-      await timeSubscriptionService.delete(tsDelete.id);
-      setTimeSubs(prev => prev.filter(t => t.id !== tsDelete.id));
+      await timeSubscriptionService.hide(tsDelete.id);
+      // Ẩn chứ không bỏ khỏi danh sách: mốc vẫn còn trong CSDL và admin phải bật
+      // lại được. Chỉ đổi status để hàng hiển thị trạng thái "Đã ẩn".
+      setTimeSubs(prev => prev.map(t => t.id === tsDelete.id ? { ...t, status: 'inactive' } : t));
       setTsDelete(null);
-      toast({ description: 'Đã xoá thời hạn' });
+      toast({ description: 'Đã ẩn thời hạn khỏi trang mua gói' });
     } catch {
-      toast({ description: 'Xoá thất bại', variant: 'destructive' });
+      toast({ description: 'Ẩn thời hạn thất bại', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -296,8 +302,13 @@ export default function AdminPackagesPage() {
                           <td className="px-3 py-2"><StatusBadge tone={t.status === 'active' ? 'success' : 'neutral'}>{t.status === 'active' ? 'Đang dùng' : 'Ẩn'}</StatusBadge></td>
                           <td className="px-3 py-2">
                             <div className="flex gap-1 justify-end">
-                              <button onClick={() => openTsEdit(t)} className="p-1.5 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => setTsDelete(t)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => openTsEdit(t)} title="Sửa" className="p-1.5 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                              {/* Ẩn chứ không xoá — mốc đã ẩn thì không còn gì để ẩn nữa,
+                                  bật lại bằng nút Sửa. Biểu tượng thùng rác gây hiểu nhầm
+                                  là xoá vĩnh viễn nên dùng con mắt gạch chéo. */}
+                              {t.status === 'active' && (
+                                <button onClick={() => setTsDelete(t)} title="Ẩn khỏi trang mua gói" className="p-1.5 text-cafe-400 hover:text-gold-deep hover:bg-gold/12 rounded-lg transition-colors"><EyeOff className="w-3.5 h-3.5" /></button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -357,9 +368,9 @@ export default function AdminPackagesPage() {
         open={!!tsDelete}
         onClose={() => setTsDelete(null)}
         onConfirm={handleTsDelete}
-        title="Xoá thời hạn"
-        message={`Xoá thời hạn "${tsDelete?.label}"? Hành động này không thể hoàn tác.`}
-        confirmLabel="Xoá"
+        title="Ẩn thời hạn"
+        message={`Ẩn thời hạn "${tsDelete?.label}" khỏi trang mua gói? Khách sẽ không chọn được mốc này nữa, nhưng các gói đã bán theo mốc này vẫn gia hạn đúng hạn. Bạn có thể bật lại bất cứ lúc nào.`}
+        confirmLabel="Ẩn"
         danger
         loading={saving}
       />

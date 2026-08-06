@@ -43,7 +43,7 @@ class TableController extends Controller
     {
         $this->authorizeCafe($cafe);
 
-        if ($table->cafe_id !== $cafe->id) {
+        if ((string) $table->cafe_id !== (string) $cafe->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
@@ -62,7 +62,7 @@ class TableController extends Controller
     {
         $this->authorizeCafe($cafe);
 
-        if ($table->cafe_id !== $cafe->id) {
+        if ((string) $table->cafe_id !== (string) $cafe->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 

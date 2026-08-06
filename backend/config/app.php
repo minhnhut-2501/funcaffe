@@ -67,7 +67,12 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // FunCafe phục vụ quán cà phê ở Việt Nam. Để UTC (mặc định của Laravel) thì mọi
+    // phép chia ngày ở backend — Carbon::today(), format('Y-m-d') trong doanh thu —
+    // đều lấy mốc UTC, nên "hôm nay" bắt đầu lúc 7 giờ sáng giờ Việt Nam: đơn bán từ
+    // 0h đến 7h sáng bị tính sang ngày hôm trước. Frontend lại gộp theo giờ trình
+    // duyệt (UTC+7) nên hai bên ra hai con số khác nhau cho cùng một ngày.
+    'timezone' => env('APP_TIMEZONE', 'Asia/Ho_Chi_Minh'),
 
     /*
     |--------------------------------------------------------------------------

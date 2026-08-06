@@ -2,8 +2,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { api, type AuthUser, type AuthResponse, type SubscriptionData } from '@/lib/api-client';
 import type { CurrentUser, UserSubscription, CafeInfo } from '@/types';
-import { defaultPackageLimits } from '@/lib/permission';
-import { cafeService, setActiveCafeId, pickActiveCafeId, clearCafeCache } from '@/services';
+import { defaultPackageLimits, daysLeftUntil } from '@/lib/permission';
+import { cafeService, setActiveCafeId, pickActiveCafeId, clearCafeCache, peekActiveCafeId } from '@/services';
 
 interface AuthContextType {
   user: CurrentUser | null;
@@ -44,7 +44,11 @@ function mapSubscription(subs: SubscriptionData[]): UserSubscription {
   const latestCredit = upgradePayments[0];
 
   const pkg = active.package;
-  const packageType = (pkg?.type as UserSubscription['packageType']) || 'free';
+  // Không đọc được loại gói -> 'none', KHÔNG phải 'free'. Fun Free là bản dùng thử
+  // Pro Max nên trong PACKAGE_LIMITS nó có bàn/món không giới hạn và bật cả AI —
+  // lấy nó làm giá trị dự phòng nghĩa là dữ liệu hỏng (subscription trỏ tới
+  // package_id không còn tồn tại) sẽ MỞ KHÓA TỐI ĐA thay vì khóa bớt.
+  const packageType = (pkg?.type as UserSubscription['packageType']) || 'none';
   // Giới hạn/quyền lấy từ gói (do admin cấu hình). null/thiếu => không giới hạn.
   // Fallback theo loại gói khi document gói chưa có field (dữ liệu cũ).
   const fallback = defaultPackageLimits(packageType);
@@ -66,7 +70,7 @@ function mapSubscription(subs: SubscriptionData[]): UserSubscription {
   };
 }
 
-function mapUser(u: AuthUser, subs: SubscriptionData[]): CurrentUser {
+function mapUser(u: AuthUser, subscription: UserSubscription): CurrentUser {
   return {
     // `id ?? _id`: API trả `id`. Chỉ đọc `_id` thì user.id là undefined, và mọi
     // useEffect phụ thuộc user.id sẽ không bao giờ chạy lại khi user nạp xong.
@@ -76,17 +80,56 @@ function mapUser(u: AuthUser, subs: SubscriptionData[]): CurrentUser {
     phone: u.phone || '',
     avatarUrl: u.avatar ?? undefined,
     role: u.role === 'admin' ? 'admin' : 'user',
-    subscription: mapSubscription(subs),
+    subscription,
   };
 }
 
-// Gói của MỘT quán cụ thể (theo quán đang chọn).
+/**
+ * Gói của MỘT quán cụ thể (theo quán đang chọn).
+ *
+ * Ném lỗi thay vì trả mảng rỗng. Mảng rỗng có nghĩa xác định là "quán chưa mua gói
+ * nào", và nếu dùng nó cho cả trường hợp gọi API hỏng thì một nhịp mạng chập sẽ
+ * khoá toàn bộ thao tác của một quán đang có gói: `packageType` thành 'none' ->
+ * `canManage()` false -> mọi nút thêm/sửa/bán hàng bị khoá kèm lời mời mua gói,
+ * mà không có thông báo lỗi nào. Backend trên gói miễn phí hay ngủ đông nên nhịp
+ * chập này xảy ra thường xuyên chứ không hiếm.
+ *
+ * Nơi gọi chịu trách nhiệm xử lý lỗi (xem `subscriptionOf` bên dưới).
+ */
 async function fetchSubscriptions(cafeId: string | null): Promise<SubscriptionData[]> {
   if (!cafeId) return [];
+  return api.get<SubscriptionData[]>(`/cafes/${cafeId}/subscriptions`);
+}
+
+/**
+ * Gói của quán đang chọn, có đường lui khi API gói không gọi được.
+ *
+ * `GET /cafes` đã đính kèm `packageType` / `packageName` / `packageEndDate` cho từng
+ * quán, nên khi endpoint chi tiết hỏng ta vẫn dựng lại được gói từ dữ liệu đó —
+ * giới hạn số bàn/món và quyền AI rơi về mặc định theo loại gói. Chủ quán tiếp tục
+ * bán hàng bình thường thay vì bị báo "chưa đăng ký gói".
+ */
+async function subscriptionOf(cafeId: string | null, cafes: CafeInfo[]): Promise<UserSubscription> {
   try {
-    return await api.get<SubscriptionData[]>(`/cafes/${cafeId}/subscriptions`);
+    return mapSubscription(await fetchSubscriptions(cafeId));
   } catch {
-    return [];
+    const cafe = cafes.find((c) => c.id === cafeId);
+    if (!cafe?.packageType || cafe.packageType === 'none') {
+      // Không có gì để lui về: giữ nguyên 'none' như trước.
+      return mapSubscription([]);
+    }
+    const limits = defaultPackageLimits(cafe.packageType);
+    return {
+      packageType: cafe.packageType,
+      packageName: cafe.packageName || 'Gói hiện tại',
+      startDate: '',
+      endDate: cafe.packageEndDate ?? '',
+      daysLeft: cafe.packageEndDate ? daysLeftUntil(cafe.packageEndDate) : 0,
+      cafeId: cafe.id,
+      maxTables: limits.maxTables,
+      maxMenuItems: limits.maxMenuItems,
+      canUseAI: limits.canUseAI,
+    };
   }
 }
 
@@ -106,14 +149,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activeCafeId, setActiveCafeIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Nạp toàn bộ trạng thái sau khi có AuthUser: quán + quán đang chọn + gói của quán đó.
+  /**
+   * Nạp toàn bộ trạng thái sau khi có AuthUser: quán + quán đang chọn + gói của quán đó.
+   *
+   * Hai request phụ chạy SONG SONG chứ không nối đuôi. Trước đây là chuỗi ba lượt
+   * mạng chờ nhau (`/user` -> `/cafes` -> `/cafes/{id}/subscriptions`) trước khi giao
+   * diện dùng được — trên backend đang ngủ đông của gói miễn phí thì đó là vài giây
+   * màn hình trắng.
+   *
+   * Mẹo ở đây: quán đang chọn hầu như luôn biết trước từ lựa chọn đã lưu, nên hỏi gói
+   * được ngay mà không cần đợi `/cafes`. Phỏng đoán đó vẫn phải kiểm lại: đổi tài
+   * khoản thì quán đã lưu không còn thuộc người dùng này nữa, khi đó bỏ kết quả đoán
+   * và hỏi lại đúng quán.
+   */
   const hydrate = useCallback(async (u: AuthUser): Promise<CurrentUser> => {
     const role = u.role === 'admin' ? 'admin' : 'user';
-    const { cafes, activeCafeId } = await loadCafes(role);
-    const subs = await fetchSubscriptions(activeCafeId);
+    const guessedCafeId = role === 'admin' ? null : peekActiveCafeId();
+
+    const [{ cafes, activeCafeId }, guessedSubs] = await Promise.all([
+      loadCafes(role),
+      guessedCafeId
+        ? fetchSubscriptions(guessedCafeId).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    const subscription = guessedCafeId === activeCafeId && guessedSubs !== null
+      ? mapSubscription(guessedSubs)
+      : await subscriptionOf(activeCafeId, cafes);
+
     setCafes(cafes);
     setActiveCafeIdState(activeCafeId);
-    const mapped = mapUser(u, subs);
+    const mapped = mapUser(u, subscription);
     setUser(mapped);
     return mapped;
   }, []);
@@ -193,9 +259,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setActiveCafe = useCallback(async (id: string) => {
     setActiveCafeId(id);
     setActiveCafeIdState(id);
-    const subs = await fetchSubscriptions(id);
-    setUser((prev) => (prev ? { ...prev, subscription: mapSubscription(subs) } : prev));
-  }, []);
+    const subscription = await subscriptionOf(id, cafes);
+    setUser((prev) => (prev ? { ...prev, subscription } : prev));
+  }, [cafes]);
 
   // Nạp lại danh sách quán (sau khi tạo quán mới), giữ quán đang chọn hợp lệ.
   const reloadCafes = useCallback(async (): Promise<CafeInfo[]> => {

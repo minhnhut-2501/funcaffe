@@ -93,15 +93,6 @@ export function formatPaymentMethod(method: string): string {
   return map[method] ?? method;
 }
 
-export function formatOrderStatus(status: string): string {
-  const map: Record<string, string> = {
-    active: 'Đang phục vụ',
-    paid: 'Đã thanh toán',
-    cancelled: 'Đã hủy',
-  };
-  return map[status] ?? status;
-}
-
 export function formatTableStatus(status: string): string {
   const map: Record<string, string> = {
     empty: 'Trống',
@@ -120,9 +111,16 @@ export function formatPackageName(type: string): string {
   return map[type] ?? type;
 }
 
-export function formatDuration(months: number): string {
-  if (months === 1) return '1 tháng';
-  if (months === 3) return '3 tháng';
-  if (months === 12) return '12 tháng';
-  return `${months} tháng`;
+/**
+ * Thời hạn gói: "12 tháng", "7 ngày".
+ *
+ * Đơn vị BẮT BUỘC đi kèm giá trị. Gói dùng thử tính bằng ngày (7 ngày) còn gói trả
+ * phí tính bằng tháng — mặc định "tháng" cho mọi giá trị sẽ biến gói 7 ngày thành
+ * "7 tháng". Xem `time_subscriptions.duration_unit`.
+ *
+ * Thiếu dữ liệu (giao dịch cũ không gắn mốc thời hạn) trả dấu gạch, không đoán bừa.
+ */
+export function formatDuration(value?: number, unit: 'day' | 'month' = 'month'): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `${value} ${unit === 'day' ? 'ngày' : 'tháng'}`;
 }

@@ -2,13 +2,17 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 function Result() {
   const params = useSearchParams();
   const status = params.get('status');
   const code = params.get('code');
+  // Cổng đã THU TIỀN nhưng hệ thống không cấp được gói. Khác hẳn thất bại thường:
+  // tiền đã ra khỏi tài khoản khách, nên tuyệt đối KHÔNG được mời "thử lại" —
+  // họ sẽ trả tiền lần hai. Backend đã ghi log mức error để đối soát.
+  const paidButNotActivated = code === 'not_activated';
   // Cổng nào trả về — backend đính kèm ?gateway=vnpay|momo. Thiếu thì không nêu tên
   // cổng chứ không đoán bừa.
   const gatewayName = ({ vnpay: 'VNPay', momo: 'MoMo' } as Record<string, string>)[params.get('gateway') ?? ''] ?? '';
@@ -43,6 +47,20 @@ function Result() {
               </p>
             )}
           </>
+        ) : paidButNotActivated ? (
+          <>
+            <div className="w-16 h-16 rounded-full bg-gold/18 grid place-items-center mx-auto mb-4"><AlertTriangle className="w-9 h-9 text-gold-deep" /></div>
+            <h1 className="text-xl font-bold text-ink mb-2">Đã nhận thanh toán, gói đang chờ kích hoạt</h1>
+            <p className="text-sm text-cafe-600">
+              {gatewayName ? `${gatewayName} báo giao dịch thành công` : 'Giao dịch đã thành công'}, nhưng hệ thống chưa kích hoạt được gói cho quán của bạn.
+            </p>
+            <p className="text-sm font-semibold text-ink mt-3">
+              Vui lòng <strong>không thanh toán lại</strong> — bạn sẽ bị trừ tiền lần nữa.
+            </p>
+            <p className="text-sm text-cafe-600 mt-2">
+              Giao dịch đã được ghi nhận. Hãy liên hệ với chúng tôi kèm mã giao dịch của ngân hàng để được kích hoạt.
+            </p>
+          </>
         ) : (
           <>
             <div className="w-16 h-16 rounded-full bg-red-50 grid place-items-center mx-auto mb-4"><XCircle className="w-9 h-9 text-red-500" /></div>
@@ -55,7 +73,11 @@ function Result() {
         )}
 
         <div className="mt-6 flex gap-2 justify-center">
-          <Link href="/user/subscription" className="btn-primary">Về trang gói dịch vụ</Link>
+          {paidButNotActivated ? (
+            <Link href="/contact" className="btn-primary">Liên hệ hỗ trợ</Link>
+          ) : (
+            <Link href="/user/subscription" className="btn-primary">Về trang gói dịch vụ</Link>
+          )}
           {!success && <Link href="/user/dashboard" className="btn-secondary">Về trang chủ</Link>}
         </div>
       </div>

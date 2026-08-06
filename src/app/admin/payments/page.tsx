@@ -118,7 +118,7 @@ export default function AdminPaymentsPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-cafe-600">{p.packageName}</td>
-                <td className="px-4 py-3 text-cafe-500">{formatDuration(p.duration)}</td>
+                <td className="px-4 py-3 text-cafe-500">{formatDuration(p.durationValue, p.durationUnit)}</td>
                 <td className="px-4 py-3 text-right font-bold text-ink">{formatCurrency(p.amount)}</td>
                 <td className="px-4 py-3"><StatusBadge tone={statusTone[p.status]}>{statusLabel[p.status]}</StatusBadge></td>
                 <td className="px-4 py-3">
@@ -164,7 +164,7 @@ export default function AdminPaymentsPage() {
               { label: 'Email', value: viewPayment.userEmail, wide: true },
               { label: 'Loại GD', value: viewPayment.actionType === 'new' ? 'Mới' : viewPayment.actionType === 'renew' ? 'Gia hạn' : viewPayment.actionType === 'upgrade' ? 'Nâng cấp' : viewPayment.actionType === 'cancel' ? 'Hủy gói' : '—' },
               { label: 'Gói đăng ký', value: viewPayment.packageName },
-              { label: 'Thời hạn', value: formatDuration(viewPayment.duration) },
+              { label: 'Thời hạn', value: formatDuration(viewPayment.durationValue, viewPayment.durationUnit) },
               { label: 'Số tiền', value: formatCurrency(viewPayment.amount) },
               { label: 'Trạng thái', value: statusLabel[viewPayment.status] },
               { label: 'Ngày tạo', value: formatDateTime(viewPayment.createdAt) },

@@ -54,6 +54,18 @@ function getCafeIdSync(): string | null {
   return cafeIdCache;
 }
 
+/**
+ * Quán đang chọn theo phỏng đoán tốt nhất, KHÔNG gọi mạng: cache trong bộ nhớ,
+ * hoặc lựa chọn đã lưu từ lần trước.
+ *
+ * Dùng để bắn trước request phụ thuộc quán song song với `GET /cafes` thay vì phải
+ * chờ nó trả về. Giá trị này CHƯA được kiểm chứng — nơi gọi phải đối chiếu lại với
+ * danh sách quán thật rồi bỏ kết quả nếu đoán sai.
+ */
+export function peekActiveCafeId(): string | null {
+  return cafeIdCache ?? readStoredCafeId();
+}
+
 export async function hasCafe(): Promise<boolean> {
   try {
     const cafes = await api.get<any[]>('/cafes');
@@ -281,7 +293,10 @@ function mapPayment(raw: any): Payment {
     userEmail: usr.email ?? '',
     packageName: pkg.name ?? '',
     packageType: (pkg.type as Payment['packageType']) ?? 'free',
-    duration: raw.duration_months ?? 1,
+    // Thời hạn nằm ở quan hệ time_subscription. KHÔNG có trường `duration_months`
+    // nào ở backend — trước đây đọc nó nên mọi giao dịch đều hiện "1 tháng".
+    durationValue: raw.time_subscription?.duration_value ?? undefined,
+    durationUnit: raw.time_subscription?.duration_unit ?? undefined,
     amount: raw.amount ?? 0,
     status,
     createdAt: raw.created_at,
@@ -293,30 +308,10 @@ function mapPayment(raw: any): Payment {
   };
 }
 
-// Auth
-export const authService = {
-  login: async (email: string, password: string) => {
-    const res = await api.post<{ user: any; token: string }>('/auth/login', { email, password });
-    api.setToken(res.token);
-    return res;
-  },
-  register: async (data: { full_name: string; email: string; password: string; phone?: string }) => {
-    const res = await api.post<{ user: any; token: string }>('/auth/register', data);
-    api.setToken(res.token);
-    return res;
-  },
-  logout: async () => {
-    await api.post('/auth/logout');
-    api.removeToken();
-  },
-  forgotPassword: async (email: string) => {
-    return api.post<{ message: string }>('/auth/forgot-password', { email });
-  },
-  getUser: async () => {
-    const raw = await api.get<any>('/user');
-    return mapUser(raw);
-  },
-};
+// Không có authService ở đây: đăng nhập / đăng ký / đăng xuất / lấy thông tin người
+// dùng đều nằm trong AuthContext, vì chúng phải cập nhật cả state của context (user,
+// danh sách quán, quán đang chọn) chứ không chỉ gọi API. Từng có một bản sao đầy đủ
+// ở đây nhưng không nơi nào gọi — hai bản song song là mời gọi sửa một bên quên bên kia.
 
 // Menu items
 export const menuService = {
@@ -433,19 +428,8 @@ export const toppingService = {
   // Không có remove: topping chỉ ẨN (is_available=false) — topping từng bán còn trong hóa đơn cũ.
 };
 
-// Item-Topping config
-export const itemToppingService = {
-  get: async (itemId: string) => {
-    const cafeId = await getCafeId();
-    const data = await api.get<string[]>(`/cafes/${cafeId}/items/${itemId}/toppings`);
-    return data;
-  },
-  update: async (itemId: string, toppingIds: string[]) => {
-    const cafeId = await getCafeId();
-    const data = await api.put<{ topping_ids: string[] }>(`/cafes/${cafeId}/items/${itemId}/toppings`, { topping_ids: toppingIds });
-    return data.topping_ids;
-  },
-};
+// Không có itemToppingService: topping gắn cho món đi kèm ngay trong body của
+// menuService.create/update (trường `topping_ids`), không qua endpoint riêng.
 
 // Tables
 export const tableService = {
@@ -479,10 +463,71 @@ export const tableService = {
 };
 
 // Orders
+/**
+ * Bộ lọc cho `GET /cafes/{cafe}/orders`.
+ * Luôn truyền ít nhất `status`: không truyền gì là kéo về TOÀN BỘ lịch sử bán hàng
+ * của quán kèm dòng món và topping.
+ */
+export interface OrderQuery {
+  status?: 'active' | 'paid' | 'cancelled';
+  from?: string;  // 'YYYY-MM-DD'
+  to?: string;    // 'YYYY-MM-DD'
+  limit?: number;
+}
+
+function orderQueryString(q: OrderQuery): string {
+  const params = new URLSearchParams();
+  if (q.status) params.set('status', q.status);
+  if (q.from) params.set('from', q.from);
+  if (q.to) params.set('to', q.to);
+  if (q.limit) params.set('limit', String(q.limit));
+  const s = params.toString();
+  return s ? `?${s}` : '';
+}
+
+/**
+ * Thân request tạo/sửa đơn.
+ *
+ * KHÔNG gửi bất kỳ trường giá nào (`subtotal`, `total_amount`, `unit_price`,
+ * `price_at_time`, và `subtotal` của từng dòng). Backend cố ý không nhận chúng —
+ * `OrderController` tự đọc giá từ CSDL và tự lấy cả tên món/topping cho snapshot,
+ * để client không quyết định được số tiền. Gửi lên thì Laravel cũng loại bỏ trong im
+ * lặng vì chúng không nằm trong `validate()`.
+ *
+ * Giữ chúng lại chỉ có hại: payload phình vô ích, và người đọc code frontend tưởng
+ * giá do frontend quyết định nên sẽ đi "sửa lỗi giá" ở đúng chỗ không có tác dụng.
+ */
+function orderBody(data: Partial<Order>) {
+  return {
+    table_id: data.tableId,
+    note: data.note,
+    discount_amount: data.discountAmount,
+    items: (data.items ?? []).map((item) => ({
+      item_id: item.itemId,
+      item_name_snapshot: item.itemNameSnapshot,
+      quantity: item.quantity,
+      item_price_id: item.sizeId,
+      size_name_snapshot: item.sizeNameSnapshot,
+      note: item.note,
+      toppings: (item.toppings ?? []).map((t) => ({
+        topping_id: t.toppingId,
+        topping_name_snapshot: t.toppingNameSnapshot,
+        quantity: t.quantity,
+      })),
+    })),
+  };
+}
+
 export const orderService = {
-  list: async () => {
+  /** Đơn ĐANG PHỤC VỤ. Màn hình Bán hàng chỉ cần chỗ này, không cần đơn đã đóng. */
+  listActive: async () => {
     const cafeId = await getCafeId();
-    const items = await api.get<any[]>(`/cafes/${cafeId}/orders`);
+    const items = await api.get<any[]>(`/cafes/${cafeId}/orders${orderQueryString({ status: 'active' })}`);
+    return items.map(mapOrder);
+  },
+  list: async (query: OrderQuery = {}) => {
+    const cafeId = await getCafeId();
+    const items = await api.get<any[]>(`/cafes/${cafeId}/orders${orderQueryString(query)}`);
     return items.map(mapOrder);
   },
   getById: async (id: string) => {
@@ -492,31 +537,7 @@ export const orderService = {
   },
   create: async (data: Partial<Order>) => {
     const cafeId = await getCafeId();
-    const body: any = {
-      table_id: data.tableId,
-      note: data.note,
-      subtotal: data.subtotal,
-      discount_amount: data.discountAmount,
-      total_amount: data.totalAmount,
-      items: (data.items ?? []).map((item) => ({
-        item_id: item.itemId,
-        item_name_snapshot: item.itemNameSnapshot,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        subtotal: item.subtotal,
-        item_price_id: item.sizeId,
-        size_name_snapshot: item.sizeNameSnapshot,
-        note: item.note,
-        toppings: (item.toppings ?? []).map((t) => ({
-          topping_id: t.toppingId,
-          topping_name_snapshot: t.toppingNameSnapshot,
-          quantity: t.quantity,
-          price_at_time: t.priceAtTime,
-          subtotal: t.subtotal,
-        })),
-      })),
-    };
-    const raw = await api.post<any>(`/cafes/${cafeId}/orders`, body);
+    const raw = await api.post<any>(`/cafes/${cafeId}/orders`, orderBody(data));
     return mapOrder(raw);
   },
   pay: async (orderId: string, data: { payment_method: string; discount_amount?: number; cash_received?: number }) => {
@@ -532,51 +553,28 @@ export const orderService = {
   },
   update: async (id: string, data: Partial<Order>) => {
     const cafeId = await getCafeId();
-    const body: any = {
-      table_id: data.tableId,
-      note: data.note,
-      subtotal: data.subtotal,
-      discount_amount: data.discountAmount,
-      total_amount: data.totalAmount,
-      items: (data.items ?? []).map((item) => ({
-        item_id: item.itemId,
-        item_name_snapshot: item.itemNameSnapshot,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        subtotal: item.subtotal,
-        item_price_id: item.sizeId,
-        size_name_snapshot: item.sizeNameSnapshot,
-        note: item.note,
-        toppings: (item.toppings ?? []).map((t) => ({
-          topping_id: t.toppingId,
-          topping_name_snapshot: t.toppingNameSnapshot,
-          quantity: t.quantity,
-          price_at_time: t.priceAtTime,
-          subtotal: t.subtotal,
-        })),
-      })),
-    };
-    const raw = await api.put<any>(`/cafes/${cafeId}/orders/${id}`, body);
+    const raw = await api.put<any>(`/cafes/${cafeId}/orders/${id}`, orderBody(data));
     return mapOrder(raw);
   },
 };
 
 // "Hóa đơn" = order đã thanh toán (bảng invoices đã bị bỏ, order tự mang thanh toán).
 export const invoiceService = {
-  list: async () => {
+  // status=paid lọc ở CSDL. Trước đây tải mọi đơn (kể cả đang phục vụ và đã hủy)
+  // rồi mới `.filter(o => o.status === 'paid')` trong trình duyệt.
+  list: async (query: Omit<OrderQuery, 'status'> = {}) => {
     const cafeId = await getCafeId();
-    const orders = await api.get<any[]>(`/cafes/${cafeId}/orders`);
-    return orders.filter((o) => o.status === 'paid').map(mapInvoice);
+    const orders = await api.get<any[]>(`/cafes/${cafeId}/orders${orderQueryString({ ...query, status: 'paid' })}`);
+    return orders.map(mapInvoice);
   },
   /**
    * Hóa đơn của MỘT quán chỉ định (không phụ thuộc quán đang chọn).
    * Trang doanh thu dùng hàm này để gộp số liệu nhiều quán: /revenue/overview chỉ
    * trả về tổng và số theo tháng nên không đủ để lọc theo ngày hay tính top món.
    */
-  listByCafe: async (cafeId: string, cafeName?: string) => {
-    const orders = await api.get<any[]>(`/cafes/${cafeId}/orders`);
+  listByCafe: async (cafeId: string, cafeName?: string, query: Omit<OrderQuery, 'status'> = {}) => {
+    const orders = await api.get<any[]>(`/cafes/${cafeId}/orders${orderQueryString({ ...query, status: 'paid' })}`);
     return orders
-      .filter((o) => o.status === 'paid')
       .map(mapInvoice)
       .map((inv) => ({ ...inv, cafeId, cafeName }));
   },
@@ -660,8 +658,22 @@ export const cafeService = {
 
 // Packages
 export const packageService = {
+  /**
+   * Endpoint CÔNG KHAI — chỉ trả gói đang bật (backend lọc status='active').
+   * Dùng cho trang chủ, bảng giá, trang mua gói.
+   */
   list: async () => {
     const items = await api.get<any[]>('/packages');
+    return items.map(mapPackage);
+  },
+  /**
+   * Bản dành cho ADMIN — trả cả gói đã tắt (status 'inactive').
+   * Trang quản trị BẮT BUỘC dùng hàm này: `update` bên dưới cho phép đặt gói về
+   * 'inactive', mà endpoint công khai lại lọc mất gói đó — dùng nhầm `list` thì tắt
+   * một gói là nó biến mất khỏi danh sách và không còn cách nào bật lại.
+   */
+  adminList: async () => {
+    const items = await api.get<any[]>('/admin/packages');
     return items.map(mapPackage);
   },
   update: async (id: string, data: Partial<Package>) => {
@@ -679,12 +691,46 @@ export const packageService = {
 };
 
 // Users (admin)
+export interface UserPage {
+  items: User[];
+  total: number;
+  currentPage: number;
+  lastPage: number;
+}
+
 export const userService = {
-  list: async () => {
-    // BUG-16/BUG-26 FIX: Backend trả về paginated response {data: [...]}
-    const res = await api.get<any>('/admin/users');
-    const items = Array.isArray(res) ? res : (res.data ?? []);
-    return items.map(mapUser);
+  /**
+   * MỘT TRANG người dùng (backend phân trang 50/trang).
+   *
+   * Trước đây hàm này bỏ qua hoàn toàn phần phân trang trong phản hồi, nên admin chỉ
+   * thấy 50 tài khoản mới nhất — tài khoản thứ 51 trở đi không tìm được, không khóa
+   * được. Nơi gọi PHẢI dùng `lastPage` để cho người dùng đi tiếp.
+   */
+  list: async (page = 1): Promise<UserPage> => {
+    const res = await api.get<any>(`/admin/users?page=${page}`);
+    // Phòng trường hợp backend trả mảng trần (bản cũ chưa phân trang).
+    if (Array.isArray(res)) {
+      return { items: res.map(mapUser), total: res.length, currentPage: 1, lastPage: 1 };
+    }
+    return {
+      items: (res.data ?? []).map(mapUser),
+      total: res.total ?? 0,
+      currentPage: res.current_page ?? 1,
+      lastPage: res.last_page ?? 1,
+    };
+  },
+  /**
+   * TOÀN BỘ người dùng, gom qua nhiều trang.
+   *
+   * Chỉ dành cho thống kê cần đếm trên tất cả tài khoản (biểu đồ tăng trưởng ở trang
+   * Doanh thu hệ thống). Đừng dùng cho bảng danh sách — hãy phân trang ở đó.
+   */
+  listAll: async (): Promise<User[]> => {
+    const first = await userService.list(1);
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, first.lastPage - 1) }, (_, i) => userService.list(i + 2)),
+    );
+    return rest.reduce((all, p) => all.concat(p.items), first.items);
   },
   toggleLock: async (id: string) => {
     await api.put(`/admin/users/${id}/lock`);
@@ -833,13 +879,25 @@ export const contactService = {
   send: async (data: { full_name: string; email: string; phone?: string; cafe_name?: string; content: string }) => {
     return api.post<{ message: string }>('/contact', data);
   },
-  // B6: admin đọc tin nhắn liên hệ từ trang public
+  /**
+   * B6: admin đọc tin nhắn liên hệ từ trang public.
+   * Backend phân trang; gom mọi trang lại (mỗi trang 200) để bảng bên admin vẫn tìm
+   * kiếm và lọc tại chỗ như hiện tại, nhưng KHÔNG còn mất tin cũ như bản chặn cứng 200.
+   */
   adminList: async (): Promise<ContactMessage[]> => {
-    const items = await api.get<any[]>('/admin/contacts');
-    return items.map(mapContact);
+    const first = await api.get<any>('/admin/contacts?per_page=200');
+    if (Array.isArray(first)) return first.map(mapContact);
+
+    const lastPage = first.last_page ?? 1;
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, lastPage - 1) }, (_, i) =>
+        api.get<any>(`/admin/contacts?per_page=200&page=${i + 2}`)),
+    );
+    return [first, ...rest].flatMap((p) => (p.data ?? []).map(mapContact));
   },
-  toggleRead: async (id: string) => {
-    return api.put(`/admin/contacts/${id}/read`);
+  /** Đặt trạng thái đã đọc. Truyền giá trị mong muốn, không đảo — xem ContactController. */
+  setRead: async (id: string, isRead: boolean) => {
+    return api.put(`/admin/contacts/${id}/read`, { is_read: isRead });
   },
   /** Gửi email trả lời cho khách và lưu lại nội dung đã trả lời. */
   reply: async (id: string, reply: string): Promise<ContactMessage> => {
@@ -865,22 +923,35 @@ function mapContact(raw: any): ContactMessage {
 }
 
 // Time Subscriptions
+function mapTimeSubscription(raw: any): TimeSubscription {
+  return {
+    id: raw.id ?? raw._id,
+    packageId: raw.package_id,
+    durationValue: raw.duration_value,
+    durationUnit: raw.duration_unit,
+    price: raw.price,
+    label: raw.label,
+    status: raw.status,
+  } as TimeSubscription;
+}
+
 export const timeSubscriptionService = {
+  // Endpoint CÔNG KHAI — chỉ trả mốc đang bật. Dùng cho trang chủ, bảng giá,
+  // trang mua gói: khách không được thấy mốc đã ẩn.
   listByPackage: async (packageId: string) => {
     const items = await api.get<any[]>(`/packages/${packageId}/time-subscriptions`);
-    return items.map((raw: any) => ({
-      id: raw.id ?? raw._id,
-      packageId: raw.package_id,
-      durationValue: raw.duration_value,
-      durationUnit: raw.duration_unit,
-      price: raw.price,
-      label: raw.label,
-      status: raw.status,
-    } as TimeSubscription));
+    return items.map(mapTimeSubscription);
   },
-  list: async () => {
+  /**
+   * Bản dành cho ADMIN — trả cả mốc đã ẩn (status 'inactive').
+   * Trang quản trị KHÔNG được dùng listByPackage: endpoint công khai lọc mất mốc
+   * đã ẩn, nên ẩn xong là mốc đó biến khỏi giao diện và không có đường bật lại.
+   */
+  adminListByPackage: async (packageId: string) => {
     const items = await api.get<any[]>('/admin/time-subscriptions');
-    return items;
+    return items
+      .map(mapTimeSubscription)
+      .filter((t) => String(t.packageId) === String(packageId));
   },
   create: async (data: { package_id: string; duration_value: number; duration_unit: 'day' | 'month'; price: number; label: string; status?: string }) => {
     const raw = await api.post<any>('/admin/time-subscriptions', data);
@@ -889,7 +960,11 @@ export const timeSubscriptionService = {
   update: async (id: string, data: Partial<TimeSubscription>) => {
     return api.put(`/admin/time-subscriptions/${id}`, data);
   },
-  delete: async (id: string) => {
+  /**
+   * ẨN một mốc thời hạn. Backend KHÔNG xóa khỏi CSDL dù route là DELETE — các
+   * subscription đã bán còn trỏ tới bản ghi này để tính ngày gia hạn.
+   */
+  hide: async (id: string) => {
     await api.delete(`/admin/time-subscriptions/${id}`);
   },
 };

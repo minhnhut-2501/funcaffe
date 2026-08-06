@@ -38,10 +38,13 @@ export default function AdminContactsPage() {
   }, []);
 
   const handleToggleRead = async (m: ContactMessage) => {
+    // Gửi trạng thái MONG MUỐN thay vì bảo máy chủ "đảo": bấm hai lần do mạng chậm
+    // sẽ ra cùng một kết quả thay vì quay về chỗ cũ.
+    const next = !m.isRead;
     try {
-      await contactService.toggleRead(m.id);
-      setMessages(prev => prev.map(x => x.id === m.id ? { ...x, isRead: !x.isRead } : x));
-      toast({ description: m.isRead ? 'Đã đánh dấu CHƯA đọc' : 'Đã đánh dấu đã đọc' });
+      await contactService.setRead(m.id, next);
+      setMessages(prev => prev.map(x => x.id === m.id ? { ...x, isRead: next } : x));
+      toast({ description: next ? 'Đã đánh dấu đã đọc' : 'Đã đánh dấu CHƯA đọc' });
     } catch {
       toast({ description: 'Thao tác thất bại', variant: 'destructive' });
     }
@@ -52,7 +55,7 @@ export default function AdminContactsPage() {
     setDetail(m);
     setReplyText('');
     if (!m.isRead) {
-      contactService.toggleRead(m.id)
+      contactService.setRead(m.id, true)
         .then(() => setMessages(prev => prev.map(x => x.id === m.id ? { ...x, isRead: true } : x)))
         .catch(() => {});
     }

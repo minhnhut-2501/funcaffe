@@ -3,7 +3,7 @@ import { Suspense, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import PublicLayout from '@/components/layouts/PublicLayout';
 import Link from 'next/link';
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 import { Coffee, Eye, EyeOff, CheckCircle2, ArrowLeft } from 'lucide-react';
 
 function ResetPasswordForm() {
@@ -26,8 +26,20 @@ function ResetPasswordForm() {
     try {
       await api.post('/auth/reset-password', { email, token, password: form.password, password_confirmation: form.confirm });
       setDone(true);
-    } catch {
-      setError('Liên kết không hợp lệ hoặc đã hết hạn.');
+    } catch (err) {
+      // Chỉ 400 mới thật sự là "liên kết hỏng hoặc hết hạn" (backend trả mã đó khi
+      // không tìm thấy token còn hạn). Gộp mọi lỗi vào một câu như trước khiến người
+      // cầm liên kết còn nguyên giá trị đi xin liên kết mới — rồi lại gặp đúng lỗi đó.
+      const status = err instanceof ApiError ? err.status : 0;
+      if (status === 400) {
+        setError('Liên kết không hợp lệ hoặc đã hết hạn. Hãy gửi lại yêu cầu đặt lại mật khẩu.');
+      } else if (status === 422) {
+        setError(err instanceof ApiError ? err.message : 'Mật khẩu chưa hợp lệ.');
+      } else if (status === 429) {
+        setError('Bạn thử quá nhiều lần. Vui lòng đợi một phút rồi thử lại.');
+      } else {
+        setError('Không kết nối được máy chủ. Liên kết của bạn vẫn còn dùng được — vui lòng thử lại.');
+      }
     } finally {
       setLoading(false);
     }
