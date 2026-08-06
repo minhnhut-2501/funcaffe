@@ -29,11 +29,19 @@ RUN chmod -R 775 storage bootstrap/cache
 
 # Render cấp cổng qua $PORT. config:cache chạy lúc RUNTIME để nhận env đã inject.
 # db:seed ProductionSeeder idempotent (chỉ nạp khi rỗng) — thay cho Shell mà
-# free tier không có; dùng ';' để serve vẫn chạy dù seed lỗi.
+# free tier không có.
+#
+# Các bước nối bằng ';' chứ KHÔNG phải '&&'. Với '&&', một bước hỏng là mọi bước sau
+# im lặng không chạy — mà 'serve' vẫn lên nên dịch vụ trông vẫn khỏe. Đó là cách dễ
+# nhất để chỉ mục không bao giờ được tạo mà chẳng ai biết: log không có lấy một dòng
+# nào của db:indexes để mà thắc mắc. Mỗi lệnh artisan ở đây đều chạy lại được nhiều
+# lần và tự chịu lỗi, nên để chúng độc lập vừa an toàn vừa luôn để lại dấu vết.
+#
+# Mốc '=== ' để tìm nhanh trong log của Render.
 EXPOSE 8000
-CMD php artisan config:cache \
-    && touch database/database.sqlite \
-    && php artisan migrate --force \
-    && php artisan db:indexes \
-    && php artisan db:seed --class=ProductionSeeder --force ; \
-    php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+CMD echo '=== config:cache ==='; php artisan config:cache; \
+    touch database/database.sqlite; \
+    echo '=== migrate ==='; php artisan migrate --force; \
+    echo '=== db:indexes ==='; php artisan db:indexes; \
+    echo '=== db:seed ==='; php artisan db:seed --class=ProductionSeeder --force; \
+    echo '=== serve ==='; php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
