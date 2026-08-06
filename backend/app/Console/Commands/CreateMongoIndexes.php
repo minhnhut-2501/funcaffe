@@ -105,35 +105,83 @@ class CreateMongoIndexes extends Command
     {
         $db = DB::connection('mongodb');
         $created = 0;
+        $skipped = 0;
         $failed = 0;
 
         foreach (self::INDEXES as $collection => $indexes) {
+            $existing = $this->existingIndexes($db, $collection);
+
             foreach ($indexes as $index) {
                 $options = $index['options'] ?? [];
+                $wantUnique = (bool) ($options['unique'] ?? false);
+                $keySpec = $this->normalizeKeys($index['keys']);
                 $label = $collection . ' ' . json_encode($index['keys']);
+
+                // Đã có chỉ mục CÙNG BỘ KHÓA thì bỏ qua, bất kể nó tên gì.
+                //
+                // Không thể chỉ dựa vào createIndex để tự bỏ qua: Mongo coi hai chỉ mục
+                // cùng khóa nhưng khác TÊN là xung đột và ném lỗi. Các chỉ mục duy nhất
+                // được tạo tay ở những phiên trước mang tên khác (uniq_cafe_code,
+                // uniq_txn), nên nếu không đối chiếu theo khóa thì lệnh này báo lỗi ở
+                // mọi lần chạy và không bao giờ trở nên vô hại khi gọi lại.
+                if (isset($existing[$keySpec])) {
+                    if ($wantUnique && !$existing[$keySpec]) {
+                        $this->warn("  KHAC {$label}: đã có chỉ mục cùng khóa nhưng KHÔNG duy nhất — cần xóa rồi chạy lại để ràng buộc có hiệu lực");
+                        $failed++;
+                    } else {
+                        $this->line("  sẵn có  {$label}");
+                        $skipped++;
+                    }
+                    continue;
+                }
 
                 try {
                     $db->getCollection($collection)->createIndex($index['keys'], $options);
-                    $this->line("  ok   {$label}");
+                    $this->line("  tạo mới {$label}");
                     $created++;
                 } catch (Throwable $e) {
-                    // Chỉ mục duy nhất sẽ THẤT BẠI nếu dữ liệu hiện có đã trùng. Đó là
-                    // thông tin hữu ích chứ không phải lý do dừng cả lệnh: báo ra rồi
-                    // đi tiếp, để các chỉ mục còn lại vẫn được tạo.
-                    $this->warn("  FAIL {$label}: " . $e->getMessage());
+                    // Nguyên nhân đáng lo nhất: dữ liệu hiện có đã trùng nên không dựng
+                    // được ràng buộc duy nhất (mã lỗi 11000). Báo ra rồi đi tiếp để các
+                    // chỉ mục còn lại vẫn được tạo.
+                    $this->warn("  LỖI {$label}: " . $e->getMessage());
                     $failed++;
                 }
             }
         }
 
-        $this->info("Xong: {$created} chỉ mục, {$failed} lỗi.");
+        $this->info("Xong: {$created} tạo mới, {$skipped} đã sẵn có, {$failed} cần xử lý.");
 
         if ($failed > 0) {
-            $this->warn('Chỉ mục duy nhất báo lỗi thường là do dữ liệu cũ đã có bản ghi trùng — cần dọn trùng rồi chạy lại.');
+            $this->warn('Có chỉ mục chưa dựng được. Nếu thông báo nhắc tới khóa trùng (duplicate key) thì CSDL đang có bản ghi trùng mã — phải dọn trùng rồi chạy lại thì ràng buộc mới có hiệu lực.');
         }
 
         // Luôn trả 0: Dockerfile chạy lệnh này lúc khởi động, không được để một chỉ
         // mục hỏng chặn cả việc lên của ứng dụng.
         return self::SUCCESS;
+    }
+
+    /**
+     * Các chỉ mục đang có của một collection: [bộ khóa đã chuẩn hóa => có duy nhất không].
+     * Đối chiếu theo KHÓA chứ không theo tên, vì tên là tùy ý và các phiên trước đã đặt khác.
+     */
+    private function existingIndexes($db, string $collection): array
+    {
+        $map = [];
+
+        try {
+            foreach ($db->getCollection($collection)->listIndexes() as $index) {
+                $map[$this->normalizeKeys((array) $index->getKey())] = $index->isUnique();
+            }
+        } catch (Throwable) {
+            // Collection chưa tồn tại (CSDL trống) — coi như chưa có chỉ mục nào.
+        }
+
+        return $map;
+    }
+
+    /** Chuỗi so sánh cho một bộ khóa; giữ nguyên thứ tự vì chỉ mục ghép phụ thuộc thứ tự. */
+    private function normalizeKeys(array $keys): string
+    {
+        return json_encode(array_map('intval', $keys));
     }
 }
