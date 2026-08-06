@@ -48,9 +48,22 @@ class TimeSubscriptionController extends Controller
         return response()->json($timeSubscription);
     }
 
+    /**
+     * ẨN một mốc thời hạn (status = 'inactive') thay vì xóa khỏi CSDL.
+     *
+     * KHÔNG được xóa cứng: subscriptions và package_payments đều lưu
+     * time_subscription_id, và SubscriptionActivator::computeRenewEndDate() đọc lại
+     * bản ghi này SAU ĐÓ để biết cộng thêm bao nhiêu ngày khi cổng xác nhận thanh
+     * toán. Không tìm thấy thì nó rơi về addMonth() — khách trả tiền 12 tháng chỉ
+     * được gia hạn 1 tháng, không cảnh báo gì.
+     *
+     * Ẩn là đủ: endpoint công khai đã lọc status='active' nên mốc ẩn biến mất khỏi
+     * trang mua gói, còn dữ liệu cũ vẫn tra cứu được.
+     * Cùng nguyên tắc "không xóa, chỉ ẩn" đang áp cho quán, danh mục, món và topping.
+     */
     public function destroy(TimeSubscription $timeSubscription)
     {
-        $timeSubscription->delete();
-        return response()->json(['message' => 'Deleted']);
+        $timeSubscription->update(['status' => 'inactive']);
+        return response()->json($timeSubscription);
     }
 }

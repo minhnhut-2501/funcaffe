@@ -33,7 +33,11 @@ class PaymentController extends Controller
     {
         // Người trả tiền lấy từ chính giao dịch (`user`), không đi vòng qua
         // subscription: subscription không còn giữ user_id nữa.
-        $payments = PackagePayment::with('subscription.package', 'user', 'package')
+        // timeSubscription: nguồn DUY NHẤT của thời hạn đã mua (duration_value +
+        // duration_unit). Thiếu nó thì frontend không có gì để hiển thị ở cột "Thời hạn"
+        // — trước đây nó đọc `duration_months`, một trường chưa từng tồn tại ở backend,
+        // nên mọi giao dịch đều rơi về giá trị mặc định và hiện "1 tháng".
+        $payments = PackagePayment::with('subscription.package', 'user', 'package', 'timeSubscription')
             ->where(function ($q) {
                 $q->whereNotIn('payment_method', PackagePayment::ONLINE_GATEWAYS)
                   ->orWhere('payment_status', '!=', 'pending');

@@ -19,17 +19,37 @@ class ContactController extends Controller
         $this->middleware(['auth:sanctum', 'admin']);
     }
 
-    public function index()
+    /**
+     * Danh sách tin nhắn, PHÂN TRANG.
+     *
+     * Trước đây chặn cứng `limit(200)` không kèm đường đi tiếp: tin thứ 201 trở đi nằm
+     * trong CSDL nhưng không có cách nào đọc tới. Vì endpoint gửi liên hệ là công khai,
+     * chỉ cần vài trăm tin rác là liên hệ thật của khách bị đẩy ra ngoài tầm nhìn.
+     */
+    public function index(Request $request)
     {
+        $perPage = min(max((int) $request->query('per_page', 50), 1), 200);
+
         return response()->json(
-            ContactMessage::orderBy('created_at', 'desc')->limit(200)->get()
+            ContactMessage::orderBy('created_at', 'desc')->paginate($perPage)
         );
     }
 
-    /** Đánh dấu đã đọc / chưa đọc (toggle). */
-    public function toggleRead(ContactMessage $contact)
+    /**
+     * Đặt trạng thái đã đọc.
+     *
+     * Nhận giá trị MONG MUỐN thay vì đảo trạng thái hiện tại: đảo thì hai quản trị
+     * viên bấm cùng lúc (hoặc một người bấm hai lần do mạng chậm) sẽ ra kết quả phụ
+     * thuộc thứ tự đến, có khi quay về đúng chỗ cũ. Thiếu tham số thì vẫn đảo để các
+     * bản frontend cũ không hỏng.
+     */
+    public function toggleRead(Request $request, ContactMessage $contact)
     {
-        $contact->update(['is_read' => !$contact->is_read]);
+        $isRead = $request->has('is_read')
+            ? $request->boolean('is_read')
+            : !$contact->is_read;
+
+        $contact->update(['is_read' => $isRead]);
         return response()->json($contact);
     }
 

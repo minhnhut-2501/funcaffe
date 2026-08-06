@@ -29,13 +29,6 @@ export const tableStatusTone: Record<TableStatus, Tone> = {
   serving: 'warning',
 };
 
-/** Map trạng thái order → tone màu. */
-export const orderStatusTone: Record<string, Tone> = {
-  active: 'warning',
-  paid: 'success',
-  cancelled: 'neutral',
-};
-
 interface Props {
   tone?: Tone;
   dot?: boolean;

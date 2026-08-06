@@ -41,7 +41,7 @@ class ToppingController extends Controller
     {
         $this->authorizeCafe($cafe);
 
-        if ($topping->cafe_id !== $cafe->id) {
+        if ((string) $topping->cafe_id !== (string) $cafe->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 

@@ -207,6 +207,9 @@ class DemoSeeder extends Seeder
             'full_name' => 'Nguyễn Minh Nhựt', 'email' => 'nphec4007@gmail.com',
             'password' => Hash::make(self::PASSWORD), 'phone' => '0901234567',
             'avatar' => null, 'role' => 'user', 'status' => 'active',
+            // Các quán của chủ này đều đã dùng hết lượt dùng thử (xem makeCafe), nên cờ
+            // cấp tài khoản phải khớp — dùng thử bị chặn ở cả hai cấp.
+            'has_used_free_trial' => true,
             'created_at' => $this->ts($this->now->copy()->subMonths(7)),
         ]]);
 
@@ -475,7 +478,7 @@ class DemoSeeder extends Seeder
             'status' => 'active',
             'subtotal' => $subtotal, 'vat_rate' => self::VAT, 'vat_amount' => $vat,
             'total_amount' => $subtotal + $vat,
-            'action_type' => 'new', 'is_pending_review' => false,
+            'action_type' => 'new',
             'created_at' => $this->ts($start),
         ]]);
 
@@ -660,6 +663,11 @@ class DemoSeeder extends Seeder
                 '_id' => new ObjectId($uid), 'full_name' => $name, 'email' => $email,
                 'password' => Hash::make(self::PASSWORD), 'phone' => $phone,
                 'avatar' => null, 'role' => 'user', 'status' => 'active',
+                // Đánh dấu ở CẢ cấp tài khoản, không chỉ cấp quán: dùng thử bị chặn ở hai
+                // cấp (xem SubscriptionController::store). Thiếu cờ này thì tài khoản demo
+                // vẫn xin thêm được một gói dùng thử nữa cho quán mới — dữ liệu mẫu sẽ mô tả
+                // sai chính quy tắc mà hệ thống đang thực thi.
+                'has_used_free_trial' => true,
                 'created_at' => $this->ts($joined),
             ];
 
@@ -685,7 +693,7 @@ class DemoSeeder extends Seeder
                 'status' => 'active',
                 'subtotal' => $price, 'vat_rate' => self::VAT, 'vat_amount' => $vat,
                 'total_amount' => $price + $vat,
-                'action_type' => 'new', 'is_pending_review' => false,
+                'action_type' => 'new',
                 'created_at' => $this->ts($start),
             ];
 

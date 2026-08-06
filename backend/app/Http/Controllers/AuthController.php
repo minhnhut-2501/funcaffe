@@ -142,9 +142,15 @@ class AuthController extends Controller
             return response()->json(['message' => 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.']);
         }
 
+        // Token gửi qua email là bản THÔ; CSDL chỉ giữ bản BĂM.
+        // Ai đọc được dữ liệu (bản sao lưu, tài khoản đọc CSDL, kết xuất chẩn đoán)
+        // cũng không dựng ngược lại được liên kết đặt lại mật khẩu.
         $token = bin2hex(random_bytes(32));
 
-        $user->update(['reset_token' => $token, 'reset_token_expires_at' => now()->addHours(1)]);
+        $user->update([
+            'reset_token' => hash('sha256', $token),
+            'reset_token_expires_at' => now()->addHours(1),
+        ]);
 
         $frontendUrl = config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:3000'));
         $resetUrl = "{$frontendUrl}/reset-password?token={$token}&email=" . urlencode($user->email);
@@ -168,13 +174,31 @@ class AuthController extends Controller
                 });
             } catch (\Throwable $e) {
                 Log::warning("Gửi email reset thất bại ({$user->email}): " . $e->getMessage());
-                Log::info("Reset link for {$user->email}: {$resetUrl}");
+                $this->logResetUrlForDevelopment($user->email, $resetUrl);
             }
         } else {
-            Log::info("[MAIL chưa cấu hình SMTP] Reset link for {$user->email}: {$resetUrl}");
+            $this->logResetUrlForDevelopment($user->email, $resetUrl, '[MAIL chưa cấu hình SMTP] ');
         }
 
         return response()->json(['message' => 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.']);
+    }
+
+    /**
+     * Ghi liên kết đặt lại mật khẩu vào log — CHỈ Ở MÔI TRƯỜNG PHÁT TRIỂN.
+     *
+     * Liên kết chứa token thô: ai đọc được log (bảng điều khiển Render,
+     * storage/logs/laravel.log) là chiếm được tài khoản mà không cần mật khẩu cũ.
+     * Ở local thì đây là cách duy nhất thử luồng khi chưa cấu hình SMTP; trên
+     * production chỉ ghi lại việc gửi thất bại, không kèm token.
+     */
+    private function logResetUrlForDevelopment(string $email, string $resetUrl, string $prefix = ''): void
+    {
+        if (app()->environment('local', 'testing')) {
+            Log::info("{$prefix}Reset link for {$email}: {$resetUrl}");
+            return;
+        }
+
+        Log::warning("{$prefix}Không gửi được email đặt lại mật khẩu cho {$email}. Liên kết KHÔNG được ghi log vì lý do bảo mật.");
     }
 
     public function resetPassword(Request $request)
@@ -186,8 +210,9 @@ class AuthController extends Controller
             'password_confirmation' => 'required|string|same:password',
         ]);
 
+        // So khớp bằng bản băm — xem forgotPassword().
         $user = User::where('email', $validated['email'])
-            ->where('reset_token', $validated['token'])
+            ->where('reset_token', hash('sha256', $validated['token']))
             ->where('reset_token_expires_at', '>', now())
             ->first();
 

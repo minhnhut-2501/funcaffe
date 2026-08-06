@@ -59,7 +59,8 @@ class UserController extends Controller
                     // open | closed | inactive — quán không xóa được, chỉ đổi trạng thái
                     'status' => $cafe->status ?? 'open',
                     'address' => $cafe->address ?? '',
-                    'package_type' => $sub ? ($sub->package->type ?? 'free') : 'none',
+                    // 'none' chứ không 'free' — xem chú thích ở CafeController::index.
+                    'package_type' => $sub ? ($sub->package->type ?? 'none') : 'none',
                     'package_name' => $sub ? ($sub->package->name ?? '') : '',
                     'package_end_date' => $sub?->end_date,
                 ];

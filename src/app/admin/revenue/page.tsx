@@ -29,7 +29,10 @@ export default function AdminRevenuePage() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      userService.list(),
+      // listAll chứ không list: biểu đồ tăng trưởng bên dưới đếm trên TOÀN BỘ tài
+      // khoản. `list` chỉ trả trang đầu (50 bản ghi) nên đường lũy kế sẽ đứng yên
+      // ngay khi hệ thống vượt 50 người dùng, mà không có dấu hiệu gì là sai.
+      userService.listAll(),
       paymentService.list(),
     ]).then(([u, p]) => {
       if (cancelled) return;

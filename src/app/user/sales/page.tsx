@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
 import { generateId } from '@/lib/utils';
 import { tableService, menuService, categoryService, toppingService, orderService, cafeService } from '@/services';
 import type { CafeTable, MenuItem, MenuItemSize, Topping, Order, OrderItem, CafeInfo } from '@/types';
@@ -71,6 +71,10 @@ export default function SalesPage() {
   const [successModal, setSuccessModal] = useState<{ code: string; total: number; method: string; cashGiven?: number; change?: number } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [cashGiven, setCashGiven] = useState('');
+  // Giảm giá (đồng) do thu ngân nhập khi thanh toán. Backend đã hỗ trợ đầy đủ từ
+  // trước (validate, kẹp không vượt tạm tính, lưu vào orders.discount_amount) nhưng
+  // màn hình chưa từng có ô nhập nào nên tính năng chưa chạy được lần nào.
+  const [discountInput, setDiscountInput] = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
   const managable = canManage(user?.subscription);
@@ -156,10 +160,13 @@ export default function SalesPage() {
       toppingService.list().then(setAllToppings),
       // Thực đơn phải về CÙNG LÚC với order: order chỉ lưu snapshot tên/giá,
       // muốn có ảnh món cho phiếu order thì phải tra ngược từ thực đơn theo itemId.
-      Promise.all([menuService.list(), orderService.list()]).then(([menu, allOrders]) => {
+      // listActive: màn hình bán hàng chỉ quan tâm đơn ĐANG PHỤC VỤ (để dựng lại giỏ
+      // của từng bàn). Trước đây gọi list() rồi lọc `status === 'active'` tại đây —
+      // tức là tải toàn bộ đơn từ ngày khai trương, kèm dòng món và topping, cho một
+      // màn hình mở suốt ca làm việc.
+      Promise.all([menuService.list(), orderService.listActive()]).then(([menu, active]) => {
         setMenuItems(menu);
         const menuById = new Map(menu.map(m => [m.id, m]));
-        const active = allOrders.filter(o => o.status === 'active');
         setActiveOrders(active);
         const draftMap: Record<string, string> = {};
         const cartsFromOrders: Record<string, CartItem[]> = {};
@@ -206,7 +213,9 @@ export default function SalesPage() {
 
   const baseSubtotal = cart.reduce((s, c) => s + calcItemBase(c), 0);
   const toppingSubtotal = cart.reduce((s, c) => s + calcItemTopping(c), 0);
-  const discount = 0;
+  // Giảm giá do thu ngân nhập ở modal thanh toán. Kẹp trong [0, tạm tính] để tổng
+  // không âm — backend cũng kẹp lại lần nữa, đây chỉ là để màn hình hiện đúng số.
+  const discount = Math.min(Math.max(0, discountInput), baseSubtotal + toppingSubtotal);
   const cartTotal = baseSubtotal + toppingSubtotal - discount;
 
   const openOption = (item: MenuItem) => {
@@ -400,17 +409,33 @@ export default function SalesPage() {
 
   const [processing, setProcessing] = useState(false);
 
+  /**
+   * Hủy đơn nháp của một bàn rồi trả bàn về trống.
+   *
+   * Trả về false khi máy chủ từ chối hủy. QUAN TRỌNG: chỉ được dọn trạng thái phía
+   * giao diện khi máy chủ đã hủy thật. Trước đây lỗi bị nuốt (`catch {}`) rồi vẫn
+   * đặt bàn về 'empty' — máy chủ còn giữ đơn 'active' trên bàn đó trong khi màn
+   * hình báo bàn trống, nên nhân viên mở đơn mới lên cùng một bàn và sau khi tải
+   * lại trang thì bàn kẹt hoặc chồng hai đơn.
+   */
+  const releaseTable = async (tableId: string, orderId: string): Promise<boolean> => {
+    try {
+      await orderService.cancel(orderId);
+    } catch {
+      showToast('Không hủy được đơn, vui lòng thử lại. Bàn vẫn đang phục vụ.');
+      return false;
+    }
+    setDraftOrderIds(prev => { const { [tableId]: _, ...rest } = prev; return rest; });
+    setActiveOrders(prev => prev.filter(o => o.id !== orderId));
+    setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t));
+    return true;
+  };
+
   const handleCancelOrder = async () => {
     if (cart.length === 0) {
       if (selectedTable) {
         const existingId = draftOrderIds[selectedTable.id];
-        if (existingId) {
-          try { await orderService.cancel(existingId); } catch {}
-          setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
-          setActiveOrders(prev => prev.filter(o => o.id !== existingId));
-          // Hủy order -> bàn về trống
-          setTables(prev => prev.map(t => t.id === selectedTable.id ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t));
-        }
+        if (existingId && !await releaseTable(selectedTable.id, existingId)) return;
         clearCartForTable(selectedTable.id);
       }
       setSelectedTable(null);
@@ -445,6 +470,15 @@ export default function SalesPage() {
         ?? payResult?.code
         ?? selectedTable.name;
 
+      // Số tiền in lên biên lai lấy từ PHẢN HỒI CỦA MÁY CHỦ, không lấy `cartTotal`
+      // do trình duyệt tự tính. Máy chủ mới là nơi tính lại giá từ CSDL và ghi vào
+      // hóa đơn; hai con số lệch nhau bất cứ khi nào giá đổi giữa lúc bỏ vào giỏ và
+      // lúc thanh toán (chủ quán sửa giá ở tab khác, đơn nháp treo từ ca trước).
+      // Lệch là biên lai đưa khách ghi một số còn sổ sách ghi số khác.
+      const paidTotal = Number(payResult?.total_amount ?? cartTotal);
+      const paidCash = payResult?.cash_received != null ? Number(payResult.cash_received) : undefined;
+      const paidChange = payResult?.change_amount != null ? Number(payResult.change_amount) : undefined;
+
       // Thanh toán xong bàn về TRỐNG (backend cũng đặt 'empty') — đồng bộ đúng trạng thái
       setTables(prev => prev.map(t =>
         t.id === selectedTable.id ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t
@@ -455,12 +489,13 @@ export default function SalesPage() {
       setSelectedTable(null);
       setPaymentModal(false);
       setCashGiven('');
+      setDiscountInput(0);
       setSuccessModal({
         code: invoiceCode,
-        total: cartTotal,
+        total: paidTotal,
         method: paymentMethod,
-        cashGiven: paymentMethod === 'cash' && cashReceived > 0 ? cashReceived : undefined,
-        change: paymentMethod === 'cash' && cashReceived > cartTotal ? cashReceived - cartTotal : undefined,
+        cashGiven: paidCash ?? (paymentMethod === 'cash' && cashReceived > 0 ? cashReceived : undefined),
+        change: paidChange ?? (paymentMethod === 'cash' && cashReceived > paidTotal ? cashReceived - paidTotal : undefined),
       });
     } catch {
       showToast('Thanh toán thất bại, vui lòng thử lại');
@@ -638,7 +673,9 @@ export default function SalesPage() {
               </div>
               {managable ? (
                 <>
-                  <button onClick={() => setPaymentModal(true)} className="btn-primary w-full py-2.5 mt-1">
+                  {/* Giảm giá đặt lại về 0 mỗi lần mở: nó thuộc về MỘT lần thanh toán,
+                      giữ lại số của bàn trước là âm thầm giảm giá cho khách sau. */}
+                  <button onClick={() => { setDiscountInput(0); setPaymentModal(true); }} className="btn-primary w-full py-2.5 mt-1">
                     <CreditCard className="w-4 h-4" />Thanh toán
                   </button>
                   <button onClick={handleCancelOrder} className="btn-ghost w-full text-red-600 hover:bg-red-50 hover:text-red-700">Hủy order</button>
@@ -766,13 +803,31 @@ export default function SalesPage() {
             <div className="border-t border-line pt-2 mt-2 space-y-1 text-xs text-cafe-500">
               <div className="flex justify-between"><span>Tạm tính</span><span>{formatCurrency(baseSubtotal)}</span></div>
               {toppingSubtotal > 0 && <div className="flex justify-between"><span>Topping</span><span>{formatCurrency(toppingSubtotal)}</span></div>}
-              <div className="flex justify-between"><span>Giảm giá</span><span>—</span></div>
-              <div className="flex justify-between"><span>Thuế</span><span>—</span></div>
+              {discount > 0 && (
+                <div className="flex justify-between text-pine font-medium"><span>Giảm giá</span><span>− {formatCurrency(discount)}</span></div>
+              )}
             </div>
             <div className="flex justify-between text-base font-bold text-ink border-t border-line pt-2 mt-1">
               <span>Tổng thanh toán</span>
               <span className="text-bean">{formatCurrency(cartTotal)}</span>
             </div>
+          </div>
+
+          <div>
+            <label className="label-funcafe">Giảm giá (đ)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              className="input-funcafe"
+              placeholder="0"
+              value={discountInput ? formatThousands(discountInput) : ''}
+              onChange={e => setDiscountInput(parseThousands(e.target.value))}
+            />
+            {discountInput > baseSubtotal + toppingSubtotal && (
+              <p className="text-sm text-gold-deep mt-1.5">
+                Giảm giá lớn hơn tạm tính — chỉ trừ tối đa {formatCurrency(baseSubtotal + toppingSubtotal)}.
+              </p>
+            )}
           </div>
 
           <div>
@@ -836,12 +891,11 @@ export default function SalesPage() {
         onConfirm={async () => {
           if (selectedTable) {
             const existingId = draftOrderIds[selectedTable.id];
-            if (existingId) {
-              try { await orderService.cancel(existingId); } catch {}
-              setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
-              setActiveOrders(prev => prev.filter(o => o.id !== existingId));
-              // Hủy order -> bàn về trống
-              setTables(prev => prev.map(t => t.id === selectedTable.id ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t));
+            // Máy chủ từ chối hủy thì giữ nguyên mọi thứ và đóng hộp thoại —
+            // releaseTable đã báo lỗi cho người dùng.
+            if (existingId && !await releaseTable(selectedTable.id, existingId)) {
+              setClearConfirm(false);
+              return;
             }
             clearCartForTable(selectedTable.id);
           }

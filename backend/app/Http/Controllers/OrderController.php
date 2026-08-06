@@ -9,6 +9,7 @@ use App\Models\ItemPrice;
 use App\Models\Topping;
 use App\Http\Controllers\Concerns\ChecksCafeOwnership;
 use App\Http\Controllers\Concerns\RunsAtomically;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
@@ -21,16 +22,62 @@ class OrderController extends Controller
         $this->middleware('auth:sanctum');
     }
 
+    /**
+     * Danh sách đơn của quán, LỌC ĐƯỢC.
+     *
+     * Trước đây không nhận tham số nào: mọi nơi gọi đều kéo về toàn bộ lịch sử bán
+     * hàng kể từ ngày khai trương (kèm dòng món và topping) rồi lọc trong trình
+     * duyệt. Màn hình Bán hàng — mở suốt ca — chỉ cần vài đơn đang mở mà vẫn tải cả
+     * chỗ đó. Chi phí này tăng đều theo tháng sử dụng chứ không lộ ra lúc chạy thử.
+     *
+     * Tham số (đều tuỳ chọn, không truyền = giữ hành vi cũ):
+     *  - status: 'active' | 'paid' | 'cancelled', cho phép nhiều giá trị cách nhau dấu phẩy
+     *  - from / to: 'YYYY-MM-DD', lọc theo NGÀY THANH TOÁN với đơn đã trả tiền,
+     *               theo ngày tạo với đơn chưa trả (xem $dateField bên dưới)
+     *  - limit: trần số bản ghi (1..1000)
+     */
     public function index(Request $request, Cafe $cafe)
     {
         $this->authorizeCafe($cafe);
+
+        $validated = $request->validate([
+            'status' => 'nullable|string',
+            'from'   => 'nullable|date_format:Y-m-d',
+            'to'     => 'nullable|date_format:Y-m-d',
+            'limit'  => 'nullable|integer|min:1|max:1000',
+        ]);
+
+        $query = $cafe->orders()->with(['orderDetails.orderDetailToppings.topping', 'table']);
+
+        if (!empty($validated['status'])) {
+            $statuses = array_values(array_intersect(
+                array_map('trim', explode(',', $validated['status'])),
+                ['active', 'paid', 'cancelled'],
+            ));
+            // Danh sách rỗng nghĩa là client gửi toàn giá trị lạ — trả rỗng chứ không
+            // âm thầm bỏ qua bộ lọc và đổ về toàn bộ đơn.
+            $query->whereIn('status', $statuses ?: ['__none__']);
+        }
+
+        // Đơn đã thanh toán được xếp theo ngày TRẢ TIỀN (đó là ngày ghi nhận doanh
+        // thu), đơn chưa thanh toán thì chỉ có ngày tạo để bám vào.
+        $dateField = ($validated['status'] ?? '') === 'paid' ? 'paid_at' : 'created_at';
+        if (!empty($validated['from'])) {
+            $query->where($dateField, '>=', Carbon::parse($validated['from'])->startOfDay());
+        }
+        if (!empty($validated['to'])) {
+            $query->where($dateField, '<=', Carbon::parse($validated['to'])->endOfDay());
+        }
+
         // Không có orderBy thì MongoDB trả theo thứ tự CHÈN, tức đơn cũ nhất nằm
         // trên cùng — trang Hóa đơn mở ra là thấy đơn từ hồi khai trương.
-        $orders = $cafe->orders()
-            ->with(['orderDetails.orderDetailToppings.topping', 'table'])
-            ->orderBy('created_at', 'desc')
-            ->get();
-        return response()->json($orders);
+        $query->orderBy($dateField, 'desc');
+
+        if (!empty($validated['limit'])) {
+            $query->limit((int) $validated['limit']);
+        }
+
+        return response()->json($query->get());
     }
 
     public function show(Cafe $cafe, Order $order)
@@ -180,13 +227,21 @@ class OrderController extends Controller
                     $orderSubtotal += $itemTotalPrice;
                 }
 
-                $discount = (float) ($updateData['discount_amount'] ?? $order->discount_amount ?? 0);
-                // Chặn giảm giá vượt tạm tính → tổng không âm
-                $discount = min($discount, (float) $orderSubtotal);
+                $updateData['subtotal'] = $orderSubtotal;
+            }
 
-                $updateData['subtotal']     = $orderSubtotal;
-                $updateData['total_amount'] = max(0.0, (float) $orderSubtotal - $discount);
+            // Tính lại tổng tiền BẤT CỨ KHI NÀO tạm tính hoặc giảm giá đổi — kể cả khi
+            // request chỉ gửi mỗi discount_amount. Trước đây cả khối này nằm trong
+            // `if ($request->has('items'))`, nên sửa riêng giảm giá sẽ ghi số giảm mới
+            // mà total_amount vẫn là con số cũ: đơn tự mâu thuẫn cho tới lần cập nhật
+            // sau có kèm items.
+            if (isset($updateData['subtotal']) || isset($updateData['discount_amount'])) {
+                $subtotal = (float) ($updateData['subtotal'] ?? $order->subtotal ?? 0);
+                // Chặn giảm giá vượt tạm tính → tổng không âm
+                $discount = min((float) ($updateData['discount_amount'] ?? $order->discount_amount ?? 0), $subtotal);
+
                 $updateData['discount_amount'] = $discount;
+                $updateData['total_amount']    = max(0.0, $subtotal - $discount);
             }
 
             $order->update($updateData);
@@ -226,8 +281,14 @@ class OrderController extends Controller
             'cash_received'   => 'nullable|numeric|min:0',
         ]);
 
-        // Chặn giảm giá vượt quá tạm tính → không cho tổng tiền âm
-        $discount = min((float) ($validated['discount_amount'] ?? 0), (float) $order->subtotal);
+        // Giảm giá: ưu tiên số gửi kèm lệnh thanh toán, nếu không có thì DÙNG LẠI số đã
+        // lưu trên đơn. `?? 0` đơn thuần sẽ xóa mất khoản giảm giá đã đặt ở bước sửa đơn
+        // — khách được hứa giảm rồi vẫn phải trả đủ.
+        // Vẫn chặn vượt quá tạm tính → không cho tổng tiền âm.
+        $discount = min(
+            (float) ($validated['discount_amount'] ?? $order->discount_amount ?? 0),
+            (float) $order->subtotal,
+        );
         $total    = max(0.0, (float) $order->subtotal - $discount);
 
         // Tiền khách đưa + tiền thối (chỉ áp dụng cho tiền mặt) — lưu để đối chứng.
@@ -324,10 +385,17 @@ class OrderController extends Controller
             );
         };
 
-        // Món phải tồn tại và thuộc quán này
+        // Món phải tồn tại, thuộc quán này, VÀ đang được bán.
+        //
+        // Kiểm is_available ở đây chứ không chỉ lọc lúc hiển thị thực đơn: giỏ hàng
+        // được giữ lại phía server dưới dạng đơn nháp, nên món có thể bị chủ quán ẩn
+        // (hết nguyên liệu) trong khoảng giữa lúc nhân viên bỏ vào giỏ và lúc chốt đơn.
         $item = Item::find($itemData['item_id']);
         if (!$item || (string) $item->cafe_id !== (string) $cafe->id) {
             $fail('Món không hợp lệ hoặc không thuộc quán của bạn.');
+        }
+        if (!($item->is_available ?? true)) {
+            $fail('Món "' . $item->name . '" đã ngừng bán, vui lòng bỏ khỏi đơn.');
         }
 
         // Tự lấy giá từ DB
@@ -350,9 +418,12 @@ class OrderController extends Controller
 
         foreach ($itemData['toppings'] ?? [] as $topData) {
             $topping = Topping::find($topData['topping_id']);
-            // Topping phải tồn tại và thuộc quán này
+            // Topping phải tồn tại, thuộc quán này và còn bán (xem chú thích ở phần món)
             if (!$topping || (string) $topping->cafe_id !== (string) $cafe->id) {
                 $fail('Topping không hợp lệ hoặc không thuộc quán của bạn.');
+            }
+            if (!($topping->is_available ?? true)) {
+                $fail('Topping "' . $topping->name . '" đã ngừng bán, vui lòng bỏ khỏi đơn.');
             }
             $toppingPrice = (float) $topping->price;
             $toppingQty   = (int) $topData['quantity'];

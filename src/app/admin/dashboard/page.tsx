@@ -41,7 +41,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      userService.list(),
+      // listAll chứ không list: mọi con số trên trang này (tổng tài khoản, đang hoạt
+      // động, tỉ lệ theo gói, đăng ký mới trong tháng) đều đếm trên TOÀN BỘ tài khoản.
+      // `list` chỉ trả trang đầu 50 bản ghi nên các thẻ số liệu sẽ đứng yên ở 50.
+      userService.listAll(),
       paymentService.list(),
     ]).then(([u, p]) => {
       if (cancelled) return;

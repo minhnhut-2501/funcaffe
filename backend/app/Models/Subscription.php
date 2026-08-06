@@ -39,6 +39,31 @@ class Subscription extends Model
         return $query->where('status', 'active')->where('end_date', '>', now());
     }
 
+    /**
+     * Scope "gói MỚI NHẤT của một quán" — kể cả khi đã quá hạn.
+     *
+     * Khác hẳn effective() và đừng lẫn hai cái:
+     *  - effective()    : dùng khi hỏi "được PHÉP làm gì" (ghi dữ liệu, dùng AI, giới
+     *                     hạn số bàn/món). Gói hết hạn phải bị loại.
+     *  - latestForCafe(): dùng khi hỏi "quán này ĐANG Ở TÌNH TRẠNG NÀO" (hiện tên gói,
+     *                     cảnh báo sắp hết / đã hết hạn, mời gia hạn). Gói hết hạn mới
+     *                     chính là thứ cần hiện, loại nó đi thì không cảnh báo được ai.
+     *
+     * "Mới nhất" tính theo end_date chứ KHÔNG theo created_at: gói còn hạn luôn phải
+     * thắng gói đã hết, kể cả khi bản ghi của nó được tạo trước. Không có tác vụ nào
+     * đổi status sang 'expired' nên một quán có thể có nhiều bản ghi cùng 'active'.
+     *
+     * Trước đây khái niệm này được cài lại bằng tay ở bốn nơi với ba cách sắp xếp khác
+     * nhau (sort giảm dần lấy đầu / sort tăng dần + keyBy lấy cuối / latest() theo
+     * created_at). Gom về đây để chúng không lệch nhau ở lần sửa tiếp theo.
+     */
+    public function scopeLatestForCafe($query, string $cafeId)
+    {
+        return $query->where('cafe_id', $cafeId)
+            ->where('status', 'active')
+            ->orderBy('end_date', 'desc');
+    }
+
     public function cafe()
     {
         return $this->belongsTo(Cafe::class, 'cafe_id');

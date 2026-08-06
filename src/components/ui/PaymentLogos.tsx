@@ -62,21 +62,5 @@ export function VietQrMark({ className }: { className?: string }) {
   );
 }
 
-/** Wordmark VietQR — icon QR + chữ "Viet" xanh, "QR" đỏ. */
-export function VietQrLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 120 28" className={className} role="img" aria-label="VietQR" xmlns="http://www.w3.org/2000/svg">
-      <g transform="translate(0,3)">
-        <rect x="1" y="1" width="6" height="6" rx="1.2" stroke="#0A3D91" strokeWidth="1.6" fill="none" />
-        <rect x="12" y="1" width="6" height="6" rx="1.2" stroke="#0A3D91" strokeWidth="1.6" fill="none" />
-        <rect x="1" y="12" width="6" height="6" rx="1.2" stroke="#0A3D91" strokeWidth="1.6" fill="none" />
-        <rect x="12.5" y="12.5" width="2.4" height="2.4" fill="#E4002B" />
-        <rect x="16" y="16" width="2.4" height="2.4" fill="#E4002B" />
-      </g>
-      <text x="26" y="21" fontFamily="Arial, Helvetica, sans-serif" fontWeight="800" fontSize="22" letterSpacing="-0.5">
-        <tspan fill="#0A3D91">Viet</tspan>
-        <tspan fill="#E4002B">QR</tspan>
-      </text>
-    </svg>
-  );
-}
+// Không còn VietQrLogo(): mã QR thanh toán dựng bằng ảnh từ img.vietqr.io
+// (xem buildVietQrUrl trong src/lib/banks.ts), ảnh đó đã có sẵn thương hiệu VietQR.

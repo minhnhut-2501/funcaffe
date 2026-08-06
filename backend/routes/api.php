@@ -35,11 +35,17 @@ Route::middleware('auth:sanctum')->group(function () {
 // Public review endpoints (no auth required)
 Route::get('reviews', [ReviewController::class, 'publicReviews']);
 
-// Upload
-Route::post('/upload', [\App\Http\Controllers\UploadController::class, 'store'])->middleware('auth:sanctum');
+// Upload — throttle vì mỗi lượt đẩy một tệp lên Cloudinary. Không giới hạn thì một
+// tài khoản bất kỳ đốt hết hạn mức miễn phí, làm hỏng ảnh của MỌI quán khác.
+// 30/phút vẫn thoải mái cho thao tác thật (thêm ảnh cho cả thực đơn một lượt).
+Route::post('/upload', [\App\Http\Controllers\UploadController::class, 'store'])
+    ->middleware(['auth:sanctum', 'throttle:30,1']);
 
-// Contact (public)
-Route::post('/contact', [ContactController::class, 'store']);
+// Contact (public) — PHẢI có throttle: endpoint này ghi thẳng vào CSDL, không cần
+// đăng nhập và không có captcha. Không giới hạn thì một script đơn giản đủ để lấp
+// đầy hạn mức 512MB của MongoDB Atlas bậc miễn phí (ảnh hưởng dữ liệu MỌI quán)
+// và đẩy liên hệ thật của khách ra khỏi tầm nhìn của admin.
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:5,1');
 
 // Cafe (user's own)
 // KHÔNG có route xóa quán: xóa một quán sẽ bỏ rơi toàn bộ bàn, thực đơn, hóa đơn
@@ -62,8 +68,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('cafes/{cafe}/items/{item}', [ItemController::class, 'update'])->middleware('subscription');
     // KHÔNG có route xóa món: món đã bán nằm trong order/hóa đơn cũ,
     // chủ quán chỉ được ẨN món (is_available = false) thay vì xóa.
-    Route::get('cafes/{cafe}/items/{item}/toppings', [ItemController::class, 'toppings']);
-    Route::put('cafes/{cafe}/items/{item}/toppings', [ItemController::class, 'updateToppings'])->middleware('subscription');
+    // KHÔNG có route cấu hình topping riêng cho món: topping đi kèm trường
+    // `topping_ids` ngay trong body của store/update món.
 
     // Toppings - CRUD
     Route::get('cafes/{cafe}/toppings', [ToppingController::class, 'index']);

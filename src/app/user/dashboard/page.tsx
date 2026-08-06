@@ -44,7 +44,9 @@ export default function DashboardPage() {
   const firstName = user?.fullName?.split(' ').slice(-1)[0] ?? '';
 
   const { data: invoices, loading: loadingInv, error: errorInv } = useApi(() => invoiceService.list());
-  const { data: orders, loading: loadingOrd, error: errorOrd } = useApi(() => orderService.list());
+  // listActive: trang này chỉ dùng `orders` để đếm và liệt kê đơn ĐANG PHỤC VỤ
+  // (xem activeOrderList bên dưới) — không cần lịch sử đơn đã đóng.
+  const { data: orders, loading: loadingOrd, error: errorOrd } = useApi(() => orderService.listActive());
   const { data: tables, loading: loadingTbl, error: errorTbl } = useApi(() => tableService.list());
 
   const activeOrderList = (orders ?? []).filter(o => o.status === 'active');

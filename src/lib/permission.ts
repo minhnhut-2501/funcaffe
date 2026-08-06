@@ -78,17 +78,14 @@ export function canManage(sub: UserSubscription | null | undefined): boolean {
   return (sub?.packageType ?? 'none') !== 'none' && !isSubscriptionExpired(sub);
 }
 
-export function canEdit(pkg: UserPackageType): boolean {
-  return pkg !== 'none';
-}
-
-// Xem doanh thu là quyền CƠ BẢN của mọi người dùng — kể cả khi chưa có gói hoặc
-// gói đã hết hạn/bị hủy. Đây là dữ liệu bán hàng của chính chủ quán; backend cũng
-// cho đọc order không cần gói (GET cafes/{cafe}/orders không có middleware subscription).
-// Giữ tham số để nơi gọi không phải đổi.
-export function canViewRevenue(_sub?: UserSubscription | null | undefined): boolean {
-  return true;
-}
+// Không có canEdit(): canManage() ở trên thay thế nó (canEdit chỉ xét loại gói,
+// bỏ qua việc gói đã hết hạn hay chưa).
+//
+// Không có canViewRevenue(): xem doanh thu là quyền CƠ BẢN của mọi người dùng, kể cả
+// khi chưa có gói hoặc gói đã hết hạn — đó là dữ liệu bán hàng của chính chủ quán, và
+// backend cũng cho đọc order không cần gói (GET cafes/{cafe}/orders không gắn
+// middleware subscription). Từng có một hàm luôn trả `true` ở đây; giữ nó chỉ khiến
+// người đọc tưởng chỗ này có phân quyền.
 
 // Trợ lý AI & phân tích doanh thu — chỉ gói có bật can_use_ai (mặc định chỉ Pro Max).
 export function canUseAI(sub: UserSubscription | null | undefined): boolean {

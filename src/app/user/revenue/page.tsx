@@ -1,7 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
-import LockedBox from '@/components/ui/LockedBox';
 import StatCard from '@/components/ui/StatCard';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import SectionCard from '@/components/user/SectionCard';
@@ -12,7 +11,6 @@ import CafeRevenueComparison from '@/components/user/CafeRevenueComparison';
 import { useAuth } from '@/context/AuthContext';
 import { invoiceService } from '@/services';
 import { useApi } from '@/hooks/use-api';
-import { canViewRevenue } from '@/lib/permission';
 import { formatCurrency, formatPaymentMethod } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { Download, TrendingUp, Receipt, DollarSign, BarChart3, AlertCircle, Store, Trophy } from 'lucide-react';
@@ -175,15 +173,10 @@ export default function RevenuePage() {
     }
   };
 
-  if (!canViewRevenue(user?.subscription)) {
-    return (
-      <div>
-        <PageHeader title="Doanh thu" />
-        <LockedBox title="Bạn chưa đăng ký gói dịch vụ"
-          description="Đăng ký gói dịch vụ (kể cả dùng thử Fun Free 7 ngày) để xem biểu đồ doanh thu theo ngày/tháng, top món bán chạy và báo cáo chi tiết." />
-      </div>
-    );
-  }
+  // KHÔNG khóa trang này theo gói. Xem doanh thu là quyền cơ bản của chủ quán với
+  // dữ liệu bán hàng của chính họ, kể cả khi chưa mua gói hay gói đã hết hạn —
+  // backend cũng cho đọc order không cần gói. Ở đây từng có một nhánh khóa gọi
+  // canViewRevenue(), nhưng hàm đó luôn trả true nên nhánh chưa từng chạy.
 
   if (loading) {
     return (

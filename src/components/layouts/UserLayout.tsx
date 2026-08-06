@@ -215,11 +215,15 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    invoiceService.list().then(invoices => {
-      const today = new Date().toDateString();
-      const todayInvoices = (invoices ?? []).filter(inv => new Date(inv.createdAt).toDateString() === today);
-      setInvoiceNotif(todayInvoices.length > 0
-        ? [{ id: 'inv-today', kind: 'invoice', message: `Hôm nay có ${todayInvoices.length} hóa đơn mới`, href: '/user/invoices' }]
+    // Chỉ hỏi hóa đơn CỦA HÔM NAY. Chuông thông báo này chạy trên MỌI trang của
+    // portal, mà tất cả những gì nó cần là một con số đếm — không có lý do gì tải
+    // toàn bộ lịch sử bán hàng rồi lọc ngày trong trình duyệt.
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    invoiceService.list({ from: today, to: today }).then(invoices => {
+      const count = invoices?.length ?? 0;
+      setInvoiceNotif(count > 0
+        ? [{ id: 'inv-today', kind: 'invoice', message: `Hôm nay có ${count} hóa đơn mới`, href: '/user/invoices' }]
         : []);
     }).catch(() => {});
   }, [activeCafeId]);

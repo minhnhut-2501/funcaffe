@@ -8,6 +8,7 @@ use App\Services\MomoService;
 use App\Services\SubscriptionActivator;
 use App\Services\VnpayService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Xử lý callback từ các cổng thanh toán (luồng chủ quán trả tiền gói): VNPay và MoMo.
@@ -26,8 +27,43 @@ class PaymentGatewayController extends Controller
     /** Đường dẫn trang kết quả ở frontend, dùng chung cho mọi cổng. */
     private function resultBase(): string
     {
-        $frontend = rtrim((string) env('FRONTEND_URL', 'http://localhost:3000'), '/');
+        // config() chứ không env(): Dockerfile chạy `artisan config:cache` lúc khởi động,
+        // và khi config đã cache thì Laravel không nạp file .env nữa.
+        $frontend = rtrim((string) config('app.frontend_url', 'http://localhost:3000'), '/');
         return $frontend . '/user/subscription/payment-result';
+    }
+
+    /**
+     * Giao dịch đã ở trạng thái "tiền đã vào và gói đã được cấp" hay chưa?
+     *
+     * markPaidAndActivate() trả false ở HAI tình huống rất khác nhau:
+     *  - Đơn đã 'paid' từ trước (Return URL và IPN cùng về — chuyện bình thường,
+     *    gói vẫn đang chạy, phải báo THÀNH CÔNG).
+     *  - Đơn ở trạng thái không kích hoạt được ('rejected') — đây mới là sự cố.
+     * Chỉ nhìn giá trị trả về thì không phân biệt được, nên đọc lại trạng thái thật.
+     */
+    private function isSettled(PackagePayment $payment, bool $activated): bool
+    {
+        return $activated || $payment->fresh()?->payment_status === 'paid';
+    }
+
+    /**
+     * Cổng báo đã thu tiền nhưng hệ thống không cấp được gói.
+     *
+     * Đây là tình huống KHÁCH ĐÃ MẤT TIỀN, nên phải để lại dấu vết cho con người
+     * xử lý: ghi log ở mức error kèm đủ thông tin đối soát với sao kê của cổng.
+     */
+    private function reportUnactivated(PackagePayment $payment, string $gateway): void
+    {
+        Log::error('[thanh-toan] Cổng báo thu tiền thành công nhưng không kích hoạt được gói', [
+            'gateway'          => $gateway,
+            'payment_id'       => (string) $payment->id,
+            'transaction_code' => $payment->transaction_code,
+            'gateway_txn_no'   => $payment->gateway_txn_no,
+            'payment_status'   => $payment->fresh()?->payment_status,
+            'cafe_id'          => (string) $payment->cafe_id,
+            'amount'           => $payment->amount,
+        ]);
     }
 
     /**
@@ -70,13 +106,18 @@ class PaymentGatewayController extends Controller
         }
 
         if ($code === '00') {
-            $this->atomic(function () use ($payment, $query) {
+            $activated = $this->atomic(function () use ($payment, $query) {
                 $payment->update([
                     'gateway_txn_no'   => $query['vnp_TransactionNo'] ?? null,
                     'gateway_bank_code' => $query['vnp_BankCode'] ?? null,
                 ]);
-                $this->activator->markPaidAndActivate($payment);
+                return $this->activator->markPaidAndActivate($payment);
             });
+
+            if (!$this->isSettled($payment, $activated)) {
+                $this->reportUnactivated($payment, 'vnpay');
+                return redirect()->away($resultBase . '&status=fail&code=not_activated');
+            }
 
             return redirect()->away($resultBase . '&status=success&code=00');
         }
@@ -117,13 +158,20 @@ class PaymentGatewayController extends Controller
         }
 
         if (($query['vnp_ResponseCode'] ?? null) === '00') {
-            $this->atomic(function () use ($payment, $query) {
+            $activated = $this->atomic(function () use ($payment, $query) {
                 $payment->update([
                     'gateway_txn_no'    => $query['vnp_TransactionNo'] ?? null,
                     'gateway_bank_code' => $query['vnp_BankCode'] ?? null,
                 ]);
-                $this->activator->markPaidAndActivate($payment);
+                return $this->activator->markPaidAndActivate($payment);
             });
+
+            if (!$this->isSettled($payment, $activated)) {
+                $this->reportUnactivated($payment, 'vnpay-ipn');
+                // Mã 99 = lỗi phía merchant. Báo đúng để VNPay còn gửi lại IPN,
+                // thay vì nói "Confirm Success" trong khi gói chưa được cấp.
+                return response()->json(['RspCode' => '99', 'Message' => 'Activation failed']);
+            }
 
             return response()->json(['RspCode' => '00', 'Message' => 'Confirm Success']);
         }
@@ -156,10 +204,15 @@ class PaymentGatewayController extends Controller
         }
 
         if ((int) ($data['resultCode'] ?? -1) === 0) {
-            $this->atomic(function () use ($payment, $data) {
+            $activated = $this->atomic(function () use ($payment, $data) {
                 $payment->update(['gateway_txn_no' => $data['transId'] ?? null]);
-                $this->activator->markPaidAndActivate($payment);
+                return $this->activator->markPaidAndActivate($payment);
             });
+
+            if (!$this->isSettled($payment, $activated)) {
+                $this->reportUnactivated($payment, 'momo');
+                return redirect()->away($resultBase . '&status=fail&code=not_activated');
+            }
 
             return redirect()->away($resultBase . '&status=success&code=0');
         }
@@ -195,17 +248,21 @@ class PaymentGatewayController extends Controller
             return response()->noContent();
         }
 
-        // Đã kích hoạt rồi (thường là do Return URL chạy trước) thì dừng: gọi tiếp
-        // markPaidAndActivate sẽ cộng thêm hạn lần nữa.
+        // Đã kích hoạt rồi (thường là do Return URL chạy trước) thì không phải làm gì.
+        // Đây chỉ là lối tắt: markPaidAndActivate() tự chặn trường hợp 'paid' rồi.
         if ($payment->payment_status === 'paid') {
             return response()->noContent();
         }
 
         if ((int) ($data['resultCode'] ?? -1) === 0) {
-            $this->atomic(function () use ($payment, $data) {
+            $activated = $this->atomic(function () use ($payment, $data) {
                 $payment->update(['gateway_txn_no' => $data['transId'] ?? null]);
-                $this->activator->markPaidAndActivate($payment);
+                return $this->activator->markPaidAndActivate($payment);
             });
+
+            if (!$this->isSettled($payment, $activated)) {
+                $this->reportUnactivated($payment, 'momo-ipn');
+            }
         } else {
             $this->atomic(function () use ($payment) {
                 $this->activator->rejectAndRollback($payment);

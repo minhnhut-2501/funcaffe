@@ -46,10 +46,15 @@ class UserRevenueController extends Controller
             ->keyBy(fn ($s) => (string) $s->cafe_id);
 
         // Doanh thu đọc thẳng từ order đã thanh toán (bỏ bảng invoices).
+        //
+        // Chỉ lấy BỐN trường cần cho phép cộng. Trước đây `->get()` kéo về nguyên
+        // document: chủ ba quán chạy hai năm là vài chục nghìn tài liệu đầy đủ nằm
+        // trong RAM của PHP cho mỗi lần mở Bảng điều khiển, trong khi tất cả những gì
+        // dùng tới chỉ là số tiền và ngày.
         $invoices = Order::whereIn('cafe_id', $cafeIds)
             ->where('status', 'paid')
             ->where('payment_status', 'paid')
-            ->get();
+            ->get(['cafe_id', 'total_amount', 'paid_at', 'created_at']);
 
         $todayStr = Carbon::now()->format('Y-m-d');
         $thisMonthStr = Carbon::now()->format('Y-m');
