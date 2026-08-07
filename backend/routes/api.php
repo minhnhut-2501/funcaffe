@@ -107,6 +107,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware(['ai', 'throttle:20,1']);
     Route::post('cafes/{cafe}/ai/revenue-analysis', [AiController::class, 'revenueAnalysis'])
         ->middleware(['ai', 'throttle:10,1']);
+    // Câu gợi ý mở đầu cho chat — chỉ đếm dữ liệu của quán, KHÔNG gọi Gemini,
+    // nên throttle rộng tay hơn các endpoint đốt credit ở trên.
+    Route::get('cafes/{cafe}/ai/suggestions', [AiController::class, 'suggestions'])
+        ->middleware(['ai', 'throttle:60,1']);
 });
 
 // Packages & Time Subscriptions

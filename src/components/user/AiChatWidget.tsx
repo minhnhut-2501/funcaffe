@@ -9,10 +9,17 @@ import { ApiError } from '@/lib/api-client';
 
 interface ChatMsg { role: 'user' | 'assistant'; content: string }
 
-const SUGGESTIONS = [
-  'Quán tôi có bao nhiêu bàn?',
-  'Doanh thu hôm nay bao nhiêu?',
+/**
+ * Dùng khi chưa hỏi được backend (chưa tải xong, hoặc gọi hỏng).
+ *
+ * Cố ý KHÔNG có câu nào hỏi về số bàn hay doanh thu: những câu đó chỉ có nghĩa khi
+ * đi kèm số liệu thật, mà lúc này ta chưa biết quán đang thế nào. Ba câu chung
+ * chung vẫn dùng được, còn hơn để người dùng mở widget ra thấy trống trơn.
+ */
+const FALLBACK_SUGGESTIONS = [
   'Gợi ý combo cho buổi chiều ế khách',
+  'Làm sao tăng doanh thu cuối tuần?',
+  'Nên đặt giá món mới thế nào cho hợp lý?',
 ];
 
 /**
@@ -47,11 +54,25 @@ export default function AiChatWidget() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>(FALLBACK_SUGGESTIONS);
+  const suggestionsLoaded = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Hỏi gợi ý khi widget được MỞ, không phải lúc mount: widget nằm trong UserLayout
+  // nên có mặt ở mọi trang của portal — gọi lúc mount là thêm một request cho mỗi
+  // lần tải trang của mọi người dùng Pro Max, kể cả người không bao giờ mở nó.
+  // Chỉ gọi một lần cho mỗi lần tải trang; hỏng thì giữ nguyên bộ mặc định.
+  useEffect(() => {
+    if (!open || !allowed || suggestionsLoaded.current) return;
+    suggestionsLoaded.current = true;
+    aiService.suggestions()
+      .then(list => { if (list.length > 0) setSuggestions(list); })
+      .catch(() => { /* giữ FALLBACK_SUGGESTIONS */ });
+  }, [open, allowed]);
 
   async function send(text: string) {
     const content = text.trim();
@@ -121,7 +142,7 @@ export default function AiChatWidget() {
                 {messages.length === 0 && (
                   <div className="space-y-2.5">
                     <p className="text-sm text-cafe-500">Xin chào! Bạn có thể hỏi tôi, ví dụ:</p>
-                    {SUGGESTIONS.map(s => (
+                    {suggestions.map(s => (
                       <button key={s} onClick={() => send(s)}
                         className="block w-full text-left text-sm bg-sand hover:bg-bean-tint text-ink rounded-xl px-3 py-2 transition-colors">
                         {s}

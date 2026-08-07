@@ -625,6 +625,19 @@ export const aiService = {
     const cafeId = await getCafeId();
     return api.post<AiRevenueResponse>(`/cafes/${cafeId}/ai/revenue-analysis`, { refresh });
   },
+  /**
+   * Câu gợi ý mở đầu, chọn theo tình trạng thật của quán.
+   *
+   * Backend sinh chứ không ghi cứng ở đây: nó là nơi biết quán đang có bàn nào
+   * phục vụ, hôm nay bán được gì — và cũng là nơi dựng ngữ cảnh gửi cho Gemini.
+   * Hai bên cùng một nguồn thì không còn cảnh gợi ý hỏi thứ AI không trả lời được.
+   * Endpoint này KHÔNG gọi Gemini, chỉ đếm dữ liệu.
+   */
+  suggestions: async (): Promise<string[]> => {
+    const cafeId = await getCafeId();
+    const res = await api.get<{ suggestions: string[] }>(`/cafes/${cafeId}/ai/suggestions`);
+    return res.suggestions ?? [];
+  },
 };
 
 // Cafe Info
