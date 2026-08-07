@@ -55,3 +55,18 @@ design-shots/
 
 # Backup .docx tam thoi cua bao cao (giu local, khong can dong bo)
 doc/_BACKUP_*.docx
+
+# ---------------------------------------------------------------------------
+# Cong cu ho tro phat trien — KHONG thuoc du an, khong day len kho.
+# Giu lai o may de lam viec, nhung nguoi khac clone ve thi khong can.
+# ---------------------------------------------------------------------------
+.claude/
+.local/
+.codegraph/
+.mcp.json
+plan/
+
+# Tai lieu noi bo va script chay nhanh rieng cho Windows
+PRODUCT.md
+DESIGN.md
+backend/*.bat
