@@ -3,7 +3,9 @@
 @theme {
   /* ============================================================
      FunCafe — Warm Cafe palette (đồng bộ Public + Portal)
-     surfaces ấm (paper/sand/line) · chữ slate/ink · accent nâu bean
+     surfaces (paper/sand/line) · chữ slate/ink · accent xanh dương bean
+     (Tên biến vẫn là "bean" vì ~600 chỗ đang dùng; giá trị đã đổi từ nâu
+      sang xanh dương ở lần làm lại giao diện — xem --color-bean bên dưới.)
      ============================================================ */
 
   /* Thang cafe-* (tương thích ngược ~600 chỗ đang dùng)
