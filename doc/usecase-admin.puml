@@ -1,0 +1,71 @@
+@startuml FunCafe-UseCase-Admin
+' So do Use Case — QUAN TRI VIEN (Admin)
+' Hai hinh "Quan tri vien" la CUNG mot tac nhan, dat 2 ben de chia use case cho gon.
+' draw.io -> + (Insert) -> Advanced -> PlantUML... dan tron khoi nay.
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+
+actor "Quản trị viên" as A_L
+actor "Quản trị viên" as A_R
+
+rectangle "FunCafe — Quản trị viên" {
+  usecase "Đăng nhập" as UC_login
+
+  ' ----- Cot trai -----
+  usecase "Xem thống kê tổng quan" as UC_dash
+  usecase "Quản lý người dùng" as UC_user
+  usecase "Quản lý gói dịch vụ" as UC_pkg
+  usecase "Quản lý thời hạn gói" as UC_time
+  usecase "Đăng xuất" as UC_logout
+
+  ' ----- Cot phai -----
+  usecase "Đối soát thanh toán gói" as UC_pay
+  usecase "Xem doanh thu hệ thống" as UC_rev
+  usecase "Quản lý đánh giá" as UC_review
+  usecase "Quản lý tin nhắn liên hệ" as UC_contact
+}
+
+' ===== Actor trai =====
+A_L --> UC_login
+A_L --> UC_dash
+A_L --> UC_user
+A_L --> UC_pkg
+A_L --> UC_time
+A_L --> UC_logout
+
+' ===== Actor phai =====
+A_R --> UC_pay
+A_R --> UC_rev
+A_R --> UC_review
+A_R --> UC_contact
+
+' ===== Quan he <<include>> Dang nhap (moi chuc nang quan tri) =====
+UC_dash ..> UC_login : <<include>>
+UC_user ..> UC_login : <<include>>
+UC_pkg ..> UC_login : <<include>>
+UC_time ..> UC_login : <<include>>
+UC_pay ..> UC_login : <<include>>
+UC_rev ..> UC_login : <<include>>
+UC_review ..> UC_login : <<include>>
+UC_contact ..> UC_login : <<include>>
+
+legend right
+  Chú thích chức năng:
+  - Đăng nhập / Đăng xuất: vào và thoát tài khoản quản trị.
+  - Xem thống kê tổng quan: màn hình CHỈ ĐỌC, xem số liệu tổng của toàn hệ thống.
+  - Quản lý người dùng: xem, khóa/mở, sửa tài khoản người dùng.
+  - Quản lý gói dịch vụ: thêm, sửa, ẩn/hiện gói dịch vụ.
+  - Quản lý thời hạn gói: thêm, sửa thời hạn và giá của gói.
+  - Đối soát thanh toán gói: CHỈ ĐỌC. Cổng thanh toán tự kích hoạt gói
+    khi xác nhận đã thu tiền, nên không có thao tác duyệt hay từ chối bằng tay.
+  - Xem doanh thu hệ thống: màn hình CHỈ ĐỌC, không có thao tác sửa dữ liệu.
+  - Quản lý đánh giá: duyệt, ẩn/hiện đánh giá của người dùng.
+  - Quản lý tin nhắn liên hệ: xem và trả lời tin nhắn liên hệ.
+  ---
+  Ghi chú: hai hình "Quản trị viên" là cùng MỘT tác nhân (tách 2 bên cho gọn).
+  <<include>>: chức năng bắt buộc phải Đăng nhập trước khi thực hiện.
+  Toàn bộ chức năng quản trị đều yêu cầu tài khoản có quyền admin.
+endlegend
+@enduml

@@ -1,0 +1,279 @@
+%% FunCafe — ERD phản ánh ĐÚNG 100% schema MongoDB thực tế của dự án
+%% Đầy đủ mọi field (kể cả created_at/updated_at, reset_token...) và đầy đủ mọi khóa phụ.
+%% Các khóa denormalize (orders.cafe_id, package_payments.cafe_id/user_id...) là cố ý -
+%% giữ trong DB để truy vấn nhanh, nên ERD cũng vẽ đúng như vậy.
+%% Cách dùng: dán trọn khối vào https://mermaid.live, hoặc draw.io: + (Insert) ▸ Advanced ▸ Mermaid...
+erDiagram
+    %% ===== Quan hệ (đầy đủ mọi khóa phụ theo DB thật) =====
+    users ||--o{ cafes : "sở hữu"
+    users ||--o{ subscriptions : "đăng ký"
+    users ||--o{ package_payments : "thanh toán"
+    users ||--o{ reviews : "viết"
+
+    packages ||--o{ time_subscriptions : "có thời hạn"
+    packages ||--o{ subscriptions : "được đăng ký"
+    packages ||--o{ package_payments : "được trả tiền"
+    packages ||--o{ reviews : "đánh giá gói"
+
+    time_subscriptions ||--o{ subscriptions : "áp dụng"
+    time_subscriptions ||--o{ package_payments : "áp dụng"
+
+    subscriptions ||--o{ package_payments : "thanh toán (subscription_id)"
+    subscriptions ||--o{ package_payments : "gói bị thay thế (previous_subscription_id)"
+
+    cafes ||--o{ subscriptions : "gói của quán"
+    cafes ||--o{ package_payments : "giao dịch của quán"
+    cafes ||--o{ reviews : "thuộc về"
+    cafes ||--o{ tables : "có bàn"
+    cafes ||--o{ categories : "có danh mục"
+    cafes ||--o{ items : "có món"
+    cafes ||--o{ toppings : "có topping"
+    cafes ||--o{ orders : "phát sinh đơn"
+
+    categories ||--o{ items : "phân loại"
+    items ||--o{ item_prices : "giá theo size"
+    items ||--o{ item_toppings : "cho phép topping"
+    toppings ||--o{ item_toppings : "được gắn"
+
+    tables ||--o{ orders : "phục vụ tại (table_id)"
+    tables ||--o| orders : "đơn đang mở (current_order_id)"
+    orders ||--|{ order_details : "gồm"
+    items ||--o{ order_details : "được bán"
+    item_prices ||--o{ order_details : "size đã chọn"
+    order_details ||--o{ order_detail_toppings : "kèm"
+    toppings ||--o{ order_detail_toppings : "được chọn"
+
+    %% ===== Thực thể (đầy đủ field) =====
+    users {
+        ObjectId _id PK
+        string full_name
+        string email UK
+        string password
+        string phone
+        string avatar
+        string role
+        string status
+        bool has_used_free_trial
+        string reset_token
+        date reset_token_expires_at
+        date created_at
+        date updated_at
+    }
+    packages {
+        ObjectId _id PK
+        string name
+        string type
+        int level
+        bool is_trial
+        string description
+        array features
+        int max_tables
+        int max_menu_items
+        bool can_use_ai
+        string status
+        date created_at
+        date updated_at
+    }
+    time_subscriptions {
+        ObjectId _id PK
+        ObjectId package_id FK
+        int duration_value
+        string duration_unit
+        number price
+        string label
+        string status
+        date created_at
+        date updated_at
+    }
+    subscriptions {
+        ObjectId _id PK
+        ObjectId user_id FK
+        ObjectId cafe_id FK
+        ObjectId package_id FK
+        ObjectId time_subscription_id FK
+        string package_name_snapshot
+        date start_date
+        date end_date
+        string status
+        number total_amount
+        bool is_pending_review
+        date created_at
+        date updated_at
+    }
+    package_payments {
+        ObjectId _id PK
+        ObjectId user_id FK
+        ObjectId cafe_id FK
+        ObjectId package_id FK
+        ObjectId time_subscription_id FK
+        ObjectId subscription_id FK
+        string transaction_code UK
+        number subtotal
+        number vat_rate
+        number vat_amount
+        number amount
+        string payment_method
+        string payment_status
+        date paid_at
+        string note
+        string action_type
+        ObjectId previous_subscription_id FK
+        date previous_end_date
+        number credit_amount
+        string credit_status
+        string gateway_txn_no
+        string gateway_bank_code
+        date created_at
+        date updated_at
+    }
+    cafes {
+        ObjectId _id PK
+        ObjectId user_id FK
+        string name
+        string address
+        string phone
+        string description
+        string logo
+        string status
+        string bank_bin
+        string bank_account_number
+        string bank_account_name
+        bool has_used_free_trial
+        date created_at
+        date updated_at
+    }
+    tables {
+        ObjectId _id PK
+        ObjectId cafe_id FK
+        string name
+        int capacity
+        int display_order
+        string status
+        ObjectId current_order_id FK
+        date created_at
+        date updated_at
+    }
+    categories {
+        ObjectId _id PK
+        ObjectId cafe_id FK
+        string name
+        string description
+        bool is_active
+        date created_at
+        date updated_at
+    }
+    items {
+        ObjectId _id PK
+        ObjectId cafe_id FK
+        ObjectId category_id FK
+        string name
+        string description
+        string image
+        int base_price
+        bool has_size
+        bool allow_topping
+        bool is_available
+        int display_order
+        date created_at
+        date updated_at
+    }
+    item_prices {
+        ObjectId _id PK
+        ObjectId item_id FK
+        string size_name
+        int price
+        bool is_active
+        date created_at
+        date updated_at
+    }
+    toppings {
+        ObjectId _id PK
+        ObjectId cafe_id FK
+        string name
+        number price
+        string image
+        bool is_available
+        date created_at
+        date updated_at
+    }
+    item_toppings {
+        ObjectId _id PK
+        ObjectId item_id FK
+        ObjectId topping_id FK
+        date created_at
+        date updated_at
+    }
+    orders {
+        ObjectId _id PK
+        ObjectId cafe_id FK
+        ObjectId table_id FK
+        string code UK
+        string status
+        string note
+        number subtotal
+        number discount_amount
+        number total_amount
+        string invoice_code UK
+        string payment_method
+        string payment_status
+        date paid_at
+        int cash_received
+        int change_amount
+        date refunded_at
+        string refund_reason
+        date created_at
+        date updated_at
+    }
+    order_details {
+        ObjectId _id PK
+        ObjectId order_id FK
+        ObjectId item_id FK
+        ObjectId item_price_id FK
+        string item_name_snapshot
+        string size_name_snapshot
+        int quantity
+        number unit_price
+        number subtotal
+        number topping_total
+        number total_price
+        string note
+        date created_at
+        date updated_at
+    }
+    order_detail_toppings {
+        ObjectId _id PK
+        ObjectId order_detail_id FK
+        ObjectId topping_id FK
+        string topping_name_snapshot
+        int quantity
+        number price_at_time
+        number subtotal
+        date created_at
+        date updated_at
+    }
+    reviews {
+        ObjectId _id PK
+        ObjectId user_id FK
+        ObjectId cafe_id FK
+        ObjectId package_id FK
+        int rating
+        string title
+        string comment
+        string status
+        date created_at
+        date updated_at
+    }
+    contact_messages {
+        ObjectId _id PK
+        string full_name
+        string email
+        string phone
+        string cafe_name
+        string content
+        bool is_read
+        string reply
+        date replied_at
+        string replied_by
+        date created_at
+        date updated_at
+    }

@@ -1,0 +1,152 @@
+@startuml FunCafe-UseCase-User
+' So do Use Case — NGUOI DUNG (Chu quan)
+' Hai hinh "Nguoi dung" la CUNG mot tac nhan, dat 2 ben de chia use case cho gon.
+' draw.io -> + (Insert) -> Advanced -> PlantUML... dan tron khoi nay.
+'
+' DONG BO voi muc 2.3.2 cua bao cao: moi muc SRS 2.3.2.x co dung mot use case.
+' Size va cau hinh topping la <<extend>> cua Quan ly thuc don, KHONG phai man
+' hinh rieng — ca hai duoc thao tac ngay trong form them/sua mon.
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+
+actor "Người dùng" as U_L
+actor "Người dùng" as U_R
+
+rectangle "FunCafe — Người dùng" {
+  usecase "Đăng nhập" as UC_login
+
+  ' ----- Cot trai: trang cong khai + khai bao du lieu -----
+  usecase "Trang chủ" as UC_home
+  usecase "Xem gói dịch vụ" as UC_pricing
+  usecase "Chi tiết dịch vụ" as UC_features
+  usecase "Liên hệ" as UC_contact
+  usecase "Hỗ trợ" as UC_support
+  usecase "Xem điều khoản & chính sách" as UC_legal
+  usecase "Đăng ký tài khoản" as UC_register
+  usecase "Quên & đặt lại mật khẩu" as UC_forgot
+  usecase "Quản lý quán cafe" as UC_cafe
+  usecase "Chuyển đổi giữa nhiều quán" as UC_multi
+  usecase "Quản lý bàn" as UC_table
+  usecase "Quản lý danh mục" as UC_cat
+  usecase "Quản lý thực đơn" as UC_menu
+  usecase "Quản lý size và giá theo size" as UC_size
+  usecase "Cấu hình topping cho món" as UC_itemtopping
+  usecase "Quản lý topping" as UC_topping
+
+  ' ----- Cot phai: van hanh + goi dich vu -----
+  usecase "Bán hàng theo bàn (POS)" as UC_pos
+  usecase "Thanh toán và xuất hóa đơn" as UC_invoice
+  usecase "Nhận tiền bằng mã VietQR" as UC_vietqr
+  usecase "Tra cứu hóa đơn" as UC_invmgmt
+  usecase "Xem báo cáo doanh thu" as UC_revenue
+  usecase "Xuất báo cáo doanh thu ra Excel" as UC_excel
+  usecase "Quản lý gói đang dùng" as UC_sub
+  usecase "Đăng ký gói dịch vụ" as UC_buy
+  usecase "Nâng cấp/gia hạn gói dịch vụ" as UC_upgrade
+  usecase "Cảnh báo gói sắp hết hạn" as UC_expiry
+  usecase "Quản lý tài khoản cá nhân" as UC_profile
+  usecase "Đánh giá dịch vụ FunCafe" as UC_review
+  usecase "Trợ lý AI" as UC_ai
+  usecase "Phân tích doanh thu bằng AI" as UC_airev
+  usecase "Đăng xuất" as UC_logout
+}
+
+' ===== Actor trai =====
+U_L --> UC_home
+U_L --> UC_pricing
+U_L --> UC_features
+U_L --> UC_contact
+U_L --> UC_support
+U_L --> UC_legal
+U_L --> UC_register
+U_L --> UC_forgot
+U_L --> UC_login
+U_L --> UC_cafe
+U_L --> UC_multi
+U_L --> UC_table
+U_L --> UC_cat
+U_L --> UC_menu
+U_L --> UC_topping
+
+' ===== Actor phai =====
+U_R --> UC_pos
+U_R --> UC_invoice
+U_R --> UC_invmgmt
+U_R --> UC_revenue
+U_R --> UC_sub
+U_R --> UC_buy
+U_R --> UC_upgrade
+U_R --> UC_profile
+U_R --> UC_review
+U_R --> UC_ai
+U_R --> UC_logout
+
+' ===== Quan he <<include>> Dang nhap (chuc nang can xac thuc) =====
+UC_cafe ..> UC_login : <<include>>
+UC_multi ..> UC_login : <<include>>
+UC_table ..> UC_login : <<include>>
+UC_cat ..> UC_login : <<include>>
+UC_menu ..> UC_login : <<include>>
+UC_topping ..> UC_login : <<include>>
+UC_pos ..> UC_login : <<include>>
+UC_invoice ..> UC_login : <<include>>
+UC_invmgmt ..> UC_login : <<include>>
+UC_revenue ..> UC_login : <<include>>
+UC_sub ..> UC_login : <<include>>
+UC_buy ..> UC_login : <<include>>
+UC_upgrade ..> UC_login : <<include>>
+UC_profile ..> UC_login : <<include>>
+UC_review ..> UC_login : <<include>>
+UC_ai ..> UC_login : <<include>>
+
+' ===== Quan he <<extend>> — hanh vi TUY CHON, lam ngay trong man hinh cha =====
+UC_size ..> UC_menu : <<extend>>
+UC_itemtopping ..> UC_menu : <<extend>>
+UC_vietqr ..> UC_invoice : <<extend>>
+UC_excel ..> UC_revenue : <<extend>>
+UC_expiry ..> UC_sub : <<extend>>
+UC_airev ..> UC_ai : <<extend>>
+
+legend right
+  Chú thích chức năng:
+  - Trang chủ: xem giới thiệu, tính năng và gói dịch vụ.
+  - Xem gói dịch vụ: xem bảng giá các gói Fun Free / Pro / Pro Max.
+  - Chi tiết dịch vụ: xem mô tả chi tiết từng tính năng.
+  - Liên hệ: gửi tin nhắn liên hệ cho hệ thống.
+  - Hỗ trợ: xem hướng dẫn sử dụng.
+  - Xem điều khoản & chính sách: đọc điều khoản dịch vụ và chính sách bảo mật.
+  - Đăng ký tài khoản: tạo tài khoản chủ quán mới.
+  - Quên & đặt lại mật khẩu: nhận liên kết qua email và đặt mật khẩu mới.
+  - Đăng nhập / Đăng xuất: vào và thoát khỏi tài khoản.
+  - Quản lý quán cafe: thêm, sửa thông tin quán và tài khoản nhận VietQR.
+  - Chuyển đổi giữa nhiều quán: một tài khoản mở nhiều quán, gói tính theo TỪNG quán.
+  - Quản lý bàn: thêm, sửa, xóa bàn; theo dõi trạng thái trống / đang phục vụ.
+  - Quản lý danh mục: thêm, sửa, ẩn/hiện danh mục món.
+  - Quản lý thực đơn: thêm, sửa, ẩn/hiện món.
+  - Quản lý size và giá theo size: đặt tên size và giá riêng, ngay trong form món.
+  - Cấu hình topping cho món: tích chọn topping cho phép, ngay trong form món.
+  - Quản lý topping: thêm, sửa, ẩn/hiện topping của quán.
+  - Bán hàng theo bàn (POS): chọn bàn, lên order, thêm/bớt món.
+  - Thanh toán và xuất hóa đơn: thu tiền và cấp mã phiếu ngay trên đơn hàng.
+  - Nhận tiền bằng mã VietQR: sinh mã QR từ tài khoản ngân hàng đã khai của quán.
+  - Tra cứu hóa đơn: xem lịch sử, lọc theo ngày và hình thức trả tiền, in lại hóa đơn.
+  - Xem báo cáo doanh thu: xem biểu đồ doanh thu và top món bán chạy.
+  - Xuất báo cáo doanh thu ra Excel: tải số liệu đang lọc về máy dạng .xlsx.
+  - Quản lý gói đang dùng: xem gói hiện tại và thời hạn còn lại của từng quán.
+  - Đăng ký gói dịch vụ: mua gói mới cho quán, trả qua VNPay hoặc MoMo.
+  - Nâng cấp/gia hạn gói dịch vụ: nâng cấp giữa kỳ có cấn trừ theo tỉ lệ, hoặc gia hạn.
+  - Cảnh báo gói sắp hết hạn: nhắc khi còn không quá 7 ngày.
+  - Quản lý tài khoản cá nhân: sửa thông tin cá nhân, đổi mật khẩu.
+  - Đánh giá dịch vụ FunCafe: viết nhận xét và chấm sao cho phần mềm.
+  - Trợ lý AI: hỏi đáp về tình hình quán (chỉ gói Pro Max).
+  - Phân tích doanh thu bằng AI: máy chủ tính số liệu, AI chỉ diễn giải.
+  ---
+  Ghi chú: hai hình "Người dùng" là cùng MỘT tác nhân (tách 2 bên cho gọn).
+  <<include>>: chức năng bắt buộc phải Đăng nhập trước khi thực hiện.
+  <<extend>>: hành vi tùy chọn, thao tác ngay trong màn hình của use case cha.
+  Các trang công khai (Trang chủ, Xem gói, Chi tiết dịch vụ, Liên hệ, Hỗ trợ,
+  Điều khoản, Đăng ký, Quên mật khẩu) dùng được mà không cần đăng nhập.
+endlegend
+@enduml
