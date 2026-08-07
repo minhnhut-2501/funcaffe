@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
 import { generateId } from '@/lib/utils';
 import { tableService, menuService, categoryService, toppingService, orderService, cafeService } from '@/services';
@@ -203,7 +203,32 @@ export default function SalesPage() {
   }, []);
 
 
-  const filteredTables = tables.filter(t => tableFilter === 'all' || t.status === tableFilter);
+  /**
+   * Trạng thái bàn dựng lại từ ĐƠN ĐANG MỞ, không lấy từ `tables.status`.
+   *
+   * `tables.status` và `current_order_id` chỉ là bộ nhớ đệm cho hiển thị. Nguồn chân
+   * lý là: có tồn tại đơn `active` trỏ vào bàn đó hay không.
+   *
+   * Vì sao bộ nhớ đệm đó lệch được: MongoDB đang chạy standalone nên
+   * `RunsAtomically::atomic()` là no-op — KHÔNG có transaction thật. `pay()` và
+   * `cancel()` cập nhật đơn ở một lệnh ghi rồi cập nhật bàn ở lệnh khác; lệnh thứ hai
+   * hỏng là bàn kẹt ở 'serving' trong khi chẳng còn đơn nào mở. Nhân viên nhìn thấy
+   * "bàn ma": tô màu đang phục vụ, bấm vào thì giỏ rỗng.
+   *
+   * Dẫn xuất tại chỗ hiển thị thì lệch bao nhiêu cũng tự biến mất sau một lần tải
+   * lại, và không tốn thêm request nào — `activeOrders` vốn đã có sẵn.
+   */
+  const tablesLive = useMemo(() => {
+    const orderByTable = new Map(activeOrders.map(o => [o.tableId, o.id]));
+    return tables.map(t => {
+      const orderId = orderByTable.get(t.id);
+      return orderId
+        ? { ...t, status: 'serving' as const, currentOrderId: orderId }
+        : { ...t, status: 'empty' as const, currentOrderId: undefined };
+    });
+  }, [tables, activeOrders]);
+
+  const filteredTables = tablesLive.filter(t => tableFilter === 'all' || t.status === tableFilter);
 
   const filteredMenu = menuItems.filter(i =>
     i.isAvailable &&
@@ -313,11 +338,11 @@ export default function SalesPage() {
           createdAt: new Date().toISOString(),
         });
         setDraftOrderIds(prev => ({ ...prev, [selectedTable.id]: created.id }));
+        // Không cần đụng `tables`: trạng thái bàn hiển thị được dẫn xuất từ
+        // `activeOrders` (xem tablesLive). Thêm đơn vào đây là bàn tự sang "đang
+        // phục vụ" — giữ thêm một bản trạng thái song song chỉ tạo ra đúng lớp lệch
+        // mà tablesLive sinh ra để dập.
         setActiveOrders(prev => [...prev, created]);
-        // Đồng bộ trạng thái bàn sang "đang phục vụ" như backend
-        setTables(prev => prev.map(t =>
-          t.id === selectedTable.id ? { ...t, status: 'serving' as const, currentOrderId: created.id } : t
-        ));
       }
       setCart(updatedCart);
       if (editCartItemId) setEditCartItemId(null);
@@ -426,8 +451,8 @@ export default function SalesPage() {
       return false;
     }
     setDraftOrderIds(prev => { const { [tableId]: _, ...rest } = prev; return rest; });
+    // Gỡ đơn khỏi activeOrders là đủ để bàn về trống — tablesLive dẫn xuất từ đây.
     setActiveOrders(prev => prev.filter(o => o.id !== orderId));
-    setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t));
     return true;
   };
 
@@ -479,10 +504,8 @@ export default function SalesPage() {
       const paidCash = payResult?.cash_received != null ? Number(payResult.cash_received) : undefined;
       const paidChange = payResult?.change_amount != null ? Number(payResult.change_amount) : undefined;
 
-      // Thanh toán xong bàn về TRỐNG (backend cũng đặt 'empty') — đồng bộ đúng trạng thái
-      setTables(prev => prev.map(t =>
-        t.id === selectedTable.id ? { ...t, status: 'empty' as const, currentOrderId: undefined } : t
-      ));
+      // Thanh toán xong bàn về TRỐNG: gỡ đơn khỏi activeOrders là đủ, tablesLive
+      // dẫn xuất trạng thái bàn từ đó.
       setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
       setActiveOrders(prev => prev.filter(o => o.id !== orderId));
       clearCartForTable(selectedTable.id);
