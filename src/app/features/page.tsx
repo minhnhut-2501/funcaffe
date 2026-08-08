@@ -99,7 +99,6 @@ const chapters: Chapter[] = [
       { name: 'Hóa đơn đầy đủ', desc: 'Mỗi lần thanh toán tạo một hóa đơn có mã riêng, thời gian và chi tiết từng món.' },
       { name: 'Lọc và tra cứu', desc: 'Tìm lại hóa đơn theo khoảng ngày và theo phương thức thanh toán.' },
       { name: 'In hóa đơn', desc: 'In thẳng từ trình duyệt ra máy in nhiệt hoặc máy in thường của quán.' },
-      { name: 'Tải PDF', desc: 'Lưu hóa đơn thành file PDF để gửi cho khách hoặc giữ lại làm chứng từ.' },
     ],
   },
   {
