@@ -49,6 +49,12 @@ function isSameCartLine(a: CartItem, b: CartItem): boolean {
   return norm(a.toppings) === norm(b.toppings);
 }
 
+/** Chặn trên cho số lượng: một lần lỡ tay không đẻ ra hóa đơn hàng tỉ đồng.
+ *  Món 999 vì có bàn gọi cả thùng; topping 20 vì đó là số phần thêm vào MỘT ly —
+ *  quá con số đó gần như chắc chắn là gõ nhầm chứ không phải đơn thật. */
+const MAX_QTY = 999;
+const MAX_TOPPING_QTY = 20;
+
 const tableStatusFilter = [
   { value: 'all', label: 'Tất cả' },
   { value: 'empty', label: 'Trống' },
@@ -96,6 +102,9 @@ export default function SalesPage() {
       const { [id]: _, ...rest } = prev;
       return rest;
     });
+  // Cùng lý do như qtyDraft, nhưng cho ô số lượng trong hộp thoại chọn món.
+  // null = ô đang hiển thị đúng optForm.qty, không có gì dở dang.
+  const [optQtyDraft, setOptQtyDraft] = useState<string | null>(null);
 
   const cartToOrderItems = (items: CartItem[]): OrderItem[] =>
     items.map(c => ({
@@ -254,6 +263,9 @@ export default function SalesPage() {
     }
     setEditCartItemId(null);
     setOptionModal({ item });
+    // Xóa số dở dang của lần mở trước, nếu không ô sẽ hiện "12" của món cũ
+    // trong khi số lượng thật của món mới là 1.
+    setOptQtyDraft(null);
     setOptForm({
       size: item.hasSize && item.sizes.length > 0
         ? item.sizes.find(s => s.isActive) ?? item.sizes[0]
@@ -267,6 +279,7 @@ export default function SalesPage() {
   const openEditOption = (c: CartItem) => {
     setEditCartItemId(c.id);
     setOptionModal({ item: c.item });
+    setOptQtyDraft(null);
     setOptForm({
       size: c.size ?? (c.item.hasSize && c.item.sizes.length > 0 ? c.item.sizes.find(s => s.isActive) ?? c.item.sizes[0] : null),
       toppings: c.toppings.map(t => ({ toppingId: t.topping.id, qty: t.quantity })),
@@ -279,9 +292,12 @@ export default function SalesPage() {
     ? allToppings.filter(t => t.isAvailable && optionModal.item.allowedToppingIds.includes(t.id))
     : [];
 
+  // Nhân giá topping với SỐ PHẦN của nó, đúng như calcItemTopping tính cho giỏ hàng.
+  // Bỏ t.qty ở đây thì hộp thoại báo một con số, thêm vào giỏ lại ra con số khác.
   const optTotal =
     ((optForm.size?.price ?? optionModal?.item.basePrice ?? 0) +
-      optForm.toppings.reduce((s, t) => s + (allToppings.find(tp => tp.id === t.toppingId)?.price ?? 0), 0)) *
+      optForm.toppings.reduce(
+        (s, t) => s + (allToppings.find(tp => tp.id === t.toppingId)?.price ?? 0) * t.qty, 0)) *
     optForm.qty;
 
   const handleSaveCartItem = async () => {
@@ -362,6 +378,22 @@ export default function SalesPage() {
     });
   };
 
+  /** Tăng/giảm số phần của MỘT topping trong ly đang chọn. Giảm xuống dưới 1 là bỏ
+   *  chọn topping đó luôn — giữ lại dòng "0 phần" thì vừa vô nghĩa vừa lọt vào giỏ. */
+  const updateToppingQty = (toppingId: string, delta: number) => {
+    setOptForm(f => {
+      const hien = f.toppings.find(t => t.toppingId === toppingId);
+      if (!hien) return f;
+      const moi = hien.qty + delta;
+      if (moi < 1) return { ...f, toppings: f.toppings.filter(t => t.toppingId !== toppingId) };
+      return {
+        ...f,
+        toppings: f.toppings.map(t =>
+          t.toppingId === toppingId ? { ...t, qty: Math.min(MAX_TOPPING_QTY, moi) } : t),
+      };
+    });
+  };
+
   const persistCart = async (tableId: string, items: CartItem[]) => {
     const bs = items.reduce((s, c) => s + calcItemBase(c), 0);
     const ts = items.reduce((s, c) => s + calcItemTopping(c), 0);
@@ -403,11 +435,8 @@ export default function SalesPage() {
     });
   };
 
-  /** Số lượng hợp lệ của một dòng: ít nhất 1, và chặn trên để một lần lỡ tay không
-   *  đẻ ra hóa đơn hàng tỉ đồng. Bấm nút trừ xuống dưới 1 thì xóa dòng (như cũ),
-   *  còn GÕ thì không bao giờ xóa — xóa dòng chỉ bằng nút X. */
-  const MAX_QTY = 999;
-
+  /** Bấm nút trừ xuống dưới 1 thì xóa dòng (như cũ), còn GÕ thì không bao giờ xóa
+   *  — xóa dòng chỉ bằng nút X. */
   const updateQty = (id: string, delta: number) => {
     if (!selectedTable) return;
     clearQtyDraft(id);
@@ -641,7 +670,11 @@ export default function SalesPage() {
                       <span className="min-w-0 flex-1">
                         <span className="block text-xs font-bold text-ink leading-snug group-hover:text-bean">{c.item.name}</span>
                         {c.size && <span className="block text-xs text-cafe-500">Size {c.size.name} — {formatCurrency(c.size.price)}</span>}
-                        {c.toppings.map(t => <span key={t.topping.id} className="block text-xs text-cafe-400">+ {t.topping.name} ({formatCurrency(t.topping.price)})</span>)}
+                        {c.toppings.map(t => (
+                          <span key={t.topping.id} className="block text-xs text-cafe-400">
+                            + {t.topping.name}{t.quantity > 1 && ` x${t.quantity}`} ({formatCurrency(t.topping.price * t.quantity)})
+                          </span>
+                        ))}
                         {c.note && <span className="block text-xs text-cafe-400 italic mt-0.5">&ldquo;{c.note}&rdquo;</span>}
                       </span>
                     </button>
@@ -764,11 +797,29 @@ export default function SalesPage() {
                   {allowedToppings.map(top => {
                     const selected = optForm.toppings.find(t => t.toppingId === top.id);
                     return (
-                      <label key={top.id} className={`flex items-center gap-3 px-3.5 py-2.5 cursor-pointer border-b border-line/60 last:border-0 transition-colors ${selected ? 'bg-bean-tint' : 'hover:bg-sand'}`}>
-                        <input type="checkbox" checked={!!selected} onChange={() => toggleTopping(top.id)} className="accent-bean" />
-                        <span className="flex-1 text-sm text-ink">{top.name}</span>
-                        <span className="text-sm text-cafe-500 font-semibold">+{formatCurrency(top.price)}</span>
-                      </label>
+                      <div key={top.id} className={`flex items-center gap-3 px-3.5 py-2.5 border-b border-line/60 last:border-0 transition-colors ${selected ? 'bg-bean-tint' : 'hover:bg-sand'}`}>
+                        <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                          <input type="checkbox" checked={!!selected} onChange={() => toggleTopping(top.id)} className="accent-bean" />
+                          <span className="flex-1 text-sm text-ink truncate">{top.name}</span>
+                        </label>
+                        {/* Nút tăng giảm chỉ hiện khi topping ĐÃ được chọn: chưa chọn mà
+                            bày sẵn ô số lượng thì không rõ bấm cộng là chọn hay là đếm. */}
+                        {selected && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button type="button" onClick={() => updateToppingQty(top.id, -1)}
+                              aria-label={`Bớt một phần ${top.name}`}
+                              className="w-7 h-7 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Minus className="w-3 h-3" /></button>
+                            <span className="text-sm font-bold w-6 text-center tabular-nums">{selected.qty}</span>
+                            <button type="button" onClick={() => updateToppingQty(top.id, 1)}
+                              aria-label={`Thêm một phần ${top.name}`}
+                              disabled={selected.qty >= MAX_TOPPING_QTY}
+                              className="w-7 h-7 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors disabled:opacity-40 disabled:hover:border-line disabled:hover:text-current"><Plus className="w-3 h-3" /></button>
+                          </div>
+                        )}
+                        <span className="text-sm text-cafe-500 font-semibold shrink-0 w-[92px] text-right">
+                          +{formatCurrency(top.price * (selected?.qty ?? 1))}
+                        </span>
+                      </div>
                     );
                   })}
                 </div>
@@ -777,10 +828,33 @@ export default function SalesPage() {
 
             <div>
               <label className="label-funcafe">Số lượng</label>
-              <div className="flex items-center gap-3">
-                <button onClick={() => setOptForm(f => ({ ...f, qty: Math.max(1, f.qty - 1) }))} className="w-9 h-9 rounded-xl bg-sand border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Minus className="w-4 h-4" /></button>
-                <span className="text-lg font-bold w-8 text-center">{optForm.qty}</span>
-                <button onClick={() => setOptForm(f => ({ ...f, qty: f.qty + 1 }))} className="w-9 h-9 rounded-xl bg-sand border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Plus className="w-4 h-4" /></button>
+              <div className="flex items-center gap-2">
+                <button type="button" aria-label="Bớt một món"
+                  onClick={() => { setOptQtyDraft(null); setOptForm(f => ({ ...f, qty: Math.max(1, f.qty - 1) })); }}
+                  className="w-9 h-9 rounded-xl bg-sand border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Minus className="w-4 h-4" /></button>
+                {/* Gõ được số, không chỉ bấm cộng từng cái — giống hệt ô số lượng của
+                    dòng trong giỏ. Gõ "12" bao giờ cũng đi qua "1", nên số dở dang giữ
+                    trong optQtyDraft chứ không ép thẳng vào optForm.qty. */}
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={MAX_QTY}
+                  aria-label="Số lượng"
+                  value={optQtyDraft ?? String(optForm.qty)}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '').slice(0, 3);
+                    setOptQtyDraft(raw);
+                    const n = parseInt(raw, 10);
+                    if (n >= 1) setOptForm(f => ({ ...f, qty: Math.min(MAX_QTY, n) }));
+                  }}
+                  onBlur={() => setOptQtyDraft(null)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="text-base font-bold w-16 h-9 text-center rounded-xl border border-line bg-white focus:outline-none focus:ring-1 focus:ring-bean focus:border-bean [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button type="button" aria-label="Thêm một món"
+                  onClick={() => { setOptQtyDraft(null); setOptForm(f => ({ ...f, qty: Math.min(MAX_QTY, f.qty + 1) })); }}
+                  className="w-9 h-9 rounded-xl bg-sand border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Plus className="w-4 h-4" /></button>
               </div>
             </div>
 

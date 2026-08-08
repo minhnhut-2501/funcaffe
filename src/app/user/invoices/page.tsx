@@ -211,12 +211,15 @@ export default function InvoicesPage() {
                         <td className="py-1.5 text-right">{formatCurrency(item.unitPrice)}</td>
                         <td className="py-1.5 text-right font-medium">{formatCurrency(item.unitPrice * item.quantity)}</td>
                       </tr>
+                      {/* t.quantity là số phần topping cho MỘT ly, nên phải nhân thêm số
+                          ly (item.quantity) mới ra phần khách thật sự trả. Trước đây bỏ
+                          quên nên cộng các dòng lại không khớp tổng hóa đơn. */}
                       {item.toppings.map((t, ti) => (
                         <tr key={ti} className="text-cafe-400">
                           <td className="py-1 pl-3 pr-2">+ {t.toppingNameSnapshot}</td>
-                          <td className="py-1 text-center">{t.quantity}</td>
+                          <td className="py-1 text-center">{t.quantity * item.quantity}</td>
                           <td className="py-1 text-right">{formatCurrency(t.priceAtTime)}</td>
-                          <td className="py-1 text-right">{formatCurrency(t.priceAtTime * t.quantity)}</td>
+                          <td className="py-1 text-right">{formatCurrency(t.priceAtTime * t.quantity * item.quantity)}</td>
                         </tr>
                       ))}
                     </Fragment>
