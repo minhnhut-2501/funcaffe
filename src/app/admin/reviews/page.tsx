@@ -8,7 +8,7 @@ import Modal from '@/components/ui/Modal';
 import DateRangePicker from '@/components/ui/DateRangePicker';
 import { reviewService } from '@/services';
 import { useToast } from '@/hooks/use-toast';
-import { Star, AlertCircle, Eye, EyeOff, History, RotateCcw, MessageSquareText } from 'lucide-react';
+import { Star, AlertCircle, Eye, History, RotateCcw, MessageSquareText } from 'lucide-react';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge from '@/components/user/StatusBadge';
@@ -248,9 +248,7 @@ export default function AdminReviewsPage() {
           <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
             <button onClick={() => setDetail(null)} className="btn-secondary">Đóng</button>
             <button onClick={() => handleToggle(detail)} className="btn-primary">
-              {detail.status === 'visible'
-                ? <><EyeOff className="w-4 h-4" />Ẩn khỏi trang giới thiệu</>
-                : <><Eye className="w-4 h-4" />Hiện trên trang giới thiệu</>}
+              {detail.status === 'visible' ? 'Ẩn khỏi trang giới thiệu' : 'Hiện trên trang giới thiệu'}
             </button>
           </div>
         )}

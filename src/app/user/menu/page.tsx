@@ -15,7 +15,7 @@ import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge from '@/components/user/StatusBadge';
 import ToppingPickerModal from '@/components/user/ToppingPickerModal';
 import type { MenuItem, MenuItemSize, Topping } from '@/types';
-import { Plus, Pencil, Trash2, Eye, EyeOff, RotateCcw, FolderPlus, Image as ImageIcon, UtensilsCrossed, AlertCircle, CupSoda, ChevronRight, FolderTree } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, RotateCcw, FolderPlus, Image as ImageIcon, UtensilsCrossed, AlertCircle, CupSoda, ChevronRight, FolderTree } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import Pagination, { usePagination } from '@/components/ui/Pagination';
 
@@ -280,14 +280,17 @@ export default function MenuPage() {
               <div className="flex items-center justify-end gap-1 mt-2.5 pt-2.5 border-t border-line/60">
                 <button onClick={() => setViewTarget(item)} title="Xem" className="p-3 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Eye className="w-4 h-4" /></button>
                 <button onClick={() => openEdit(item)} title="Sửa" className="p-3 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                {/* Ẩn/hiện viết thành CHỮ chứ không dùng con mắt gạch chéo: ngay bên
+                    trái đã có nút Xem mang icon con mắt, hai glyph mắt cạnh nhau ở cỡ
+                    16px nhìn như lặp lại. Chữ nói thẳng ra hành động sẽ xảy ra. */}
                 {managable ? (
                   <button onClick={() => handleToggleAvailable(item)}
                     title={item.isAvailable ? 'Ẩn món (ngừng bán)' : 'Mở bán lại'}
-                    className={`p-3 rounded-lg transition-colors ${item.isAvailable ? 'text-cafe-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:text-pine hover:bg-pine/10'}`}>
-                    {item.isAvailable ? <EyeOff className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                    className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${item.isAvailable ? 'border-line text-cafe-500 hover:text-amber-600 hover:border-amber-200 hover:bg-amber-50' : 'border-pine/30 text-pine hover:bg-pine/12'}`}>
+                    {item.isAvailable ? 'Ẩn' : 'Hiện'}
                   </button>
                 ) : (
-                  <LockedButton className="p-3 text-xs"><EyeOff className="w-3.5 h-3.5" /></LockedButton>
+                  <LockedButton className="px-3 py-2 text-xs">Ẩn</LockedButton>
                 )}
               </div>
             </div>
@@ -341,11 +344,11 @@ export default function MenuPage() {
                       {managable ? (
                         <button onClick={() => handleToggleAvailable(item)}
                           title={item.isAvailable ? 'Ẩn món (ngừng bán)' : 'Mở bán lại'}
-                          className={`p-2 rounded-lg transition-colors ${item.isAvailable ? 'text-cafe-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:text-pine hover:bg-pine/10'}`}>
-                          {item.isAvailable ? <EyeOff className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                          className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${item.isAvailable ? 'border-line text-cafe-500 hover:text-amber-600 hover:border-amber-200 hover:bg-amber-50' : 'border-pine/30 text-pine hover:bg-pine/12'}`}>
+                          {item.isAvailable ? 'Ẩn' : 'Hiện'}
                         </button>
                       ) : (
-                        <LockedButton className="p-2 text-xs"><EyeOff className="w-3.5 h-3.5" /></LockedButton>
+                        <LockedButton className="px-2.5 py-1.5 text-xs">Ẩn</LockedButton>
                       )}
                     </div>
                   </td>
@@ -389,11 +392,11 @@ export default function MenuPage() {
                       title="Sửa danh mục" className="p-2 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => handleCatToggle(c)}
                       title={c.isActive ? 'Ẩn danh mục' : 'Hiển thị lại'}
-                      className={`p-2 rounded-lg transition-colors ${c.isActive ? 'text-cafe-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:text-pine hover:bg-pine/10'}`}>
-                      {c.isActive ? <EyeOff className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${c.isActive ? 'border-line text-cafe-500 hover:text-amber-600 hover:border-amber-200 hover:bg-amber-50' : 'border-pine/30 text-pine hover:bg-pine/12'}`}>
+                      {c.isActive ? 'Ẩn' : 'Hiện'}
                     </button>
                   </>) : (
-                    <LockedButton className="p-2 text-xs"><EyeOff className="w-3.5 h-3.5" /></LockedButton>
+                    <LockedButton className="px-2.5 py-1.5 text-xs">Ẩn</LockedButton>
                   )}
                 </div>
               </div>

@@ -7,7 +7,7 @@ import { packageService, timeSubscriptionService } from '@/services';
 import { formatCurrency } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import type { Package, TimeSubscription } from '@/types';
-import { Check, X, Pencil, Plus, EyeOff, AlertCircle } from 'lucide-react';
+import { Check, X, Pencil, Plus, AlertCircle } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import StatusBadge from '@/components/user/StatusBadge';
@@ -280,34 +280,41 @@ export default function AdminPackagesPage() {
               {timeSubs.length === 0 ? (
                 <p className="text-sm text-cafe-400">Chưa có thời hạn nào. Nhấn "Thêm" để tạo mới.</p>
               ) : (
-                <div className="bg-white rounded-xl border border-line overflow-hidden">
+                // overflow-x-auto chứ không overflow-hidden: hộp thoại chỉ rộng max-w-2xl,
+                // gói có nhãn dài và giá bảy chữ số (1.399.000 đ) là bảng vượt khung —
+                // overflow-hidden cắt mất luôn cột Hành động mà không có thanh cuộn.
+                <div className="bg-white rounded-xl border border-line overflow-x-auto">
+                  {/* Không đặt min-w: mọi ô đều whitespace-nowrap nên bảng tự co về đúng
+                      bề rộng nội dung, vừa khít hộp thoại. Đặt min-w cứng thì gói có giá
+                      bảy chữ số lại đẩy cột Hành động ra ngoài. */}
                   <table className="w-full text-sm">
                     <thead className="bg-sand border-b border-line">
                       <tr>
-                        <th className="text-left px-3 py-2 text-cafe-600 font-semibold text-xs">Nhãn</th>
-                        <th className="text-right px-3 py-2 text-cafe-600 font-semibold text-xs">Giá trị</th>
-                        <th className="text-left px-3 py-2 text-cafe-600 font-semibold text-xs">Đơn vị</th>
-                        <th className="text-right px-3 py-2 text-cafe-600 font-semibold text-xs">Giá</th>
-                        <th className="text-left px-3 py-2 text-cafe-600 font-semibold text-xs">Trạng thái</th>
-                        <th className="text-right px-3 py-2 text-cafe-600 font-semibold text-xs">Hành động</th>
+                        <th className="text-left px-2 py-2 text-cafe-600 font-semibold text-xs whitespace-nowrap">Nhãn</th>
+                        {/* Gộp "Giá trị" và "Đơn vị" làm một: tách đôi thì bảng rộng hơn
+                            bề ngang hộp thoại, mà đọc riêng "3" rồi "Tháng" cũng không rõ
+                            hơn "3 tháng". */}
+                        <th className="text-left px-2 py-2 text-cafe-600 font-semibold text-xs whitespace-nowrap">Thời lượng</th>
+                        <th className="text-right px-2 py-2 text-cafe-600 font-semibold text-xs whitespace-nowrap">Giá</th>
+                        <th className="text-left px-2 py-2 text-cafe-600 font-semibold text-xs whitespace-nowrap">Trạng thái</th>
+                        <th className="text-right px-2 py-2 text-cafe-600 font-semibold text-xs whitespace-nowrap">Hành động</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line/70">
                       {timeSubs.map(t => (
                         <tr key={t.id} className="hover:bg-sand/50 transition-colors">
-                          <td className="px-3 py-2 font-semibold text-ink">{t.label}</td>
-                          <td className="px-3 py-2 text-right text-cafe-700">{t.durationValue}</td>
-                          <td className="px-3 py-2 text-cafe-600">{t.durationUnit === 'month' ? 'Tháng' : 'Ngày'}</td>
-                          <td className="px-3 py-2 text-right font-semibold text-bean">{formatCurrency(t.price)}</td>
-                          <td className="px-3 py-2"><StatusBadge tone={t.status === 'active' ? 'success' : 'neutral'}>{t.status === 'active' ? 'Đang dùng' : 'Ẩn'}</StatusBadge></td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-2 font-semibold text-ink whitespace-nowrap">{t.label}</td>
+                          <td className="px-2 py-2 text-cafe-600 whitespace-nowrap">{t.durationValue} {t.durationUnit === 'month' ? 'tháng' : 'ngày'}</td>
+                          <td className="px-2 py-2 text-right font-semibold text-bean whitespace-nowrap">{formatCurrency(t.price)}</td>
+                          <td className="px-2 py-2 whitespace-nowrap"><StatusBadge tone={t.status === 'active' ? 'success' : 'neutral'}>{t.status === 'active' ? 'Đang dùng' : 'Ẩn'}</StatusBadge></td>
+                          <td className="px-2 py-2 whitespace-nowrap">
                             <div className="flex gap-1 justify-end">
                               <button onClick={() => openTsEdit(t)} title="Sửa" className="p-1.5 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
                               {/* Ẩn chứ không xoá — mốc đã ẩn thì không còn gì để ẩn nữa,
-                                  bật lại bằng nút Sửa. Biểu tượng thùng rác gây hiểu nhầm
-                                  là xoá vĩnh viễn nên dùng con mắt gạch chéo. */}
+                                  bật lại bằng nút Sửa. Thùng rác gây hiểu nhầm là xoá vĩnh
+                                  viễn, còn con mắt gạch chéo thì phải đoán; viết thẳng chữ. */}
                               {t.status === 'active' && (
-                                <button onClick={() => setTsDelete(t)} title="Ẩn khỏi trang mua gói" className="p-1.5 text-cafe-400 hover:text-gold-deep hover:bg-gold/12 rounded-lg transition-colors"><EyeOff className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => setTsDelete(t)} title="Ẩn khỏi trang mua gói" className="px-2 py-1 rounded-lg border border-line text-xs font-semibold text-cafe-500 hover:text-gold-deep hover:border-gold/40 hover:bg-gold/12 transition-colors">Ẩn</button>
                               )}
                             </div>
                           </td>

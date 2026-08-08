@@ -15,7 +15,7 @@ import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { SearchInput } from '@/components/user/FilterBar';
 import StatusBadge from '@/components/user/StatusBadge';
 import type { Topping } from '@/types';
-import { Plus, Pencil, EyeOff, RotateCcw, Image as ImageIcon, CupSoda } from 'lucide-react';
+import { Plus, Pencil, Image as ImageIcon, CupSoda } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 
 export default function ToppingsPage() {
@@ -119,14 +119,16 @@ export default function ToppingsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1 justify-end">
                     <button onClick={() => openEdit(t)} className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                    {/* Ẩn/hiện viết thành CHỮ, không dùng con mắt gạch chéo — cùng quy
+                        ước với trang Thực đơn: chữ nói thẳng ra hành động sẽ xảy ra. */}
                     {managable ? (
                       <button onClick={() => handleToggleAvailable(t)}
                         title={t.isAvailable ? 'Ẩn topping (ngừng bán)' : 'Mở bán lại'}
-                        className={`p-2 rounded-lg transition-colors ${t.isAvailable ? 'text-cafe-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:text-pine hover:bg-pine/10'}`}>
-                        {t.isAvailable ? <EyeOff className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${t.isAvailable ? 'border-line text-cafe-500 hover:text-amber-600 hover:border-amber-200 hover:bg-amber-50' : 'border-pine/30 text-pine hover:bg-pine/12'}`}>
+                        {t.isAvailable ? 'Ẩn' : 'Hiện'}
                       </button>
                     ) : (
-                      <LockedButton className="p-2 text-xs"><EyeOff className="w-3.5 h-3.5" /></LockedButton>
+                      <LockedButton className="px-2.5 py-1.5 text-xs">Ẩn</LockedButton>
                     )}
                   </div>
                 </td>

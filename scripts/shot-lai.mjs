@@ -14,14 +14,10 @@ const B = 'http://localhost:3000';
 const OUT = 'doc/report-shots';
 
 const ADMIN_EMAIL = 'admin.preview@funcafe.local';
-const ADMIN_PASS = process.env.ADMIN_PASS;
 // Mat khau KHONG viet cung trong ma nguon — kho nay cong khai.
 // Chay:  ADMIN_PASS='...' node scripts/<ten>.mjs
-if (!ADMIN_PASS) {
-  console.error('Thieu ADMIN_PASS. Chay lai kem bien moi truong ADMIN_PASS truoc lenh node.');
-  process.exit(1);
-}
-
+// Chi bat buoc khi trong danh sach chup co trang thuoc khu Admin (kiem o duoi).
+const ADMIN_PASS = process.env.ADMIN_PASS;
 const OWNER_TOKEN = process.env.OWNER_TOKEN;
 
 /** ten -> { khu, duong-dan, chuan-bi } */
@@ -41,6 +37,13 @@ const TRANG = {
     },
   },
   'user-menu': { khu: 'user', path: '/user/menu' },
+  'user-menu-category': {
+    khu: 'user', path: '/user/menu',
+    chuan_bi: async (p) => {
+      await p.getByRole('button', { name: /Danh mục/ }).first().click();
+      await p.waitForTimeout(900);
+    },
+  },
   // Bo chon topping chi hien khi mon da bat "cho phep topping" — phai sua dung mot
   // mon co huy hieu Topping, khong phai mon bat ky.
   'user-menu-item-toppings': {
@@ -72,8 +75,16 @@ const TRANG = {
       // dung mot moc 7 ngay gia 0d, khong minh hoa duoc viec quan ly nhieu moc thoi han.
       await p.locator('button:has(svg.lucide-pencil)').last().click();
       await p.waitForTimeout(2500);
-      await p.locator('[role=dialog], .fixed.inset-0').last()
-        .evaluate(el => { el.scrollTop = el.scrollHeight; }).catch(() => {});
+      // Vung cuon cua Modal la <div class="overflow-y-auto"> BEN TRONG hop thoai,
+      // khong phai lop phu .fixed.inset-0 — cuon nham lop phu thi khong nhuc nhich
+      // ma cung khong bao loi, anh chup ra van dung dau hop thoai.
+      const cuon = await p.evaluate(() => {
+        const box = document.querySelector('.print-root .overflow-y-auto');
+        if (!box) return false;
+        box.scrollTop = box.scrollHeight;
+        return box.scrollTop > 0;
+      });
+      if (!cuon) throw new Error('khong cuon duoc xuong muc Quan ly thoi han');
       await p.waitForTimeout(1000);
     },
   },
@@ -92,6 +103,10 @@ for (const t of can) {
 }
 if (can.some(t => TRANG[t].khu === 'user') && !OWNER_TOKEN) {
   console.error('Thiếu OWNER_TOKEN cho khu User.');
+  process.exit(1);
+}
+if (can.some(t => TRANG[t].khu === 'admin') && !ADMIN_PASS) {
+  console.error('Thiếu ADMIN_PASS cho khu Admin.');
   process.exit(1);
 }
 
