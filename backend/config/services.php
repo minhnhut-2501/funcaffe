@@ -58,6 +58,8 @@ return [
         'endpoint'     => env('MOMO_ENDPOINT', 'https://test-payment.momo.vn/v2/gateway/api/create'),
         'redirect_url' => env('MOMO_REDIRECT_URL', env('APP_URL', 'http://localhost:8000') . '/api/payments/momo/return'),
         'ipn_url'      => env('MOMO_IPN_URL', env('APP_URL', 'http://localhost:8000') . '/api/payments/momo/ipn'),
+        // captureWallet = ví MoMo (cần app MoMo Test) · payWithATM = thẻ ATM trên trình duyệt
+        'request_type' => env('MOMO_REQUEST_TYPE', 'captureWallet'),
     ],
 
 ];

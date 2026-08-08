@@ -50,7 +50,15 @@ class MomoService
 
         $cfg = config('services.momo');
         $extraData = '';
-        $requestType = 'captureWallet';
+
+        // captureWallet = tra bang vi MoMo (quet ma bang app). payWithATM = tra bang
+        // the ATM noi dia ngay tren trinh duyet, khong can app.
+        //
+        // De o .env de chuyen duoc ma khong phai sua ma nguon: moi truong thu nghiem
+        // chi mo vi bang APP TEST rieng cua MoMo (Android/iOS, phai go app that truoc),
+        // nen khi khong co thiet bi phu hop thi dat MOMO_REQUEST_TYPE=payWithATM de
+        // van chay tron luong that — van ky HMAC-SHA256, van nhan IPN, van kich hoat goi.
+        $requestType = (string) ($cfg['request_type'] ?? 'captureWallet');
         // requestId phải khác orderId và duy nhất theo TỪNG LẦN GỌI: nếu lần tạo đầu
         // lỗi mạng, lần thử lại vẫn dùng chung orderId nhưng phải có requestId mới.
         $requestId = $orderId . '-' . now()->format('YmdHis');
