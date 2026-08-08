@@ -40,7 +40,8 @@ Thumbs.db
 /artifacts/
 /attached_assets/
 /lib/
-/scripts/
+# scripts/ ĐƯỢC theo dõi: đây là công cụ dựng ảnh cho báo cáo, nén ảnh, dọn ảnh
+# mồ côi trong .docx, chạy thử giao dịch và kiểm bản in. Tổng 80 KB.
 pnpm-lock.yaml
 pnpm-workspace.yaml
 replit.md
