@@ -15,8 +15,9 @@ import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge from '@/components/user/StatusBadge';
 import ToppingPickerModal from '@/components/user/ToppingPickerModal';
 import type { MenuItem, MenuItemSize, Topping } from '@/types';
-import { Plus, Pencil, Trash2, Eye, EyeOff, RotateCcw, FolderPlus, Image as ImageIcon, UtensilsCrossed, AlertCircle, CupSoda, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, RotateCcw, FolderPlus, Image as ImageIcon, UtensilsCrossed, AlertCircle, CupSoda, ChevronRight, FolderTree } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 
 export default function MenuPage() {
   const { user } = useAuth();
@@ -36,6 +37,9 @@ export default function MenuPage() {
   const [loading, setLoading] = useState(true);
   const [toppingPickerOpen, setToppingPickerOpen] = useState(false);
   const [catEditModal, setCatEditModal] = useState<{ open: boolean; target?: { id?: string; name: string; description?: string; isActive: boolean } }>({ open: false, target: { name: '', isActive: true } });
+  // Danh mục tách hẳn thành một tab thay vì khối thu gọn cuối trang: đó là nơi
+  // duy nhất sửa và ẩn/hiện được danh mục, mà lại là chỗ khó thấy nhất.
+  const [tab, setTab] = useState<'items' | 'categories'>('items');
 
   const load = () => {
     setLoading(true);
@@ -60,6 +64,10 @@ export default function MenuPage() {
     (toppingFilter === 'all' || (toppingFilter === 'yes' ? i.allowTopping : !i.allowTopping)) &&
     i.name.toLowerCase().includes(search.toLowerCase())
   ).sort((a, b) => compareByName(a.name, b.name));
+
+  // Cắt trang SAU khi đã lọc và tìm kiếm, không phải trước.
+  const itemPaging = usePagination(filtered);
+  const catPaging = usePagination(categories);
 
   // Giới hạn theo gói (Pro: tối đa 15 món; Free/Pro Max: không giới hạn).
   // Chỉ áp cho gói có quyền chỉnh sửa & có trần hữu hạn (Pro) — bỏ qua 'none'.
@@ -175,19 +183,41 @@ export default function MenuPage() {
     <div>
       <PageHeader title="Thực đơn" description="Quản lý món, giá bán, size và topping của quán."
         actions={<div className="flex items-center gap-2">
-          {hasItemCap && (
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${atItemLimit ? 'bg-red-50 text-red-600 border-red-200' : 'bg-sand text-cafe-600 border-line'}`}>
-              {items.length}/{limits.maxMenuItems} món
-            </span>
+          {/* Nút đổi theo tab đang mở — hiện cả hai cùng lúc thì rối và dễ bấm nhầm. */}
+          {tab === 'items' ? (<>
+            {hasItemCap && (
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${atItemLimit ? 'bg-red-50 text-red-600 border-red-200' : 'bg-sand text-cafe-600 border-line'}`}>
+                {items.length}/{limits.maxMenuItems} món
+              </span>
+            )}
+            <button onClick={openAdd} disabled={atItemLimit || !managable}
+              title={!managable ? 'Gói đã hết hạn — chỉ có thể xem' : atItemLimit ? `Gói Pro tối đa ${limits.maxMenuItems} món — nâng cấp Pro Max để không giới hạn` : undefined}
+              className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Plus className="w-4 h-4" />Thêm món</button>
+          </>) : (
+            <button onClick={() => setCatEditModal({ open: true, target: { name: '', isActive: true } })} disabled={!managable}
+              title={!managable ? 'Gói đã hết hạn — chỉ có thể xem' : undefined}
+              className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><FolderPlus className="w-4 h-4" />Thêm danh mục</button>
           )}
-          <button onClick={() => setCatEditModal({ open: true, target: { name: '', isActive: true } })} className="btn-secondary flex items-center gap-1.5 text-sm"><FolderPlus className="w-4 h-4" />Thêm danh mục</button>
-          <button onClick={openAdd} disabled={atItemLimit || !managable}
-            title={!managable ? 'Gói đã hết hạn — chỉ có thể xem' : atItemLimit ? `Gói Pro tối đa ${limits.maxMenuItems} món — nâng cấp Pro Max để không giới hạn` : undefined}
-            className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Plus className="w-4 h-4" />Thêm món</button>
         </div>} />
 
       {loading && <LoadingSkeleton variant="table" rows={6} cols={5} />}
       {!loading && (<>
+
+      <div className="flex gap-1 border-b border-line mb-6">
+        <button onClick={() => setTab('items')}
+          className={`px-4 py-2.5 text-sm border-b-2 -mb-px transition-colors inline-flex items-center gap-1.5 ${tab === 'items' ? 'border-bean text-bean font-semibold' : 'border-transparent text-cafe-500 hover:text-ink font-medium'}`}>
+          <UtensilsCrossed className="w-4 h-4" />Món ăn
+          {items.length > 0 && <span className="text-[11px] font-semibold bg-sand text-cafe-500 rounded-full px-1.5">{items.length}</span>}
+        </button>
+        <button onClick={() => setTab('categories')}
+          className={`px-4 py-2.5 text-sm border-b-2 -mb-px transition-colors inline-flex items-center gap-1.5 ${tab === 'categories' ? 'border-bean text-bean font-semibold' : 'border-transparent text-cafe-500 hover:text-ink font-medium'}`}>
+          <FolderTree className="w-4 h-4" />Danh mục
+          {categories.length > 0 && <span className="text-[11px] font-semibold bg-sand text-cafe-500 rounded-full px-1.5">{categories.length}</span>}
+        </button>
+      </div>
+
+      {/* ===== Tab: Món ăn ===== */}
+      {tab === 'items' && (<>
 
       {atItemLimit && (
         <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
@@ -222,7 +252,7 @@ export default function MenuPage() {
 
       {/* Mobile: giao diện thẻ thay cho bảng cứng để không phải cuộn ngang trên màn hẹp */}
       <div className="stagger md:hidden space-y-2.5">
-        {filtered.map(item => {
+        {itemPaging.pageRows.map(item => {
           const minPrice = item.hasSize && item.sizes.length > 0
             ? Math.min(...item.sizes.filter(s => s.isActive).map(s => s.price))
             : item.basePrice;
@@ -285,7 +315,7 @@ export default function MenuPage() {
             </tr>
           </thead>
           <tbody className="stagger divide-y divide-line/70">
-            {filtered.map(item => {
+            {itemPaging.pageRows.map(item => {
               const minPrice = item.hasSize && item.sizes.length > 0
                 ? Math.min(...item.sizes.filter(s => s.isActive).map(s => s.price))
                 : item.basePrice;
@@ -332,6 +362,52 @@ export default function MenuPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={itemPaging.page} lastPage={itemPaging.lastPage} total={itemPaging.total}
+        onChange={itemPaging.setPage} unit="món" />
+
+      </>)}
+
+      {/* ===== Tab: Danh mục ===== */}
+      {tab === 'categories' && (
+        categories.length === 0 ? (
+          <EmptyState icon={FolderTree} title="Chưa có danh mục nào"
+            description="Danh mục giúp nhóm các món lại với nhau, ví dụ Cà phê, Trà sữa, Bánh ngọt. Thêm danh mục trước khi tạo món." />
+        ) : (<>
+          <div className="space-y-1.5">
+            {catPaging.pageRows.map(c => (
+              <div key={c.id} className="flex items-center justify-between px-3.5 py-2.5 bg-white rounded-xl border border-line shadow-soft">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-semibold text-ink truncate">{c.name}</span>
+                  {!c.isActive && <span className="badge-inactive text-xs shrink-0">Ẩn</span>}
+                  {c.description && <span className="text-xs text-cafe-400 truncate">— {c.description}</span>}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-xs text-cafe-400 mr-2">{items.filter(i => i.categoryId === c.id).length} món</span>
+                  {managable ? (<>
+                    <button onClick={() => setCatEditModal({ open: true, target: { id: c.id, name: c.name, description: c.description, isActive: c.isActive } })}
+                      title="Sửa danh mục" className="p-2 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => handleCatToggle(c)}
+                      title={c.isActive ? 'Ẩn danh mục' : 'Hiển thị lại'}
+                      className={`p-2 rounded-lg transition-colors ${c.isActive ? 'text-cafe-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-500 hover:text-pine hover:bg-pine/10'}`}>
+                      {c.isActive ? <EyeOff className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+                    </button>
+                  </>) : (
+                    <LockedButton className="p-2 text-xs"><EyeOff className="w-3.5 h-3.5" /></LockedButton>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Pagination page={catPaging.page} lastPage={catPaging.lastPage} total={catPaging.total}
+            onChange={catPaging.setPage} unit="danh mục" />
+
+          <p className="text-xs text-cafe-400 mt-4">
+            Danh mục chỉ ẩn được chứ không xóa — xóa sẽ làm các món bên trong mất nhóm.
+          </p>
+        </>)
+      )}
 
       {/* View Modal */}
       <Modal
@@ -552,36 +628,13 @@ export default function MenuPage() {
         </div>
       </Modal>
 
-      {/* Category list management */}
-      {categories.length === 0 && (
+      {/* Nhắc ở tab Món: chưa có danh mục thì không tạo món được. Tab Danh mục đã có
+          màn hình rỗng riêng nên không cần nhắc lại. */}
+      {tab === 'items' && categories.length === 0 && (
         <div className="mt-4 p-4 bg-gold/10 border border-gold/25 rounded-2xl text-center">
           <p className="text-sm text-gold-deep mb-2">Chưa có danh mục nào. Vui lòng thêm danh mục trước khi tạo món.</p>
-          <button onClick={() => setCatEditModal({ open: true, target: { name: '', isActive: true } })} className="btn-primary text-sm">Thêm danh mục đầu tiên</button>
+          <button onClick={() => setTab('categories')} className="btn-primary text-sm">Thêm danh mục đầu tiên</button>
         </div>
-      )}
-      {categories.length > 0 && (
-        <details className="mt-4 group">
-          <summary className="text-sm text-cafe-500 cursor-pointer hover:text-bean font-medium">Quản lý danh mục ({categories.length})</summary>
-          <div className="mt-2 space-y-1.5">
-            {categories.map(c => (
-              <div key={c.id} className="flex items-center justify-between px-3.5 py-2.5 bg-white rounded-xl border border-line shadow-soft">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-ink">{c.name}</span>
-                  {!c.isActive && <span className="badge-inactive text-xs">Ẩn</span>}
-                  {c.description && <span className="text-xs text-cafe-400">— {c.description}</span>}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setCatEditModal({ open: true, target: { id: c.id, name: c.name, description: c.description, isActive: c.isActive } })} className="p-1 text-cafe-400 hover:text-cafe-700"><Pencil className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => handleCatToggle(c)}
-                    title={c.isActive ? 'Ẩn danh mục' : 'Hiển thị lại'}
-                    className={`p-1 ${c.isActive ? 'text-cafe-400 hover:text-amber-600' : 'text-amber-500 hover:text-pine'}`}>
-                    {c.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </details>
       )}
       </>)}
     </div>
