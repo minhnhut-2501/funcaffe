@@ -79,7 +79,11 @@ export default function PricingPage() {
     { label: 'In hóa đơn',             free: true, pro: true, promax: true },
     { label: 'Thống kê & biểu đồ doanh thu', free: true, pro: true, promax: true },
     { label: 'Top món bán chạy & báo cáo',   free: true, pro: true, promax: true },
-    { label: 'Trợ lý AI & phân tích doanh thu', free: false, pro: proPkg?.canUseAI ?? false, promax: promaxPkg?.canUseAI ?? true },
+    // Cả ba cột đều đọc canUseAI từ gói trong CSDL. Trước đây cột Fun Free ghi cứng
+    // `false`, trong khi Fun Free là bản dùng thử TOÀN BỘ tính năng Pro Max trong
+    // 7 ngày nên thực tế có trợ lý AI — bảng so sánh nói ngược với chính danh sách
+    // tính năng của thẻ Fun Free ngay bên trên.
+    { label: 'Trợ lý AI & phân tích doanh thu', free: freePkg?.canUseAI ?? true, pro: proPkg?.canUseAI ?? false, promax: promaxPkg?.canUseAI ?? true },
   ];
 
   const cards = [
