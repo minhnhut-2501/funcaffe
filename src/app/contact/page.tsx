@@ -12,10 +12,10 @@ import { Mail, Phone, MapPin, Clock, CheckCircle2 } from 'lucide-react';
 // "tích cực / đã xác nhận" — dùng nó để tô icon Điện thoại là gợi ý một sự phân
 // loại không tồn tại, và làm loãng nghĩa của màu ở những chỗ nó nói thật.
 const info = [
-  { icon: Mail, label: 'Email', value: 'support@funcafe.vn' },
-  { icon: Phone, label: 'Điện thoại', value: '1900 1234' },
+  { icon: Mail, label: 'Email', value: 'nphec4007@gmail.com' },
+  { icon: Phone, label: 'Điện thoại', value: '0795 966 549' },
   { icon: Clock, label: 'Giờ hỗ trợ', value: 'Thứ 2 - Thứ 7, 8:00 - 22:00' },
-  { icon: MapPin, label: 'Địa chỉ', value: 'TP. Hồ Chí Minh' },
+  { icon: MapPin, label: 'Địa chỉ', value: 'Tòa nhà QTSC9 (toà T), đường Tô Ký, Phường Trung Mỹ Tây, TP. Hồ Chí Minh' },
 ];
 
 export default function ContactPage() {

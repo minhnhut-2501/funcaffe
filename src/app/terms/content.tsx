@@ -212,7 +212,7 @@ export const sections: LegalSection[] = [
         </p>
         <p>
           Bạn có thể ngừng sử dụng bất cứ lúc nào. Nếu muốn xóa hẳn tài khoản và dữ liệu, gửi yêu cầu
-          tới <a href="mailto:support@funcafe.vn">support@funcafe.vn</a> từ chính email đã đăng ký.
+          tới <a href="mailto:nphec4007@gmail.com">nphec4007@gmail.com</a> từ chính email đã đăng ký.
         </p>
       </>
     ),
@@ -250,7 +250,7 @@ export const sections: LegalSection[] = [
         </p>
         <p>Điều khoản này được điều chỉnh bởi pháp luật Việt Nam.</p>
         <p>
-          Mọi thắc mắc xin gửi về <a href="mailto:support@funcafe.vn">support@funcafe.vn</a> hoặc qua
+          Mọi thắc mắc xin gửi về <a href="mailto:nphec4007@gmail.com">nphec4007@gmail.com</a> hoặc qua
           trang <Link href="/contact">Liên hệ</Link>.
         </p>
       </>
