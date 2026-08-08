@@ -19,9 +19,14 @@ class UserController extends Controller
     // BUG-16 FIX: Trả về thông tin gói dịch vụ và tên quán cho mỗi user
     public function index()
     {
+        // Chi liet ke chu quan. Tai khoan quan tri khong phai khach hang: de lot vao
+        // day thi sai so dem nguoi dung, sai bo loc theo goi (admin khong co goi) va
+        // con hien ra nut khoa tai khoan.
         // Sắp ở CSDL chứ không sắp sau khi lấy: có phân trang nên sắp phía PHP chỉ
         // đảo được đúng 50 bản ghi của trang hiện tại.
-        $users = User::orderBy('created_at', 'desc')->paginate(50);
+        $users = User::where('role', 'user')
+            ->orderBy('created_at', 'desc')
+            ->paginate(50);
 
         $userIds = $users->pluck('_id')->map(fn($id) => (string) $id)->toArray();
 
@@ -97,9 +102,11 @@ class UserController extends Controller
 
     public function toggleLock(Request $request, User $user)
     {
-        // Không cho admin tự khóa chính mình (tránh tự khóa cửa hệ thống)
-        if ((string) $user->id === (string) $request->user()->id) {
-            return response()->json(['message' => 'Bạn không thể khóa chính tài khoản của mình.'], 400);
+        // SECURITY: khong khoa duoc BAT KY tai khoan quan tri nao, khong rieng gi
+        // chinh minh. Chan tu khoa chinh minh la chua du: he thong co the co nhieu
+        // admin, luc do admin nay khoa duoc admin kia.
+        if ($user->role === 'admin') {
+            return response()->json(['message' => 'Không thể khóa tài khoản quản trị.'], 403);
         }
 
         $newStatus = $user->status === 'active' ? 'locked' : 'active';

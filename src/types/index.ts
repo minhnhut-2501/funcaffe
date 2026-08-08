@@ -215,6 +215,11 @@ export interface User {
   cafeName?: string;
   hasUsedFreeTrial?: boolean;
   createdAt: string;
+  /**
+   * Vai trò. /admin/users chỉ trả về tài khoản chủ quán, nhưng giữ trường này để
+   * giao diện còn tự nhận biết được thay vì đoán.
+   */
+  role?: 'user' | 'admin';
   // Chỉ có ở API quản trị (/admin/users)
   cafes?: UserCafeSummary[];
   cafeCount?: number;

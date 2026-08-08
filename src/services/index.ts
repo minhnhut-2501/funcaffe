@@ -251,6 +251,7 @@ function mapUser(raw: any): User {
     phone: raw.phone ?? '',
     avatar: raw.avatar ?? undefined,
     status: raw.status === 'locked' ? 'locked' : 'active',
+    role: raw.role === 'admin' ? 'admin' : raw.role === 'user' ? 'user' : undefined,
     packageType: raw.package_type ?? 'none',
     packageName: raw.package_name ?? '',
     cafeName: raw.cafe_name ?? undefined,
