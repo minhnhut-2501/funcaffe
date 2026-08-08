@@ -8,6 +8,7 @@ import { formatCurrency, formatDateTime, formatDuration } from '@/lib/format';
 import type { Payment, PaymentStatus, CreditStatus } from '@/types';
 import { Eye, CreditCard } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge, { type Tone } from '@/components/user/StatusBadge';
 
@@ -32,6 +33,9 @@ export default function AdminPaymentsPage() {
     (packageFilter === 'all' || p.packageName === packageFilter) &&
     (p.userName.toLowerCase().includes(search.toLowerCase()) || p.transactionCode.toLowerCase().includes(search.toLowerCase()))
   );
+
+  // Cắt trang SAU khi đã lọc và tìm kiếm.
+  const paging = usePagination(filtered);
 
   const statusTone: Record<PaymentStatus, Tone> = {
     pending: 'warning',
@@ -100,7 +104,7 @@ export default function AdminPaymentsPage() {
             </tr>
           </thead>
           <tbody className="stagger divide-y divide-line/70">
-            {filtered.map(p => (
+            {paging.pageRows.map(p => (
               <tr key={p.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs font-bold text-bean">{p.transactionCode}</td>
                 <td className="px-4 py-3">
@@ -145,6 +149,9 @@ export default function AdminPaymentsPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
+        onChange={paging.setPage} unit="giao dịch" />
 
       {/* 2 cột thay vì 1: 13 dòng nhãn:giá trị xếp dọc trong khung 448px thì cao
           hơn cả màn hình, phải kéo mới đọc hết một giao dịch. */}

@@ -11,6 +11,7 @@ import type { User, UserCafeSummary } from '@/types';
 import { Eye, Lock, Unlock, Store, Users as UsersIcon } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge, { type Tone } from '@/components/user/StatusBadge';
 
@@ -47,6 +48,9 @@ export default function AdminUsersPage() {
     (statusFilter === 'all' || u.status === statusFilter) &&
     (u.fullName.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
   );
+
+  // Cắt trang SAU khi đã lọc và tìm kiếm.
+  const paging = usePagination(filtered);
 
   const toggleLock = async (u: User) => {
     setProcessing(true);
@@ -97,7 +101,7 @@ export default function AdminUsersPage() {
             </tr>
           </thead>
           <tbody className="stagger divide-y divide-line/70">
-            {filtered.map(u => (
+            {paging.pageRows.map(u => (
               <tr key={u.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3 font-semibold text-ink">{u.fullName}</td>
                 <td className="px-4 py-3 text-cafe-600">{u.email}</td>
@@ -136,6 +140,11 @@ export default function AdminUsersPage() {
           </tbody>
         </table>
       </div>
+      )}
+
+      {!loading && (
+        <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
+          onChange={paging.setPage} unit="tài khoản" />
       )}
 
       <Modal open={!!viewUser} onClose={() => setViewUser(null)} title="Chi tiết người dùng" size="xl">

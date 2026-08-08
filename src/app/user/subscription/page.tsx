@@ -11,6 +11,7 @@ import { Check, CreditCard, AlertCircle, ArrowUp, RotateCcw, History, Store } fr
 import type { Package, DurationMonths, TimeSubscription, MyPayment, OnlineGateway } from '@/types';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { isSubscriptionExpired } from '@/lib/permission';
 
 const durations: { value: DurationMonths; label: string }[] = [
@@ -56,6 +57,8 @@ export default function SubscriptionPage() {
   const [payments, setPayments] = useState<MyPayment[]>([]);
 
   const loadPayments = () => subscriptionService.payments().then(setPayments).catch(() => {});
+
+  const payPaging = usePagination(payments);
 
   const currentLevel = useMemo(() => {
     if (pkg === 'none' || !packages.length) return -1;
@@ -346,7 +349,7 @@ export default function SubscriptionPage() {
                   </tr>
                 </thead>
                 <tbody className="stagger divide-y divide-line/70">
-                  {payments.map(p => (
+                  {payPaging.pageRows.map(p => (
                     <tr key={p.id} className="hover:bg-sand/50 transition-colors">
                       <td className="px-3 py-2.5 font-mono text-xs font-bold text-bean">{p.transactionCode || '—'}</td>
                       <td className="px-3 py-2.5 text-ink">{p.packageName || '—'}</td>
@@ -374,6 +377,9 @@ export default function SubscriptionPage() {
               </table>
             </div>
           )}
+
+          <Pagination page={payPaging.page} lastPage={payPaging.lastPage} total={payPaging.total}
+            onChange={payPaging.setPage} unit="giao dịch" />
         </div>
       )}
 

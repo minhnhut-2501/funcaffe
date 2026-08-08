@@ -6,6 +6,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import LockedButton from '@/components/ui/LockedButton';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge, { tableStatusTone } from '@/components/user/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
@@ -53,6 +54,9 @@ export default function TablesPage() {
     (filterStatus === 'all' || t.status === filterStatus) &&
     t.name.toLowerCase().includes(search.toLowerCase())
   ).sort((a, b) => compareByName(a.name, b.name));
+
+  // Cắt trang SAU khi đã lọc và tìm kiếm.
+  const paging = usePagination(filtered);
 
   const counts = {
     all: tables.length,
@@ -171,7 +175,7 @@ export default function TablesPage() {
             </tr>
           </thead>
           <tbody className="stagger divide-y divide-line/70">
-            {filtered.map(t => (
+            {paging.pageRows.map(t => (
               <tr key={t.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-5 py-3 font-semibold text-ink">{t.name}</td>
                 <td className="px-5 py-3 text-cafe-600">{t.capacity} người</td>
@@ -201,6 +205,9 @@ export default function TablesPage() {
         </table>
         </div>
       </div>
+
+      <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
+        onChange={paging.setPage} unit="bàn" />
 
       <Modal
         open={!!viewTarget}

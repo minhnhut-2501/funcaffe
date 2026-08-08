@@ -10,9 +10,10 @@ import { canPrint } from '@/lib/permission';
 import { formatCurrency, formatDate, formatDateTime, formatPaymentMethod } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import type { Invoice } from '@/types';
-import { Eye, Printer, FileDown, RotateCcw, AlertCircle, Receipt } from 'lucide-react';
+import { Eye, Printer, RotateCcw, AlertCircle, Receipt } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import DateRangePicker from '@/components/ui/DateRangePicker';
 import StatusBadge from '@/components/user/StatusBadge';
@@ -29,9 +30,6 @@ export default function InvoicesPage() {
   const [toDate, setToDate] = useState('');
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
 
-  if (loading) return <div><PageHeader title="Hóa đơn" description="Xem, lọc và in hóa đơn thanh toán." /><LoadingSkeleton variant="table" rows={6} cols={7} /></div>;
-  if (error) return <div><PageHeader title="Hóa đơn" /><div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-2xl p-4"><AlertCircle className="w-5 h-5" /><span>Không thể tải danh sách hóa đơn.</span></div></div>;
-
   // Bán hàng chỉ có 2 phương thức: tiền mặt và chuyển khoản. Chuyển khoản được lưu là
   // 'vietqr', nhưng đơn cũ trong DB còn giá trị 'transfer' — gom cả hai vào một nhóm.
   const matchesMethod = (method?: string) =>
@@ -47,6 +45,16 @@ export default function InvoicesPage() {
       (toDate === '' || paidDate <= toDate)
     );
   });
+
+  // Cắt trang SAU khi đã lọc và tìm kiếm.
+  //
+  // Hook này phải gọi TRƯỚC hai nhánh return bên dưới. Đặt sau chúng thì lượt vẽ đầu
+  // (đang tải) không gọi hook, lượt sau lại gọi — React báo "change in the order of
+  // Hooks" và trang hỏng hẳn.
+  const paging = usePagination(filtered);
+
+  if (loading) return <div><PageHeader title="Hóa đơn" description="Xem, lọc và in hóa đơn thanh toán." /><LoadingSkeleton variant="table" rows={6} cols={7} /></div>;
+  if (error) return <div><PageHeader title="Hóa đơn" /><div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-2xl p-4"><AlertCircle className="w-5 h-5" /><span>Không thể tải danh sách hóa đơn.</span></div></div>;
 
   const resetFilters = () => { setSearch(''); setMethodFilter('all'); setFromDate(''); setToDate(''); };
 
@@ -82,7 +90,7 @@ export default function InvoicesPage() {
             </tr>
           </thead>
           <tbody className="stagger divide-y divide-line/70">
-            {filtered.map(inv => (
+            {paging.pageRows.map(inv => (
               <tr key={inv.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs font-bold text-bean">{inv.invoiceCode}</td>
                 <td className="px-4 py-3 font-mono text-xs text-cafe-500">{inv.orderCode}</td>
@@ -105,13 +113,6 @@ export default function InvoicesPage() {
                     ) : (
                       <LockedButton variant="secondary" className="p-2 text-xs"><Printer className="w-3.5 h-3.5" /></LockedButton>
                     )}
-                    {canPrint(pkg) ? (
-                      <button title="Tải PDF" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors">
-                        <FileDown className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <LockedButton variant="secondary" className="p-2 text-xs"><FileDown className="w-3.5 h-3.5" /></LockedButton>
-                    )}
                   </div>
                 </td>
               </tr>
@@ -126,6 +127,9 @@ export default function InvoicesPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
+        onChange={paging.setPage} unit="hóa đơn" className="no-print" />
 
       <Modal
         open={!!viewInvoice}
@@ -143,21 +147,6 @@ export default function InvoicesPage() {
             ) : (
               <LockedButton variant="secondary" className="flex-1 flex items-center justify-center gap-2 text-sm">
                 <Printer className="w-4 h-4" />In hóa đơn
-              </LockedButton>
-            )}
-            {canPrint(pkg) ? (
-              // BUG-18 FIX: Tải PDF dùng print-to-PDF thay vì cùng hành động với nút In
-              <button onClick={() => {
-                const originalTitle = document.title;
-                document.title = `HoaDon-${viewInvoice?.invoiceCode ?? 'invoice'}`;
-                window.print();
-                document.title = originalTitle;
-              }} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
-                <FileDown className="w-4 h-4" />Tải PDF
-              </button>
-            ) : (
-              <LockedButton variant="secondary" className="flex-1 flex items-center justify-center gap-2 text-sm">
-                <FileDown className="w-4 h-4" />Tải PDF
               </LockedButton>
             )}
             <button onClick={() => setViewInvoice(null)} className="btn-primary flex-1 text-sm">Đóng</button>

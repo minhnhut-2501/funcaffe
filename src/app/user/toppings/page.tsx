@@ -11,6 +11,7 @@ import { generateId, compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ImageUpload from '@/components/ui/ImageUpload';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { SearchInput } from '@/components/user/FilterBar';
 import StatusBadge from '@/components/user/StatusBadge';
 import type { Topping } from '@/types';
@@ -38,6 +39,10 @@ export default function ToppingsPage() {
   const filtered = toppings
     .filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => compareByName(a.name, b.name));
+
+  // Cat trang SAU khi da loc va tim kiem.
+  const paging = usePagination(filtered);
+
   const openAdd = () => { setEditTarget(null); setForm({ name: '', price: 0, isAvailable: true }); setModalOpen(true); };
   const openEdit = (t: Topping) => { setEditTarget(t); setForm(t); setModalOpen(true); };
   const handleSave = async () => {
@@ -99,7 +104,7 @@ export default function ToppingsPage() {
             </tr>
           </thead>
           <tbody className="stagger divide-y divide-line/70">
-            {filtered.map(t => (
+            {paging.pageRows.map(t => (
               <tr key={t.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3">
                   {t.imageUrl ? (
@@ -137,6 +142,9 @@ export default function ToppingsPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
+        onChange={paging.setPage} unit="topping" />
 
       <Modal
         open={modalOpen}

@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import DateRangePicker from '@/components/ui/DateRangePicker';
 import { reviewService } from '@/services';
@@ -92,6 +93,10 @@ export default function AdminReviewsPage() {
   const visibleCount = filtered.filter(r => r.status === 'visible').length;
   const editedCount = filtered.filter(r => (r.history?.length ?? 0) > 0).length;
 
+  // Cắt trang SAU khi đã lọc. Các chỉ số ở trên vẫn tính trên toàn bộ tập lọc,
+  // không phải trên trang đang xem.
+  const paging = usePagination(filtered);
+
   return (
     <div>
       <PageHeader
@@ -151,7 +156,7 @@ export default function AdminReviewsPage() {
           : <EmptyState title="Chưa có đánh giá nào" description="Khi chủ quán gửi đánh giá FunCafe, chúng sẽ hiển thị ở đây." />
       )}
 
-      {!loading && !error && filtered.length > 0 && (
+      {!loading && !error && filtered.length > 0 && (<>
         <div className="bg-white rounded-2xl border border-line overflow-x-auto shadow-soft">
           <table className="w-full text-sm min-w-[880px]">
             <thead className="bg-sand border-b border-line">
@@ -166,7 +171,7 @@ export default function AdminReviewsPage() {
               </tr>
             </thead>
             <tbody className="stagger divide-y divide-line/70">
-              {filtered.map(r => {
+              {paging.pageRows.map(r => {
                 const edits = r.history?.length ?? 0;
                 return (
                   <tr key={r.id} className="hover:bg-sand/50 transition-colors">
@@ -230,7 +235,9 @@ export default function AdminReviewsPage() {
             </tbody>
           </table>
         </div>
-      )}
+        <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
+          onChange={paging.setPage} unit="đánh giá" />
+      </>)}
 
       <Modal
         open={!!detail}

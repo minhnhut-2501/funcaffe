@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import Pagination, { usePagination } from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
 import { contactService, type ContactMessage } from '@/services';
 import { useToast } from '@/hooks/use-toast';
@@ -92,6 +93,9 @@ export default function AdminContactsPage() {
       m.content.toLowerCase().includes(q))
   );
 
+  // Cắt trang SAU khi đã lọc và tìm kiếm.
+  const paging = usePagination(filtered);
+
   const unreadCount = messages.filter(m => !m.isRead).length;
   const repliedCount = messages.filter(m => m.reply).length;
 
@@ -117,7 +121,7 @@ export default function AdminContactsPage() {
         <EmptyState title="Không có tin nhắn nào" description="Khi khách gửi form Liên hệ trên trang public, tin nhắn sẽ hiển thị ở đây." />
       )}
 
-      {!loading && !error && filtered.length > 0 && (
+      {!loading && !error && filtered.length > 0 && (<>
         <div className="bg-white rounded-2xl border border-line overflow-x-auto shadow-soft">
           <table className="w-full text-sm min-w-[900px]">
             <thead className="bg-sand border-b border-line">
@@ -132,7 +136,7 @@ export default function AdminContactsPage() {
               </tr>
             </thead>
             <tbody className="stagger divide-y divide-line/70">
-              {filtered.map(m => {
+              {paging.pageRows.map(m => {
                 const stage = stageOf(m);
                 return (
                   <tr key={m.id} className={`hover:bg-sand/50 transition-colors ${!m.isRead ? 'bg-bean-tint/30' : ''}`}>
@@ -173,7 +177,9 @@ export default function AdminContactsPage() {
             </tbody>
           </table>
         </div>
-      )}
+        <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
+          onChange={paging.setPage} unit="tin nhắn" />
+      </>)}
 
       <Modal
         open={!!detail}
