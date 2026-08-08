@@ -1,5 +1,5 @@
 'use client';
-import { useState, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
 import LockedButton from '@/components/ui/LockedButton';
@@ -29,6 +29,8 @@ export default function InvoicesPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+  /** Đã bấm in từ bảng, đang chờ hộp thoại vẽ xong. */
+  const [choIn, setChoIn] = useState(false);
 
   // Bán hàng chỉ có 2 phương thức: tiền mặt và chuyển khoản. Chuyển khoản được lưu là
   // 'vietqr', nhưng đơn cũ trong DB còn giá trị 'transfer' — gom cả hai vào một nhóm.
@@ -52,6 +54,22 @@ export default function InvoicesPage() {
   // (đang tải) không gọi hook, lượt sau lại gọi — React báo "change in the order of
   // Hooks" và trang hỏng hẳn.
   const paging = usePagination(filtered);
+
+  // In từ NÚT TRONG BẢNG: phải mở hóa đơn đó ra trước rồi mới in.
+  //
+  // Bản in được dựng bằng cách ẩn toàn bộ trang trừ khối .print-area, mà khối đó chỉ
+  // tồn tại bên trong hộp thoại chi tiết. Gọi thẳng window.print() từ dòng trong bảng
+  // — như trước đây — thì hộp thoại chưa mở, không có .print-area nào, và máy in nhận
+  // được MỘT TỜ TRẮNG. Lỗi này không lộ ra trên màn hình nên rất dễ lọt.
+  useEffect(() => {
+    if (!choIn || !viewInvoice) return;
+    // Đợi qua hai khung hình cho hộp thoại vẽ xong rồi mới gọi hộp thoại in.
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      setChoIn(false);
+    }));
+    return () => cancelAnimationFrame(id);
+  }, [choIn, viewInvoice]);
 
   if (loading) return <div><PageHeader title="Hóa đơn" description="Xem, lọc và in hóa đơn thanh toán." /><LoadingSkeleton variant="table" rows={6} cols={7} /></div>;
   if (error) return <div><PageHeader title="Hóa đơn" /><div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-2xl p-4"><AlertCircle className="w-5 h-5" /><span>Không thể tải danh sách hóa đơn.</span></div></div>;
@@ -107,7 +125,7 @@ export default function InvoicesPage() {
                       <Eye className="w-4 h-4" />
                     </button>
                     {canPrint(pkg) ? (
-                      <button onClick={() => window.print()} title="In hóa đơn" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors">
+                      <button onClick={() => { setViewInvoice(inv); setChoIn(true); }} title="In hóa đơn" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors">
                         <Printer className="w-4 h-4" />
                       </button>
                     ) : (

@@ -398,8 +398,18 @@
 }
 
 @media print {
-  body * { visibility: hidden; }
-  .print-area, .print-area * { visibility: visible; }
-  .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 16px; }
+  /* Chỉ in nội dung hộp thoại đang mở, bỏ hẳn phần còn lại của trang.
+     Trước đây dùng `visibility: hidden` cho cả trang rồi cho .print-area hiện lại.
+     Cách đó có hai chỗ hỏng: visibility vẫn GIỮ CHỖ nên bản in có một vùng trắng
+     cao bằng cả trang phía trên hóa đơn, và .print-area đặt position:absolute lại
+     bị khung cuộn của hộp thoại cắt mất phần dưới khi hóa đơn dài.
+     Ẩn hẳn bằng display:none thì nội dung cần in tự nằm đầu trang và tự sang trang
+     khi dài, không cần định vị tuyệt đối. */
+  body > *:not(.print-root) { display: none !important; }
+  .print-root { position: static !important; }
   .no-print { display: none !important; }
+  /* Bó ngang lại cho ra dáng hóa đơn. Để tràn hết khổ A4 thì cột "Thành tiền" dạt
+     ra tận mép giấy, mắt phải quét ngang cả trang mới đọc được một dòng món. */
+  .print-area { padding: 0; max-width: 460px; margin: 0 auto; }
+  @page { margin: 12mm; }
 }
