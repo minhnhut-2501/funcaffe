@@ -105,6 +105,8 @@ export default function SalesPage() {
   // Cùng lý do như qtyDraft, nhưng cho ô số lượng trong hộp thoại chọn món.
   // null = ô đang hiển thị đúng optForm.qty, không có gì dở dang.
   const [optQtyDraft, setOptQtyDraft] = useState<string | null>(null);
+  // Và cho ô số phần của từng topping, khóa theo id topping.
+  const [topQtyDraft, setTopQtyDraft] = useState<Record<string, string>>({});
 
   const cartToOrderItems = (items: CartItem[]): OrderItem[] =>
     items.map(c => ({
@@ -266,6 +268,7 @@ export default function SalesPage() {
     // Xóa số dở dang của lần mở trước, nếu không ô sẽ hiện "12" của món cũ
     // trong khi số lượng thật của món mới là 1.
     setOptQtyDraft(null);
+    setTopQtyDraft({});
     setOptForm({
       size: item.hasSize && item.sizes.length > 0
         ? item.sizes.find(s => s.isActive) ?? item.sizes[0]
@@ -280,6 +283,7 @@ export default function SalesPage() {
     setEditCartItemId(c.id);
     setOptionModal({ item: c.item });
     setOptQtyDraft(null);
+    setTopQtyDraft({});
     setOptForm({
       size: c.size ?? (c.item.hasSize && c.item.sizes.length > 0 ? c.item.sizes.find(s => s.isActive) ?? c.item.sizes[0] : null),
       toppings: c.toppings.map(t => ({ toppingId: t.topping.id, qty: t.quantity })),
@@ -370,7 +374,15 @@ export default function SalesPage() {
     }
   };
 
+  const clearTopQtyDraft = (toppingId: string) =>
+    setTopQtyDraft(prev => {
+      if (!(toppingId in prev)) return prev;
+      const { [toppingId]: _, ...rest } = prev;
+      return rest;
+    });
+
   const toggleTopping = (toppingId: string) => {
+    clearTopQtyDraft(toppingId);
     setOptForm(f => {
       const exists = f.toppings.find(t => t.toppingId === toppingId);
       if (exists) return { ...f, toppings: f.toppings.filter(t => t.toppingId !== toppingId) };
@@ -378,9 +390,20 @@ export default function SalesPage() {
     });
   };
 
-  /** Tăng/giảm số phần của MỘT topping trong ly đang chọn. Giảm xuống dưới 1 là bỏ
-   *  chọn topping đó luôn — giữ lại dòng "0 phần" thì vừa vô nghĩa vừa lọt vào giỏ. */
+  /** Đặt thẳng số phần của MỘT topping. Dùng cho ô gõ tay: gõ thì không bao giờ bỏ
+   *  chọn topping — bỏ chọn bằng ô tick hoặc bấm trừ. */
+  const setToppingQty = (toppingId: string, qty: number) => {
+    const an_toan = Math.min(MAX_TOPPING_QTY, Math.max(1, Math.trunc(qty)));
+    setOptForm(f => ({
+      ...f,
+      toppings: f.toppings.map(t => (t.toppingId === toppingId ? { ...t, qty: an_toan } : t)),
+    }));
+  };
+
+  /** Tăng/giảm số phần. Bấm trừ xuống dưới 1 là bỏ chọn topping đó luôn — giữ lại
+   *  dòng "0 phần" thì vừa vô nghĩa vừa lọt vào giỏ. */
   const updateToppingQty = (toppingId: string, delta: number) => {
+    clearTopQtyDraft(toppingId);
     setOptForm(f => {
       const hien = f.toppings.find(t => t.toppingId === toppingId);
       if (!hien) return f;
@@ -809,7 +832,29 @@ export default function SalesPage() {
                             <button type="button" onClick={() => updateToppingQty(top.id, -1)}
                               aria-label={`Bớt một phần ${top.name}`}
                               className="w-7 h-7 rounded-lg bg-white border border-line grid place-items-center hover:border-bean hover:text-bean transition-colors"><Minus className="w-3 h-3" /></button>
-                            <span className="text-sm font-bold w-6 text-center tabular-nums">{selected.qty}</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              max={MAX_TOPPING_QTY}
+                              aria-label={`Số phần ${top.name}`}
+                              value={topQtyDraft[top.id] ?? String(selected.qty)}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                const n = parseInt(raw, 10);
+                                // Gõ quá trần thì hiện ngay số đã chặn, đừng để ô đọc "99"
+                                // trong khi số thật là 20 — bấm Thêm vào order lúc đó sẽ
+                                // ra một con số khác với con số đang nhìn thấy.
+                                setTopQtyDraft(prev => ({
+                                  ...prev,
+                                  [top.id]: n > MAX_TOPPING_QTY ? String(MAX_TOPPING_QTY) : raw,
+                                }));
+                                if (n >= 1) setToppingQty(top.id, n);
+                              }}
+                              onBlur={() => clearTopQtyDraft(top.id)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              className="text-sm font-bold w-11 h-7 text-center rounded-lg border border-line bg-white focus:outline-none focus:ring-1 focus:ring-bean focus:border-bean [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
                             <button type="button" onClick={() => updateToppingQty(top.id, 1)}
                               aria-label={`Thêm một phần ${top.name}`}
                               disabled={selected.qty >= MAX_TOPPING_QTY}
