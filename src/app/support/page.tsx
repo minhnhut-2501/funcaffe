@@ -84,7 +84,7 @@ const sections: Section[] = [
       'Trong phiếu order, bấm “Thanh toán” và chọn phương thức.',
       'Với tiền mặt: nhập tiền khách đưa, hệ thống tính tiền thối.',
       'Với VietQR: khách quét mã, nhận tiền xong bấm “Xác nhận thanh toán”.',
-      'Xem lại mọi hóa đơn trong mục “Hóa đơn”, có thể in hoặc tải PDF.',
+      'Xem lại mọi hóa đơn trong mục “Hóa đơn”, in lại bất cứ lúc nào.',
     ],
   },
   {

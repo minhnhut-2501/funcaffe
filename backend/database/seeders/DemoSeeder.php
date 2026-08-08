@@ -154,7 +154,7 @@ class DemoSeeder extends Seeder
                     'Quản lý size & topping',
                     'Bán hàng theo bàn',
                     'Quản lý order & hóa đơn',
-                    'In & xuất PDF hóa đơn',
+                    'In hóa đơn',
                     'Thống kê & biểu đồ doanh thu',
                 ],
                 'max_tables' => 10, 'max_menu_items' => 15, 'can_use_ai' => false,

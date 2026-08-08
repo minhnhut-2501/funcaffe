@@ -76,7 +76,7 @@ export default function PricingPage() {
     { label: 'Quản lý order',          free: true, pro: true, promax: true },
     { label: 'Quản lý hóa đơn',        free: true, pro: true, promax: true },
     { label: 'Quản lý size & topping', free: true, pro: true, promax: true },
-    { label: 'In & xuất PDF hóa đơn',  free: true, pro: true, promax: true },
+    { label: 'In hóa đơn',             free: true, pro: true, promax: true },
     { label: 'Thống kê & biểu đồ doanh thu', free: true, pro: true, promax: true },
     { label: 'Top món bán chạy & báo cáo',   free: true, pro: true, promax: true },
     { label: 'Trợ lý AI & phân tích doanh thu', free: false, pro: proPkg?.canUseAI ?? false, promax: promaxPkg?.canUseAI ?? true },
@@ -100,7 +100,7 @@ export default function PricingPage() {
       period: periodLabel,
       badge: 'Phù hợp quán nhỏ',
       desc: 'Đủ dùng cho vận hành hằng ngày.',
-      features: proPkg?.features ?? ['Tối đa 10 bàn, 15 món', 'Size và topping', 'Bán hàng theo bàn', 'In và xuất PDF hóa đơn', 'Có thống kê doanh thu'],
+      features: proPkg?.features ?? ['Tối đa 10 bàn, 15 món', 'Size và topping', 'Bán hàng theo bàn', 'In hóa đơn', 'Có thống kê doanh thu'],
       highlight: false,
     },
     {
