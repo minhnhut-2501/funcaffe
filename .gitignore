@@ -70,3 +70,6 @@ plan/
 PRODUCT.md
 DESIGN.md
 backend/*.bat
+
+# Tep khoa cua Word khi dang mo tai lieu
+~$*.docx
