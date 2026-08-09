@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { ImagePlus, Camera, Loader2, Trash2 } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 
 interface Props {
@@ -34,8 +34,11 @@ export default function MediaUploader({ value, onChange, onRemove, shape = 'squa
     setUploading(true);
     try {
       onChange(await api.upload(file));
-    } catch {
-      toast({ description: 'Tải ảnh thất bại, vui lòng thử lại.', variant: 'destructive' });
+    } catch (e) {
+      toast({
+        description: e instanceof ApiError ? e.message : 'Tải ảnh thất bại, vui lòng thử lại.',
+        variant: 'destructive',
+      });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';

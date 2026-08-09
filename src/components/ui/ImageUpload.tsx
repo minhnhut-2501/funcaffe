@@ -1,7 +1,8 @@
 'use client';
 import { useState, useRef } from 'react';
 import { Upload, X } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   currentImage?: string;
@@ -12,6 +13,7 @@ interface Props {
 export default function ImageUpload({ currentImage, onUpload, onRemove }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -20,8 +22,14 @@ export default function ImageUpload({ currentImage, onUpload, onRemove }: Props)
     try {
       const url = await api.upload(file);
       onUpload(url);
-    } catch {
-      // error handled silently
+    } catch (err) {
+      // Trước đây nuốt lỗi im lặng: bấm chọn ảnh, chữ "Đang tải..." chạy rồi tắt,
+      // ảnh không hiện ra và KHÔNG có một lời nào giải thích. Người dùng chỉ biết
+      // là "không đưa ảnh lên được" mà chẳng có manh mối nào để sửa.
+      toast({
+        description: err instanceof ApiError ? err.message : 'Tải ảnh thất bại, vui lòng thử lại.',
+        variant: 'destructive',
+      });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';

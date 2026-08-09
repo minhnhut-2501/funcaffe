@@ -142,7 +142,13 @@ export const api = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
-    if (!response.ok) throw new ApiError('Upload thất bại', response.status);
+    if (!response.ok) {
+      // Đọc lời giải thích của máy chủ thay vì nuốt đi. Upload hỏng vì đủ thứ lý do
+      // khác nhau — ảnh quá 2MB, sai định dạng, kho ảnh Cloudinary từ chối — mà chỉ
+      // báo "Upload thất bại" thì người dùng không biết phải sửa gì.
+      const body = await response.json().catch(() => ({}));
+      throw new ApiError(body.message || 'Tải ảnh thất bại', response.status, body.errors);
+    }
     const data = await response.json();
     // Cloudinary trả URL tuyệt đối (https://res.cloudinary.com/...) -> dùng thẳng.
     // Ảnh cũ lưu local trả path tương đối (/storage/...) -> ghép STORAGE_URL.

@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { Camera, Loader2, X } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 
 interface Props {
@@ -30,8 +30,11 @@ export default function AvatarUploader({ value, onChange, onRemove, fallback = '
     setUploading(true);
     try {
       onChange(await api.upload(file));
-    } catch {
-      toast({ description: 'Tải ảnh thất bại, vui lòng thử lại.', variant: 'destructive' });
+    } catch (e) {
+      toast({
+        description: e instanceof ApiError ? e.message : 'Tải ảnh thất bại, vui lòng thử lại.',
+        variant: 'destructive',
+      });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
