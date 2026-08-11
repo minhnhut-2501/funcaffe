@@ -146,18 +146,18 @@ class DemoSeeder extends Seeder
             ]),
             $pkg(self::PKG_PRO, [
                 'name' => 'Pro', 'type' => 'pro', 'level' => 1, 'is_trial' => false,
-                'description' => 'Đầy đủ chức năng + doanh thu (tối đa 10 bàn, 15 món)',
+                'description' => 'Đầy đủ chức năng + doanh thu (tối đa 20 bàn, 40 món)',
                 'features' => [
                     'Quản lý thông tin quán',
-                    'Tối đa 10 bàn',
-                    'Thực đơn tối đa 15 món',
+                    'Tối đa 20 bàn',
+                    'Thực đơn tối đa 40 món',
                     'Quản lý size & topping',
                     'Bán hàng theo bàn',
                     'Quản lý order & hóa đơn',
                     'In hóa đơn',
                     'Thống kê & biểu đồ doanh thu',
                 ],
-                'max_tables' => 10, 'max_menu_items' => 15, 'can_use_ai' => false,
+                'max_tables' => 20, 'max_menu_items' => 40, 'can_use_ai' => false,
             ]),
             $pkg(self::PKG_PROMAX, [
                 'name' => 'Pro Max', 'type' => 'promax', 'level' => 2, 'is_trial' => false,
@@ -239,7 +239,7 @@ class DemoSeeder extends Seeder
             $this->now->copy()->subDays(2), $this->now->copy()->addDays(5), 0);
         $this->makeOrders($c1, 45, 2, 6);
 
-        // Quán 2 — Pro: chạm đúng trần gói (10 bàn / 15 món) để giới hạn nhìn thấy được.
+        // Quán 2 — Pro: dữ liệu vừa đủ để bộ đếm hạn mức (n/20 bàn, n/40 món) nhìn thấy được.
         $c2 = $this->makeCafe($ownerId, 'Trà Sữa MiMi', '215 Nguyễn Văn Cừ, Q.1, TP.HCM', '0912345602',
             'Trà sữa pha máy, đủ size và topping, khách trẻ.', '970407', '19036789012345', 'NGUYEN MINH NHUT');
         $this->menuMiMi($c2);
@@ -386,7 +386,7 @@ class DemoSeeder extends Seeder
 
     private function menuMiMi(string $cafeId): void
     {
-        // ĐÚNG 15 món và 10 bàn — chạm trần gói Pro, để giới hạn nhìn thấy được ngay.
+        // 15 món và 10 bàn — dưới trần gói Pro (40 món / 20 bàn), đủ để thấy bộ đếm hạn mức.
         $s = fn (int $a, int $b, int $c) => ['S' => $a, 'M' => $b, 'L' => $c];
 
         $this->makeMenu($cafeId, [

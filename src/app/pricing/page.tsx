@@ -69,9 +69,9 @@ export default function PricingPage() {
   const compareFeatures: { label: string; free: CompareCell; pro: CompareCell; promax: CompareCell }[] = [
     { label: 'Quản lý thông tin quán', free: true, pro: true, promax: true },
     { label: 'Số bàn tối đa',
-      free: limitLabel(freePkg?.maxTables, 'bàn'), pro: limitLabel(proPkg?.maxTables ?? 10, 'bàn'), promax: limitLabel(promaxPkg?.maxTables, 'bàn') },
+      free: limitLabel(freePkg?.maxTables, 'bàn'), pro: limitLabel(proPkg?.maxTables ?? 20, 'bàn'), promax: limitLabel(promaxPkg?.maxTables, 'bàn') },
     { label: 'Số món trong thực đơn',
-      free: limitLabel(freePkg?.maxMenuItems, 'món'), pro: limitLabel(proPkg?.maxMenuItems ?? 15, 'món'), promax: limitLabel(promaxPkg?.maxMenuItems, 'món') },
+      free: limitLabel(freePkg?.maxMenuItems, 'món'), pro: limitLabel(proPkg?.maxMenuItems ?? 40, 'món'), promax: limitLabel(promaxPkg?.maxMenuItems, 'món') },
     { label: 'Bán hàng theo bàn (POS)', free: true, pro: true, promax: true },
     { label: 'Quản lý order',          free: true, pro: true, promax: true },
     { label: 'Quản lý hóa đơn',        free: true, pro: true, promax: true },
@@ -104,7 +104,7 @@ export default function PricingPage() {
       period: periodLabel,
       badge: 'Phù hợp quán nhỏ',
       desc: 'Đủ dùng cho vận hành hằng ngày.',
-      features: proPkg?.features ?? ['Tối đa 10 bàn, 15 món', 'Size và topping', 'Bán hàng theo bàn', 'In hóa đơn', 'Có thống kê doanh thu'],
+      features: proPkg?.features ?? ['Tối đa 20 bàn, 40 món', 'Size và topping', 'Bán hàng theo bàn', 'In hóa đơn', 'Có thống kê doanh thu'],
       highlight: false,
     },
     {

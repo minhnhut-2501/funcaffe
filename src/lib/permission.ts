@@ -14,7 +14,7 @@ const PACKAGE_LIMITS: Record<UserPackageType, PackageLimits> = {
   none:   { maxTables: 0,        maxMenuItems: 0,        canUseAI: false },
   // Fun Free là bản dùng thử Pro Max 7 ngày nên có luôn AI (khớp packages.can_use_ai).
   free:   { maxTables: Infinity, maxMenuItems: Infinity, canUseAI: true  },
-  pro:    { maxTables: 10,       maxMenuItems: 15,       canUseAI: false },
+  pro:    { maxTables: 20,       maxMenuItems: 40,       canUseAI: false },
   promax: { maxTables: Infinity, maxMenuItems: Infinity, canUseAI: true  },
 };
 

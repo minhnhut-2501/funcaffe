@@ -16,7 +16,12 @@ class Package extends Model
     ];
 
     protected $casts = [
-        'features' => 'array',
+        // KHÔNG cast 'features' => 'array'. Cast đó json_encode giá trị trước khi
+        // ghi, nên trong MongoDB `features` nằm dưới dạng CHUỖI JSON thay vì mảng
+        // BSON — đọc qua model vẫn ra mảng nên nhìn ngoài không thấy gì sai, nhưng
+        // dữ liệu lệch chuẩn, lệch ERD và không truy vấn được bằng toán tử mảng.
+        // Bỏ cast đi thì mongodb-laravel lưu mảng ở dạng native. (Cùng lỗi đã sửa
+        // cho `invoices` trước đây.)
         'is_trial' => 'boolean',
         'level' => 'integer',
         'max_tables' => 'integer',

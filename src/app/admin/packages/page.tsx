@@ -251,7 +251,7 @@ export default function AdminPackagesPage() {
                     onChange={e => setForm({ ...form, maxTables: e.target.value === '' ? null : Number(e.target.value) })} />
                   <label className="flex items-center gap-1.5 text-xs text-cafe-600 mt-1.5 cursor-pointer">
                     <input type="checkbox" checked={form.maxTables == null}
-                      onChange={e => setForm({ ...form, maxTables: e.target.checked ? null : 10 })} />
+                      onChange={e => setForm({ ...form, maxTables: e.target.checked ? null : 20 })} />
                     Không giới hạn
                   </label>
                 </div>
@@ -263,7 +263,7 @@ export default function AdminPackagesPage() {
                     onChange={e => setForm({ ...form, maxMenuItems: e.target.value === '' ? null : Number(e.target.value) })} />
                   <label className="flex items-center gap-1.5 text-xs text-cafe-600 mt-1.5 cursor-pointer">
                     <input type="checkbox" checked={form.maxMenuItems == null}
-                      onChange={e => setForm({ ...form, maxMenuItems: e.target.checked ? null : 15 })} />
+                      onChange={e => setForm({ ...form, maxMenuItems: e.target.checked ? null : 40 })} />
                     Không giới hạn
                   </label>
                 </div>
