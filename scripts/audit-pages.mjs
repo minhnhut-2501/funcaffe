@@ -48,7 +48,10 @@ async function sweep(label, paths, creds) {
       if (mounted) break;
       await page.waitForTimeout(1000);
     }
-    await page.waitForFunction(() => document.querySelectorAll('.animate-pulse').length === 0, null, { timeout: 15000 }).catch(() => {});
+    // Khung xương của dự án dùng lớp `.skeleton-sweep` (LoadingSkeleton), không phải
+    // `.animate-pulse`. Chờ nhầm lớp = không chờ gì cả: công cụ đo lúc trang mới có
+    // mỗi tiêu đề rồi báo "NỘI DUNG NGẮN" cho những trang gọi nhiều API nhất.
+    await page.waitForFunction(() => document.querySelectorAll('.skeleton-sweep, .animate-pulse').length === 0, null, { timeout: 20000 }).catch(() => {});
     await page.waitForTimeout(2500);
     const m = await page.evaluate(() => ({
       len: (document.querySelector('main')?.innerText || document.body.innerText || '').trim().length,

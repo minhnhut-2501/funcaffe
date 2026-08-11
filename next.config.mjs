@@ -6,11 +6,13 @@ const nextConfig = {
   allowedDevOrigins: ['localhost'],
   devIndicators: false,
   webpack: (config, { dev }) => {
-    // Node 24 làm crash WasmHash (xxhash64) trong webpack mà Next đóng gói:
-    // "TypeError: Cannot read properties of undefined (reading 'length')
-    //  at WasmHash._updateWithBuffer". Hậu quả: chunk không build được -> 404.
-    // Ép dùng hàm băm native của Node (crypto) để né WasmHash.
-    config.output.hashFunction = 'sha256';
+    // KHÔNG đặt lại `config.output.hashFunction`. Trước đây ở đây có dòng
+    // `config.output.hashFunction = 'sha256'` để né lỗi WasmHash (xxhash64) của
+    // webpack trên Node 24. Bản webpack đi kèm Next 15.5 đã sửa lỗi đó, và chính
+    // dòng né ấy giờ mới là thứ làm hỏng bản dựng: `next build` chết ngay từ đầu
+    // với "The data argument must be of type string or an instance of Buffer...
+    // Received undefined" (webpack gọi hash.update() với dữ liệu rỗng, hàm băm
+    // native của Node từ chối còn WasmHash thì bỏ qua). Bỏ dòng đó, build chạy lại.
 
     // Backend Laravel nằm CÙNG thư mục dự án, và Sanctum ghi bảng token vào
     // backend/database/database.sqlite ở MỖI lần đăng nhập / đăng xuất. Watcher
