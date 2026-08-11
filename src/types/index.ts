@@ -6,8 +6,6 @@ export type PaymentMethod = 'cash' | 'bank_transfer' | 'qr_code' | 'e_wallet' | 
 /** Cổng online tự kích hoạt gói qua callback — khớp PackagePayment::ONLINE_GATEWAYS ở backend. */
 export type OnlineGateway = 'vnpay' | 'momo';
 export type InvoiceStatus = 'paid';
-export type MenuItemStatus = 'available' | 'unavailable';
-export type ToppingStatus = 'available' | 'unavailable';
 export type PackageType = 'free' | 'pro' | 'promax';
 export type DurationMonths = 1 | 3 | 12;
 export type UserStatus = 'active' | 'locked';
@@ -43,7 +41,9 @@ export interface Category {
   id: string;
   name: string;
   description?: string;
-  isActive?: boolean;
+  /** Danh mục ẩn không hiện ở màn hình bán hàng. Luôn có giá trị — mapCategory
+   *  điền `true` khi bản ghi cũ chưa có trường này. */
+  isActive: boolean;
 }
 
 export interface Topping {
