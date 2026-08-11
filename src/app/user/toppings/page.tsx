@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toppingService } from '@/services';
 import { canManage } from '@/lib/permission';
 import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
-import { generateId, compareByName } from '@/lib/utils';
+import { compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ImageUpload from '@/components/ui/ImageUpload';
 import EmptyState from '@/components/ui/EmptyState';
@@ -41,7 +41,7 @@ export default function ToppingsPage() {
     .sort((a, b) => compareByName(a.name, b.name));
 
   // Cat trang SAU khi da loc va tim kiem.
-  const paging = usePagination(filtered);
+  const paging = usePagination(filtered, undefined, [search]);
 
   const openAdd = () => { setEditTarget(null); setForm({ name: '', price: 0, isAvailable: true }); setModalOpen(true); };
   const openEdit = (t: Topping) => { setEditTarget(t); setForm(t); setModalOpen(true); };

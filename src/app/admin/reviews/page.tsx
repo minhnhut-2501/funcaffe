@@ -95,7 +95,7 @@ export default function AdminReviewsPage() {
 
   // Cắt trang SAU khi đã lọc. Các chỉ số ở trên vẫn tính trên toàn bộ tập lọc,
   // không phải trên trang đang xem.
-  const paging = usePagination(filtered);
+  const paging = usePagination(filtered, undefined, [search, fromDate, toDate, statusFilter, ratingFilter]);
 
   return (
     <div>

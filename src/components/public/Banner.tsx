@@ -34,7 +34,6 @@ export default function Banner({
 
   return (
     <section className="relative overflow-hidden photo-tint">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={image}
         srcSet={`${image.replace(/\.jpg$/, '-900w.jpg')} 900w, ${image} 1600w`}

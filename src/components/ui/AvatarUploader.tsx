@@ -1,8 +1,6 @@
 'use client';
-import { useRef, useState } from 'react';
 import { Camera, Loader2, X } from 'lucide-react';
-import { api, ApiError } from '@/lib/api-client';
-import { useToast } from '@/hooks/use-toast';
+import { useImageUpload } from '@/hooks/use-image-upload';
 
 interface Props {
   value?: string;
@@ -17,29 +15,7 @@ interface Props {
  * spinner khi tải, nút xóa nhỏ hiện khi hover (nếu có onRemove).
  */
 export default function AvatarUploader({ value, onChange, onRemove, fallback = 'U', size = 80 }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const { toast } = useToast();
-
-  const upload = async (file?: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast({ description: 'Vui lòng chọn tệp ảnh (PNG, JPG...).', variant: 'destructive' });
-      return;
-    }
-    setUploading(true);
-    try {
-      onChange(await api.upload(file));
-    } catch (e) {
-      toast({
-        description: e instanceof ApiError ? e.message : 'Tải ảnh thất bại, vui lòng thử lại.',
-        variant: 'destructive',
-      });
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
-  };
+  const { inputRef, uploading, upload, moHopChonTep } = useImageUpload(onChange);
 
   return (
     <div className="relative inline-block group" style={{ width: size, height: size }}>
@@ -55,7 +31,7 @@ export default function AvatarUploader({ value, onChange, onRemove, fallback = '
       {/* Badge camera */}
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
+        onClick={moHopChonTep}
         disabled={uploading}
         title="Đổi ảnh đại diện"
         className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-bean text-white ring-2 ring-white shadow-soft flex items-center justify-center hover:bg-bean-dark active:scale-95 transition"

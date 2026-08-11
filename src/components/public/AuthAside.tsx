@@ -24,7 +24,6 @@ export default function AuthAside({
 }) {
   return (
     <div className="photo-tint relative hidden md:flex flex-col justify-between overflow-hidden h-full min-h-[30rem] p-8 lg:p-10">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={image}
         alt=""

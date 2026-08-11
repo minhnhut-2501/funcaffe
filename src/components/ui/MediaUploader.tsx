@@ -1,8 +1,7 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { ImagePlus, Camera, Loader2, Trash2 } from 'lucide-react';
-import { api, ApiError } from '@/lib/api-client';
-import { useToast } from '@/hooks/use-toast';
+import { useImageUpload } from '@/hooks/use-image-upload';
 
 interface Props {
   value?: string;
@@ -19,31 +18,9 @@ interface Props {
  * bám nội dung nên KHÔNG để lại khoảng trống thừa dù thẻ có rộng.
  */
 export default function MediaUploader({ value, onChange, onRemove, shape = 'square', label = 'Ảnh', hint }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
   const [drag, setDrag] = useState(false);
-  const { toast } = useToast();
+  const { inputRef, uploading, upload, moHopChonTep } = useImageUpload(onChange);
   const radius = shape === 'circle' ? 'rounded-full' : 'rounded-2xl';
-
-  const upload = async (file?: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast({ description: 'Vui lòng chọn tệp ảnh (PNG, JPG...).', variant: 'destructive' });
-      return;
-    }
-    setUploading(true);
-    try {
-      onChange(await api.upload(file));
-    } catch (e) {
-      toast({
-        description: e instanceof ApiError ? e.message : 'Tải ảnh thất bại, vui lòng thử lại.',
-        variant: 'destructive',
-      });
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
-  };
 
   return (
     <div className="flex items-center gap-4">
@@ -58,7 +35,7 @@ export default function MediaUploader({ value, onChange, onRemove, shape = 'squa
           {value ? (
             <img src={value} alt={label} className="w-full h-full object-cover" />
           ) : (
-            <button type="button" onClick={() => inputRef.current?.click()} className="w-full h-full flex items-center justify-center text-bean/70 bg-bean-tint/50 hover:bg-bean-tint transition-colors">
+            <button type="button" onClick={moHopChonTep} className="w-full h-full flex items-center justify-center text-bean/70 bg-bean-tint/50 hover:bg-bean-tint transition-colors">
               <ImagePlus className="w-8 h-8" />
             </button>
           )}
@@ -71,7 +48,7 @@ export default function MediaUploader({ value, onChange, onRemove, shape = 'squa
         {/* Badge camera */}
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={moHopChonTep}
           disabled={uploading}
           title="Tải / đổi ảnh"
           className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-bean text-white ring-2 ring-white shadow-soft flex items-center justify-center hover:bg-bean-dark active:scale-95 transition"

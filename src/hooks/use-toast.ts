@@ -17,12 +17,14 @@ type ToasterToast = ToastProps & {
   action?: ToastActionElement
 }
 
-const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
-} as const
+// Chỉ dùng ở vị trí kiểu (Action bên dưới), không có lời gọi lúc chạy — nên khai
+// báo thẳng là type thay vì một object hằng bị đóng gói vào bundle mà không ai đọc.
+type ActionType = {
+  ADD_TOAST: "ADD_TOAST"
+  UPDATE_TOAST: "UPDATE_TOAST"
+  DISMISS_TOAST: "DISMISS_TOAST"
+  REMOVE_TOAST: "REMOVE_TOAST"
+}
 
 let count = 0
 
@@ -31,7 +33,6 @@ function genId() {
   return count.toString()
 }
 
-type ActionType = typeof actionTypes
 
 type Action =
   | {

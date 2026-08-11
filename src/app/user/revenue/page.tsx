@@ -62,7 +62,7 @@ const today = new Date();
 const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
 export default function RevenuePage() {
-  const { user, cafes, activeCafeId } = useAuth();
+  const { cafes, activeCafeId } = useAuth();
   const { toast } = useToast();
   // null = người dùng CHƯA tự chọn quán -> bám theo quán đang quản lý. Đã chọn rồi
   // (kể cả chọn "Tất cả quán") thì giữ nguyên lựa chọn đó.

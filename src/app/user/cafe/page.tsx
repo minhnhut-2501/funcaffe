@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
+import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import MediaUploader from '@/components/ui/MediaUploader';
 import { useAuth } from '@/context/AuthContext';
 import { cafeService, createCafe, invoiceService, revenueService, type RevenueOverview } from '@/services';
@@ -184,7 +185,15 @@ export default function CafePage() {
     }
   };
 
-  if (loading) return <div className="p-6 text-cafe-400">Đang tải...</div>;
+  // Khung xương thay cho một dòng chữ "Đang tải..." trơ trọi: trang này là nơi
+  // đầu tiên chủ quán nhìn thấy sau khi đăng nhập, mà mọi màn hình khác đều dùng
+  // khung xương — riêng chỗ này cả trang co lại thành một dòng chữ xám.
+  if (loading) return (
+    <div className="max-w-6xl">
+      <PageHeader title="Quản lý quán" description="Tất cả quán của bạn, gói dịch vụ và doanh thu." />
+      <LoadingSkeleton variant="card" rows={3} />
+    </div>
+  );
 
   // ---- EDIT / CREATE FORM ----
   if (mode === 'edit') {
@@ -296,7 +305,6 @@ export default function CafePage() {
   }
 
   // ---- LIST / HUB ----
-  const active = cafes.find(c => c.id === activeCafeId);
   return (
     <div className="max-w-6xl">
       <PageHeader

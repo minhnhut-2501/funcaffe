@@ -4,6 +4,8 @@ import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
 import { generateId } from '@/lib/utils';
 import { tableService, menuService, categoryService, toppingService, orderService, cafeService } from '@/services';
 import type { CafeTable, MenuItem, MenuItemSize, Topping, Order, OrderItem, CafeInfo } from '@/types';
+// Phép tính tiền nằm ở lib/cart để kiểm được bằng bài kiểm thử — xem src/lib/cart.test.ts.
+import { calcItemBase, calcItemTopping, calcCartItem, clampDiscount, calcChange, type CartItem } from '@/lib/cart';
 import { buildVietQrImageUrl } from '@/lib/banks';
 import Link from 'next/link';
 import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, Receipt, Banknote } from 'lucide-react';
@@ -17,26 +19,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { canManage } from '@/lib/permission';
 
-interface CartItem {
-  id: string;
-  item: MenuItem;
-  size?: MenuItemSize;
-  quantity: number;
-  toppings: { topping: Topping; quantity: number }[];
-  note: string;
-}
-
-function calcItemBase(c: CartItem): number {
-  return (c.size ? c.size.price : c.item.basePrice) * c.quantity;
-}
-
-function calcItemTopping(c: CartItem): number {
-  return c.toppings.reduce((s, t) => s + t.topping.price * t.quantity, 0) * c.quantity;
-}
-
-function calcCartItem(c: CartItem): number {
-  return calcItemBase(c) + calcItemTopping(c);
-}
 
 // Hai dòng giỏ được coi là trùng khi cùng món, cùng size, cùng ghi chú và cùng topping (id + số lượng)
 function isSameCartLine(a: CartItem, b: CartItem): boolean {
@@ -251,7 +233,7 @@ export default function SalesPage() {
   const toppingSubtotal = cart.reduce((s, c) => s + calcItemTopping(c), 0);
   // Giảm giá do thu ngân nhập ở modal thanh toán. Kẹp trong [0, tạm tính] để tổng
   // không âm — backend cũng kẹp lại lần nữa, đây chỉ là để màn hình hiện đúng số.
-  const discount = Math.min(Math.max(0, discountInput), baseSubtotal + toppingSubtotal);
+  const discount = clampDiscount(discountInput, baseSubtotal + toppingSubtotal);
   const cartTotal = baseSubtotal + toppingSubtotal - discount;
 
   const openOption = (item: MenuItem) => {
@@ -579,9 +561,13 @@ export default function SalesPage() {
     }
   };
 
-  const cashChange = cashGiven
-    ? Number(cashGiven.replace(/\D/g, '')) - cartTotal
-    : 0;
+  // Tiền khách đưa và hai câu trả lời rút ra từ nó. `calcChange` KHÔNG trả số âm
+  // (thu ngân đọc "-15.000" rồi đưa nhầm là chuyện có thật), nên việc "đưa thiếu"
+  // phải hỏi bằng một cờ riêng chứ không dò dấu âm của tiền thối.
+  const cashGivenNumber = Number(cashGiven.replace(/\D/g, '')) || 0;
+  const cashChange = calcChange(cashGivenNumber, cartTotal);
+  const thieuTien = cashGivenNumber > 0 && cashGivenNumber < cartTotal;
+  const conThieu = Math.max(0, cartTotal - cashGivenNumber);
 
   return (
     <div className="flex flex-col md:h-[calc(100vh-9rem)]">
@@ -925,7 +911,7 @@ export default function SalesPage() {
           <div className="flex gap-2">
             <button onClick={() => setPaymentModal(false)} className="btn-secondary flex-1">Hủy</button>
             <button onClick={handlePayment}
-              disabled={processing || (paymentMethod === 'cash' && Number(cashGiven.replace(/\D/g, '')) > 0 && cashChange < 0)}
+              disabled={processing || (paymentMethod === 'cash' && thieuTien)}
               className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed">
               <CreditCard className="w-4 h-4" />{processing ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</button>
           </div>
@@ -993,8 +979,8 @@ export default function SalesPage() {
             <div>
               <label className="label-funcafe">Tiền khách đưa (đ)</label>
               <input type="text" className="input-funcafe" placeholder="0" value={cashGiven} onChange={e => setCashGiven(e.target.value)} />
-              {Number(cashGiven.replace(/\D/g, '')) > 0 && cashChange >= 0 && <p className="text-sm text-pine font-semibold mt-1.5">Tiền thối: {formatCurrency(cashChange)}</p>}
-              {Number(cashGiven.replace(/\D/g, '')) > 0 && cashChange < 0 && <p className="text-sm text-red-500 mt-1.5">Chưa đủ {formatCurrency(Math.abs(cashChange))}</p>}
+              {cashGivenNumber > 0 && !thieuTien && <p className="text-sm text-pine font-semibold mt-1.5">Tiền thối: {formatCurrency(cashChange)}</p>}
+              {thieuTien && <p className="text-sm text-red-500 mt-1.5">Chưa đủ {formatCurrency(conThieu)}</p>}
             </div>
           )}
 

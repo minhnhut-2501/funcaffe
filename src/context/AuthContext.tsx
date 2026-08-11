@@ -11,6 +11,12 @@ interface AuthContextType {
   isAuthenticated: boolean;
   // ĐA QUÁN: danh sách quán + quán đang chọn
   cafes: CafeInfo[];
+  /**
+   * `true` khi lượt gọi /cafes THẤT BẠI (mạng, máy chủ) — khác hẳn "chủ quán chưa
+   * có quán nào". Không phân biệt hai trạng thái này thì một lần mạng chập cũng
+   * đẩy chủ quán đang có 2 quán sang màn hình "tạo quán đầu tiên".
+   */
+  cafesError: boolean;
   activeCafeId: string | null;
   setActiveCafe: (id: string) => Promise<void>;
   reloadCafes: () => Promise<CafeInfo[]>;
@@ -33,7 +39,6 @@ function mapSubscription(subs: SubscriptionData[]): UserSubscription {
   if (!active) {
     return { packageType: 'none', packageName: 'Chưa đăng ký', startDate: '', endDate: '', daysLeft: 0 };
   }
-  const start = new Date(active.start_date);
   const end = new Date(active.end_date);
   const daysLeft = Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000));
 
@@ -134,11 +139,12 @@ async function subscriptionOf(cafeId: string | null, cafes: CafeInfo[]): Promise
 }
 
 // Tải danh sách quán + xác định quán đang chọn (admin không có quán -> bỏ qua).
-async function loadCafes(role: 'user' | 'admin'): Promise<{ cafes: CafeInfo[]; activeCafeId: string | null }> {
-  if (role === 'admin') return { cafes: [], activeCafeId: null };
-  const cafes = await cafeService.list().catch(() => [] as CafeInfo[]);
+async function loadCafes(role: 'user' | 'admin'): Promise<{ cafes: CafeInfo[]; activeCafeId: string | null; failed: boolean }> {
+  if (role === 'admin') return { cafes: [], activeCafeId: null, failed: false };
+  let failed = false;
+  const cafes = await cafeService.list().catch(() => { failed = true; return [] as CafeInfo[]; });
   const activeCafeId = pickActiveCafeId(cafes.map((c) => c.id));
-  return { cafes, activeCafeId };
+  return { cafes, activeCafeId, failed };
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -147,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [cafes, setCafes] = useState<CafeInfo[]>([]);
   const [activeCafeId, setActiveCafeIdState] = useState<string | null>(null);
+  const [cafesError, setCafesError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   /**
@@ -166,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const role = u.role === 'admin' ? 'admin' : 'user';
     const guessedCafeId = role === 'admin' ? null : peekActiveCafeId();
 
-    const [{ cafes, activeCafeId }, guessedSubs] = await Promise.all([
+    const [{ cafes, activeCafeId, failed }, guessedSubs] = await Promise.all([
       loadCafes(role),
       guessedCafeId
         ? fetchSubscriptions(guessedCafeId).catch(() => null)
@@ -178,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       : await subscriptionOf(activeCafeId, cafes);
 
     setCafes(cafes);
+    setCafesError(failed);
     setActiveCafeIdState(activeCafeId);
     const mapped = mapUser(u, subscription);
     setUser(mapped);
@@ -265,8 +273,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Nạp lại danh sách quán (sau khi tạo quán mới), giữ quán đang chọn hợp lệ.
   const reloadCafes = useCallback(async (): Promise<CafeInfo[]> => {
-    const list = await cafeService.list().catch(() => [] as CafeInfo[]);
+    let failed = false;
+    const list = await cafeService.list().catch(() => { failed = true; return [] as CafeInfo[]; });
     setCafes(list);
+    setCafesError(failed);
     const active = pickActiveCafeId(list.map((c) => c.id));
     setActiveCafeIdState(active);
     return list;
@@ -275,7 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, isLoading, isAuthenticated: user !== null,
-      cafes, activeCafeId, setActiveCafe, reloadCafes,
+      cafes, cafesError, activeCafeId, setActiveCafe, reloadCafes,
       login, register, logout, refreshUser,
     }}>
       {children}

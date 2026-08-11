@@ -94,7 +94,7 @@ export default function AdminContactsPage() {
   );
 
   // Cắt trang SAU khi đã lọc và tìm kiếm.
-  const paging = usePagination(filtered);
+  const paging = usePagination(filtered, undefined, [search]);
 
   const unreadCount = messages.filter(m => !m.isRead).length;
   const repliedCount = messages.filter(m => m.reply).length;

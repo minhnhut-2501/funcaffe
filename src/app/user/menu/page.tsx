@@ -66,10 +66,10 @@ export default function MenuPage() {
   ).sort((a, b) => compareByName(a.name, b.name));
 
   // Cắt trang SAU khi đã lọc và tìm kiếm, không phải trước.
-  const itemPaging = usePagination(filtered);
+  const itemPaging = usePagination(filtered, undefined, [search, catFilter, statusFilter, sizeFilter, toppingFilter]);
   const catPaging = usePagination(categories);
 
-  // Giới hạn theo gói (Pro: tối đa 15 món; Free/Pro Max: không giới hạn).
+  // Giới hạn theo gói (Pro: tối đa 40 món; Free/Pro Max: không giới hạn).
   // Chỉ áp cho gói có quyền chỉnh sửa & có trần hữu hạn (Pro) — bỏ qua 'none'.
   const limits = packageLimits(user?.subscription);
   const managable = canManage(user?.subscription);
@@ -117,8 +117,8 @@ export default function MenuPage() {
       setModalOpen(false);
     } catch (err: any) {
       console.error('Save error:', err?.errors || err?.message || err);
-      const msg = err?.errors ? Object.values(err.errors).flat().join(', ') : (err?.message || 'Lưu thất bại');
-      toast({ description: msg, variant: 'destructive' });
+      // `detail` của ApiError đã gộp sẵn lỗi từng ô của phản hồi 422.
+      toast({ description: err?.detail || err?.message || 'Lưu thất bại', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -168,7 +168,7 @@ export default function MenuPage() {
       await categoryService.list().then(setCategories);
       setCatEditModal({ open: false, target: { name: '', isActive: true } });
       toast({ description: 'Đã lưu danh mục' });
-    } catch (err: any) { toast({ description: err?.errors ? Object.values(err.errors).flat().join(', ') : (err?.message || 'Lưu danh mục thất bại'), variant: 'destructive' }); }
+    } catch (err: any) { toast({ description: err?.detail || err?.message || 'Lưu danh mục thất bại', variant: 'destructive' }); }
   };
   // Danh mục KHÔNG xóa được (xóa sẽ bỏ rơi món bên trong) — chỉ ẩn/hiện.
   const handleCatToggle = async (c: { id: string; name: string; isActive: boolean }) => {

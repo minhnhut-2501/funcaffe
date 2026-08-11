@@ -56,7 +56,7 @@ export default function TablesPage() {
   ).sort((a, b) => compareByName(a.name, b.name));
 
   // Cắt trang SAU khi đã lọc và tìm kiếm.
-  const paging = usePagination(filtered);
+  const paging = usePagination(filtered, undefined, [search, filterStatus]);
 
   const counts = {
     all: tables.length,
@@ -64,7 +64,7 @@ export default function TablesPage() {
     serving: tables.filter(t => t.status === 'serving').length,
   };
 
-  // Giới hạn theo gói (Pro: tối đa 10 bàn; Free/Pro Max: không giới hạn).
+  // Giới hạn theo gói (Pro: tối đa 20 bàn; Free/Pro Max: không giới hạn).
   // Chỉ áp cho gói có quyền chỉnh sửa & có trần hữu hạn (Pro) — bỏ qua 'none'.
   const limits = packageLimits(user?.subscription);
   const managable = canManage(user?.subscription);

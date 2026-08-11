@@ -119,7 +119,6 @@ export default function HeroSlider() {
                 aria-label={`${i + 1} / ${SLIDES.length}`}
                 aria-hidden={!active}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/banners/${s.img}.jpg`}
                   srcSet={`/banners/${s.img}-900w.jpg 900w, /banners/${s.img}.jpg 1600w`}

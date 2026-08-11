@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Star } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { reviewService, hasCafe } from '@/services';
+import { reviewService } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 import { isSubscriptionExpired } from '@/lib/permission';
 import type { Review } from '@/types';
@@ -15,7 +15,7 @@ import type { Review } from '@/types';
  * 'subscription' của route tạo đánh giá).
  */
 export default function FunCafeReviewSection() {
-  const { user } = useAuth();
+  const { user, cafes } = useAuth();
   const { toast } = useToast();
   const sub = user?.subscription;
   const pkg = sub?.packageType ?? 'none';
@@ -41,15 +41,15 @@ export default function FunCafeReviewSection() {
   // nên đổi quán không làm đổi đánh giá. Trước đây hook này gọi listByCafe() theo
   // quán đang chọn và CHỈ setMyReview khi tìm thấy — nên chuyển sang quán chưa
   // đánh giá thì form vẫn giữ nội dung của quán trước và nút vẫn ghi "Cập nhật".
+  // Danh sách quán đã có sẵn trong AuthContext. Trước đây chỗ này gọi thêm
+  // `GET /cafes` chỉ để đếm, và nuốt luôn lỗi: mạng trục trặc là khối đánh giá
+  // lặng lẽ biến mất, không một dòng thông báo nào.
   useEffect(() => {
-    if (!user) return;
-    hasCafe().then(exists => {
-      if (!exists) return;
-      setReviewReady(true);
-      reviewService.mine().then(applyMine).catch(() => {});
-    }).catch(() => {});
+    if (!user || cafes.length === 0) return;
+    setReviewReady(true);
+    reviewService.mine().then(applyMine).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, cafes.length]);
 
   const handleSubmit = async () => {
     if (reviewForm.rating < 1) return;

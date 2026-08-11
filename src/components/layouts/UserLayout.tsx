@@ -340,12 +340,41 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   );
 }
 
+/**
+ * Khung chờ trong lúc khôi phục phiên: dựng sẵn hình dáng thanh bên + nội dung để
+ * mắt không thấy trang "nhảy" khi dữ liệu về.
+ */
+function KhungChoPhien() {
+  return (
+    <div className="flex h-screen overflow-hidden bg-paper">
+      <div className="hidden md:block w-64 shrink-0 bg-ink/95" />
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="h-16 border-b border-line bg-white" />
+        <div className="flex-1 p-6 sm:p-8">
+          <div className="skeleton-sweep max-w-6xl">
+            <div className="h-7 w-56 bg-cafe-100 rounded mb-3" />
+            <div className="h-4 w-80 bg-cafe-50 rounded mb-8" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-2xl border border-line p-6">
+                  <div className="h-4 w-24 bg-cafe-50 rounded mb-3" />
+                  <div className="h-7 w-32 bg-cafe-100 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isLoading, cafes, activeCafeId, logout } = useAuth();
+  const { user, isLoading, cafes, cafesError, activeCafeId, logout, reloadCafes } = useAuth();
   const hasPackage = user?.subscription.packageType !== 'none';
   const expired = isSubscriptionExpired(user?.subscription);
   // Sắp hết hạn của QUÁN ĐANG CHỌN. Các quán khác đã được chuông và chấm ở dropdown
@@ -381,16 +410,24 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   // ĐA QUÁN: nếu user chưa có quán nào -> ép sang trang Quản lý quán để tạo quán đầu tiên.
+  //
+  // CHỈ khi danh sách quán tải THÀNH CÔNG mà rỗng. Lượt gọi /cafes hỏng cũng cho ra
+  // mảng rỗng, và nếu tính luôn trường hợp đó thì một lần mạng chập là chủ quán đang
+  // có hai quán bị đá sang màn hình "tạo quán đầu tiên" — vừa sai vừa đáng sợ.
   const [cafeReady, setCafeReady] = useState<boolean | null>(null);
   useEffect(() => {
     if (isLoading || !user) return;
     if (pathname === '/user/cafe' || pathname === '/user/subscription') { setCafeReady(true); return; }
+    if (cafesError) { setCafeReady(true); return; }
     if (cafes.length === 0) { router.replace('/user/cafe'); return; }
     setCafeReady(true);
-  }, [pathname, router, isLoading, user, cafes]);
+  }, [pathname, router, isLoading, user, cafes, cafesError]);
 
-  // Chặn render khi chưa xác thực xong hoặc không đủ quyền (đang redirect)
-  if (isLoading || !user || user.role !== 'user') return null;
+  // Đang khôi phục phiên: vẽ khung xương thay vì trả null. Trả null là MÀN HÌNH
+  // TRẮNG — trên máy chủ miễn phí vừa ngủ dậy, khoảng trắng đó kéo dài vài giây và
+  // người dùng tưởng ứng dụng hỏng.
+  if (isLoading) return <KhungChoPhien />;
+  if (!user || user.role !== 'user') return null; // đang chuyển hướng
   if (cafeReady === null) return null;
 
   return (
@@ -399,6 +436,19 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} onToggle={() => setCollapsed(!collapsed)} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Topbar onMenuClick={() => setMobileOpen(true)} />
+        {/* Không tải được danh sách quán: nói thẳng ra và cho đường thử lại. Im lặng
+            ở đây nghĩa là người dùng thấy "0 quán" rồi tự kết luận mình mất dữ liệu. */}
+        {cafesError && (
+          <div className="bg-red-50 border-b border-red-200 px-4 sm:px-6 py-2.5 flex items-center justify-between flex-wrap gap-2">
+            <p className="text-sm text-red-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              Không tải được danh sách quán. Dữ liệu của bạn vẫn còn nguyên — chỉ là máy chủ chưa trả lời.
+            </p>
+            <button onClick={() => reloadCafes()} className="text-xs font-semibold bg-red-100 text-red-700 px-3 py-1.5 rounded-full hover:bg-red-200 transition-colors">
+              Thử lại
+            </button>
+          </div>
+        )}
         {!hasPackage && (
           <div className="bg-gold/12 border-b border-gold/25 px-4 sm:px-6 py-2.5 flex items-center justify-between flex-wrap gap-2">
             <p className="text-sm text-gold-deep">

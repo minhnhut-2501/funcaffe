@@ -8,7 +8,6 @@ import { invoiceService } from '@/services';
 import { useApi } from '@/hooks/use-api';
 import { canPrint } from '@/lib/permission';
 import { formatCurrency, formatDate, formatDateTime, formatPaymentMethod } from '@/lib/format';
-import { useToast } from '@/hooks/use-toast';
 import type { Invoice } from '@/types';
 import { Eye, Printer, RotateCcw, AlertCircle, Receipt } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
@@ -53,7 +52,7 @@ export default function InvoicesPage() {
   // Hook này phải gọi TRƯỚC hai nhánh return bên dưới. Đặt sau chúng thì lượt vẽ đầu
   // (đang tải) không gọi hook, lượt sau lại gọi — React báo "change in the order of
   // Hooks" và trang hỏng hẳn.
-  const paging = usePagination(filtered);
+  const paging = usePagination(filtered, undefined, [search, methodFilter, fromDate, toDate]);
 
   // In từ NÚT TRONG BẢNG: phải mở hóa đơn đó ra trước rồi mới in.
   //

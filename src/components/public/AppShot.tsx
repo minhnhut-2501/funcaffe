@@ -38,7 +38,6 @@ export default function AppShot({
         {label && <span className="ml-2 text-[10px] text-ink/70 font-medium truncate">{label}</span>}
       </div>
       <div className={maxH ? `${maxH} overflow-hidden` : ''}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
           alt={alt}

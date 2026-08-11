@@ -151,7 +151,6 @@ export default function HomePage() {
               className="absolute -bottom-6 -left-4 z-20 w-[42%] max-w-[210px] rounded-xl border border-line bg-white overflow-hidden rotate-[-5deg] hidden sm:block"
               style={{ boxShadow: '0 22px 48px -20px rgba(15,23,42,0.45)' }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/product/cafe-switcher.png" alt="Bộ chọn quán để chuyển nhanh giữa các chi nhánh" className="block w-full object-cover object-left-top h-full max-h-[130px]" loading="lazy" />
             </div>
           </Reveal>
@@ -263,7 +262,6 @@ export default function HomePage() {
 
           <Reveal delay={120} className="relative flex justify-center lg:justify-end">
             <div aria-hidden className="absolute -inset-8 rounded-[3rem] bg-bean/10 blur-3xl" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/product/ai-chat.png"
               alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý ba combo đồ uống kèm giá cho buổi chiều vắng khách"

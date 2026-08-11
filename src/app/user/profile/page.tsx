@@ -6,7 +6,7 @@ import AvatarUploader from '@/components/ui/AvatarUploader';
 import { useAuth } from '@/context/AuthContext';
 import { userService } from '@/services';
 import { getPackageBadgeClass } from '@/lib/permission';
-import { Eye, EyeOff, AlertCircle, KeyRound, Mail, User as UserIcon, Phone, ShieldCheck, Check } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Mail, User as UserIcon, Phone, ShieldCheck, Check } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();

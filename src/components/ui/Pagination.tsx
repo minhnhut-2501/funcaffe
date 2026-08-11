@@ -15,9 +15,19 @@ export const PER_PAGE = 10;
  * hay để lại màn hình trắng: đang ở trang cuối mà gõ từ khóa làm danh sách ngắn
  * lại, và xóa/ẩn dòng cuối cùng của trang cuối.
  */
-export function usePagination<T>(rows: T[], perPage: number = PER_PAGE) {
+export function usePagination<T>(rows: T[], perPage: number = PER_PAGE, resetOn: unknown[] = []) {
   const [page, setPage] = useState(1);
   const lastPage = Math.max(1, Math.ceil(rows.length / perPage));
+
+  // Đổi bộ lọc thì về trang 1. Không có bước này, người dùng đang ở trang 5 mà gõ
+  // từ khóa mới sẽ rơi thẳng vào kết quả thứ 41 của danh sách vừa đổi — trông như
+  // "tìm không ra" trong khi bốn trang đầu đầy kết quả đúng.
+  // Kẹp trang ở dưới đã lo trường hợp danh sách NGẮN đi; chỗ này lo trường hợp
+  // danh sách vẫn dài nhưng nội dung đã khác hẳn.
+  const dauMocLoc = JSON.stringify(resetOn);
+  useEffect(() => {
+    setPage(1);
+  }, [dauMocLoc]);
 
   useEffect(() => {
     if (page > lastPage) setPage(lastPage);

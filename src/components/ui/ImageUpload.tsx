@@ -1,8 +1,6 @@
 'use client';
-import { useState, useRef } from 'react';
 import { Upload, X } from 'lucide-react';
-import { api, ApiError } from '@/lib/api-client';
-import { useToast } from '@/hooks/use-toast';
+import { useImageUpload } from '@/hooks/use-image-upload';
 
 interface Props {
   currentImage?: string;
@@ -11,30 +9,9 @@ interface Props {
 }
 
 export default function ImageUpload({ currentImage, onUpload, onRemove }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const { toast } = useToast();
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const url = await api.upload(file);
-      onUpload(url);
-    } catch (err) {
-      // Trước đây nuốt lỗi im lặng: bấm chọn ảnh, chữ "Đang tải..." chạy rồi tắt,
-      // ảnh không hiện ra và KHÔNG có một lời nào giải thích. Người dùng chỉ biết
-      // là "không đưa ảnh lên được" mà chẳng có manh mối nào để sửa.
-      toast({
-        description: err instanceof ApiError ? err.message : 'Tải ảnh thất bại, vui lòng thử lại.',
-        variant: 'destructive',
-      });
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
-  };
+  // Kiểm loại tệp và dung lượng nằm trong hook — bản trước ở đây gửi thẳng mọi
+  // thứ người dùng chọn, kể cả tệp PDF hay ảnh 8MB, rồi để máy chủ từ chối.
+  const { inputRef, uploading, upload, moHopChonTep } = useImageUpload(onUpload);
 
   return (
     <div className="flex items-center gap-3">
@@ -53,11 +30,11 @@ export default function ImageUpload({ currentImage, onUpload, onRemove }: Props)
           <Upload className="w-5 h-5" />
         </div>
       )}
-      <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+      <button type="button" onClick={moHopChonTep} disabled={uploading}
         className="btn-secondary text-sm py-1.5 px-3">
         {uploading ? 'Đang tải...' : 'Chọn ảnh'}
       </button>
-      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+      <input ref={inputRef} type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0])} className="hidden" />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { formatCurrency, formatDateTime, formatDuration } from '@/lib/format';
 import type { Payment, PaymentStatus, CreditStatus } from '@/types';
 import { Eye, CreditCard } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
+import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge, { type Tone } from '@/components/user/StatusBadge';
@@ -19,7 +20,13 @@ export default function AdminPaymentsPage() {
   const [packageFilter, setPackageFilter] = useState<string>('all');
   const [viewPayment, setViewPayment] = useState<Payment | null>(null);
 
-  const load = () => paymentService.list().then(setPayments).catch(() => toast({ description: 'Không thể tải danh sách thanh toán', variant: 'destructive' }));
+  // Thiếu cờ này thì trong lúc chờ máy chủ, bảng rỗng + EmptyState hiện ra câu
+  // "chưa có giao dịch nào" — một câu SAI, và là thứ admin nhìn thấy đầu tiên.
+  const [loading, setLoading] = useState(true);
+
+  const load = () => paymentService.list().then(setPayments)
+    .catch(() => toast({ description: 'Không thể tải danh sách thanh toán', variant: 'destructive' }))
+    .finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
   // Danh sách gói lấy từ chính dữ liệu giao dịch: luôn khớp với thứ đang hiển thị,
@@ -35,7 +42,7 @@ export default function AdminPaymentsPage() {
   );
 
   // Cắt trang SAU khi đã lọc và tìm kiếm.
-  const paging = usePagination(filtered);
+  const paging = usePagination(filtered, undefined, [search, packageFilter]);
 
   const statusTone: Record<PaymentStatus, Tone> = {
     pending: 'warning',
@@ -87,6 +94,7 @@ export default function AdminPaymentsPage() {
         </select>
       </FilterBar>
 
+      {loading ? <LoadingSkeleton variant="table" rows={8} cols={7} /> : (
       <div className="bg-white rounded-2xl border border-line overflow-x-auto shadow-soft">
         <table className="w-full text-sm min-w-[900px]">
           <thead className="bg-sand border-b border-line">
@@ -149,9 +157,12 @@ export default function AdminPaymentsPage() {
           </tbody>
         </table>
       </div>
+      )}
 
-      <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
-        onChange={paging.setPage} unit="giao dịch" />
+      {!loading && (
+        <Pagination page={paging.page} lastPage={paging.lastPage} total={paging.total}
+          onChange={paging.setPage} unit="giao dịch" />
+      )}
 
       {/* 2 cột thay vì 1: 13 dòng nhãn:giá trị xếp dọc trong khung 448px thì cao
           hơn cả màn hình, phải kéo mới đọc hết một giao dịch. */}

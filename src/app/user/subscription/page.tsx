@@ -94,7 +94,6 @@ export default function SubscriptionPage() {
     })();
     loadPayments();
     // Nạp lại lịch sử thanh toán khi đổi quán đang chọn (gói theo từng quán).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCafeId]);
 
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);

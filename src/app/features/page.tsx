@@ -272,7 +272,6 @@ export default function FeaturesPage() {
 
           <Reveal delay={120} className="relative flex justify-center lg:justify-end">
             <div aria-hidden className="absolute -inset-8 rounded-[3rem] bg-bean/10 blur-3xl" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/product/ai-chat.png"
               alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý các combo đồ uống kèm giá cho buổi chiều vắng khách"

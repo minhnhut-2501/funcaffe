@@ -50,7 +50,7 @@ export default function AdminUsersPage() {
   );
 
   // Cắt trang SAU khi đã lọc và tìm kiếm.
-  const paging = usePagination(filtered);
+  const paging = usePagination(filtered, undefined, [search, pkgFilter, statusFilter]);
 
   const toggleLock = async (u: User) => {
     setProcessing(true);
@@ -237,6 +237,10 @@ export default function AdminUsersPage() {
         message={`Bạn có chắc muốn ${lockTarget?.status === 'active' ? 'khóa' : 'mở khóa'} tài khoản của ${lockTarget?.fullName}?`}
         confirmLabel={lockTarget?.status === 'active' ? 'Khóa' : 'Mở khóa'}
         danger={lockTarget?.status === 'active'}
+        // Không truyền `processing` thì nút Khóa vẫn bấm được trong lúc request
+        // đang bay — mạng chậm là admin bấm hai lần, gửi hai lệnh khóa liên tiếp
+        // và lệnh thứ hai MỞ LẠI tài khoản vừa khóa (endpoint là đảo trạng thái).
+        loading={processing}
       />
     </div>
   );
