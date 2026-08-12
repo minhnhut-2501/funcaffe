@@ -7,7 +7,7 @@ import {
   BarChart3, LogOut, Menu, X, Bell, DollarSign,
   Star, PanelLeft, ShieldCheck, Mail as MailIcon,
 } from 'lucide-react';
-import { paymentService, userService } from '@/services';
+import { contactService } from '@/services';
 import { useAuth } from '@/context/AuthContext';
 import SidebarNav, { type NavGroup } from '@/components/layouts/SidebarNav';
 
@@ -98,20 +98,37 @@ function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
   const [notifications, setNotifications] = useState<{ id: string; type: string; message: string; href: string }[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Chuông báo: TIN NHẮN LIÊN HỆ CHƯA ĐỌC.
+   *
+   * Trước đây chỗ này báo "Yêu cầu thanh toán từ X" cho mỗi giao dịch `pending`, và
+   * nó sai theo hai cách cùng lúc:
+   *
+   *  - Không bao giờ hiện. `Admin\PaymentController` đã lọc bỏ đơn cổng đang chờ
+   *    (khách bấm mua rồi bỏ dở, không phải việc của admin), nên danh sách trả về
+   *    không còn dòng `pending` nào để mà báo.
+   *  - Kể cả hiện thì cũng không làm gì được: khâu admin duyệt giao dịch đã gỡ từ
+   *    22/07/2026, trang Giao dịch nay chỉ đọc. Một thông báo không dẫn tới hành
+   *    động nào chỉ dạy người ta bỏ qua cái chuông.
+   *
+   * Tin nhắn liên hệ thì ngược lại: có người thật đang chờ trả lời, và admin bấm vào
+   * là làm được ngay. Lượt gọi `userService.list()` cũ cũng bỏ đi — kết quả của nó
+   * bị vứt ngay tại chỗ nhận.
+   */
   useEffect(() => {
-    Promise.all([
-      paymentService.list().catch(() => []),
-      userService.list().catch(() => []),
-    ]).then(([payments]) => {
-      const items: typeof notifications = [];
-      payments.forEach((p: any) => {
-        if (p.status === 'pending') {
-          items.push({ id: p.id, type: 'payment', message: `Yêu cầu thanh toán từ ${p.userName}`, href: '/admin/payments' });
-        }
-      });
-      items.sort((a, b) => a.id.localeCompare(b.id));
-      setNotifications(items.slice(0, 10));
-    });
+    let huy = false;
+    contactService.chuaDocGanDay(10)
+      .then((tin) => {
+        if (huy) return;
+        setNotifications(tin.map((m) => ({
+          id: m.id,
+          type: 'contact',
+          message: `${m.fullName} gửi một yêu cầu tư vấn`,
+          href: '/admin/contacts',
+        })));
+      })
+      .catch(() => { /* chuông rỗng còn hơn cả trang gãy vì một lượt gọi phụ */ });
+    return () => { huy = true; };
   }, []);
 
   useEffect(() => {
