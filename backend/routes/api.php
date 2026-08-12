@@ -29,7 +29,11 @@ Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::put('/user', [AuthController::class, 'updateProfile']);
-    Route::put('/user/password', [AuthController::class, 'changePassword']);
+    // Throttle NGANG với đăng nhập: endpoint này nhận `current_password` và nói cho
+    // người gọi biết đoán đúng hay sai. Ai cầm được token (máy để mở, token bị chép)
+    // mà không biết mật khẩu thì đây là chỗ dò — không giới hạn là dò được vô hạn.
+    Route::put('/user/password', [AuthController::class, 'changePassword'])
+        ->middleware('throttle:10,1');
 });
 
 // Public review endpoints (no auth required)
