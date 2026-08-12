@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Loader2, User, Mail, Phone, Lock, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import AuthShell, { AuthField, PasswordToggle } from '@/components/public/AuthShell';
+import { MAT_KHAU_TOI_THIEU, HO_TEN_TOI_DA, soDienThoaiHopLe, LOI_SO_DIEN_THOAI } from '@/lib/validate';
 
 const aside = {
   image: '/banners/cafe-counter.jpg',
@@ -45,12 +46,15 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     fullName: '', email: '', phone: '', password: '', confirmPassword: '', agree: false,
   });
-  const [fieldError, setFieldError] = useState<{ password?: string; confirmPassword?: string }>({});
+  const [fieldError, setFieldError] = useState<{ password?: string; confirmPassword?: string; phone?: string }>({});
 
   const validate = (f = form) => {
-    const errs: { password?: string; confirmPassword?: string } = {};
-    if (f.password && f.password.length < 8) errs.password = 'Mật khẩu tối thiểu 8 ký tự.';
+    const errs: { password?: string; confirmPassword?: string; phone?: string } = {};
+    if (f.password && f.password.length < MAT_KHAU_TOI_THIEU) errs.password = `Mật khẩu tối thiểu ${MAT_KHAU_TOI_THIEU} ký tự.`;
     if (f.confirmPassword && f.confirmPassword !== f.password) errs.confirmPassword = 'Mật khẩu xác nhận không khớp.';
+    // Cùng luật với máy chủ (App\Rules\SoDienThoaiVN). Trước đây cả hai bên chỉ đếm
+    // độ dài, nên "abc" cũng lưu được — mà đó là cách duy nhất liên lạc lại chủ quán.
+    if (f.phone && !soDienThoaiHopLe(f.phone)) errs.phone = LOI_SO_DIEN_THOAI;
     return errs;
   };
 
@@ -58,7 +62,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     const errs = validate();
-    if (errs.password || errs.confirmPassword) {
+    if (errs.password || errs.confirmPassword || errs.phone) {
       setFieldError(errs);
       return;
     }
@@ -108,6 +112,7 @@ export default function RegisterPage() {
         placeholder="Nguyễn Văn A"
         required
         markRequired
+        maxLength={HO_TEN_TOI_DA}
         value={form.fullName}
         onChange={e => setForm({ ...form, fullName: e.target.value })}
       />
@@ -133,8 +138,11 @@ export default function RegisterPage() {
         autoComplete="tel"
         inputMode="numeric"
         placeholder="0901234567"
+        maxLength={20}
+        error={fieldError.phone}
         value={form.phone}
-        onChange={e => setForm({ ...form, phone: e.target.value })}
+        onChange={e => { const v = e.target.value; setForm({ ...form, phone: v }); setFieldError(validate({ ...form, phone: v })); }}
+        onBlur={() => setFieldError(validate())}
       />
 
       <AuthField

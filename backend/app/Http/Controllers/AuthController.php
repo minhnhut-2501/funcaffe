@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Rules\SoDienThoaiVN;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -21,7 +22,8 @@ class AuthController extends Controller
             // được 2 tài khoản trùng email.
             'email' => 'required|string|email|max:255|unique:mongodb.users,email',
             'password' => 'required|string|min:8',
-            'phone' => 'nullable|string|max:20',
+            // Cùng luật với ô nhập ở giao diện — xem App\Rules\SoDienThoaiVN.
+            'phone' => ['nullable', 'string', 'max:20', new SoDienThoaiVN()],
         ], [
             // Thông báo tiếng Việt: các lỗi này hiện thẳng lên form đăng ký.
             'full_name.required' => 'Vui lòng nhập họ tên.',
@@ -92,11 +94,21 @@ class AuthController extends Controller
         return response()->json($request->user());
     }
 
+    /**
+     * Sửa hồ sơ cá nhân — CÓ CHỦ Ý không cho đổi email.
+     *
+     * Email là tên đăng nhập, là địa chỉ nhận liên kết đặt lại mật khẩu, và là khóa
+     * đối chiếu trong lịch sử giao dịch gói. Cho đổi tại đây thì phải kèm bước xác
+     * minh địa chỉ mới (gõ sai một ký tự là mất luôn đường vào tài khoản) — việc đó
+     * chưa làm, nên chặn hẳn thay vì làm nửa vời. Ô email ở giao diện bị vô hiệu hóa
+     * và ghi rõ "không thể đổi"; ở đây `email` không nằm trong danh sách nên có gửi
+     * lên cũng bị bỏ, không âm thầm ghi vào CSDL.
+     */
     public function updateProfile(Request $request)
     {
         $validated = $request->validate([
             'full_name' => 'sometimes|string|max:255',
-            'phone' => 'nullable|string|max:20',
+            'phone' => ['nullable', 'string', 'max:20', new SoDienThoaiVN()],
             'avatar' => 'nullable|string',
         ]);
 
