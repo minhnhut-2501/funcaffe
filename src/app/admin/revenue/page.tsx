@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import StatCard from '@/components/ui/StatCard';
 import { userService, paymentService } from '@/services';
-import { formatCurrency, ngayDiaPhuong } from '@/lib/format';
+import { formatCurrency, ngayDiaPhuong, khoaThoiGian, thangDiaPhuong, thangNay } from '@/lib/format';
 import type { User, Payment } from '@/types';
 import { DollarSign, TrendingUp, Users, BarChart3, AlertCircle } from 'lucide-react';
 import { ComposedChart, Bar, Line, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -46,16 +46,13 @@ export default function AdminRevenuePage() {
     return () => { cancelled = true; };
   }, []);
 
-  const thisMonthKey = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }, []);
+  const thisMonthKey = useMemo(() => thangNay(), []);
 
   // BUG-19 FIX: Chỉ tính giao dịch đã thanh toán
   const approvedPayments = useMemo(() => payments.filter(p => p.status === 'paid'), [payments]);
   const totalRevenue = useMemo(() => approvedPayments.reduce((s, p) => s + p.amount, 0), [approvedPayments]);
   const avgRevenue = useMemo(() => approvedPayments.length > 0 ? Math.round(totalRevenue / approvedPayments.length) : 0, [approvedPayments, totalRevenue]);
-  const thisMonthRevenue = useMemo(() => approvedPayments.filter(p => p.createdAt.startsWith(thisMonthKey)).reduce((s, p) => s + p.amount, 0), [approvedPayments, thisMonthKey]);
+  const thisMonthRevenue = useMemo(() => approvedPayments.filter(p => thangDiaPhuong(p.createdAt) === thisMonthKey).reduce((s, p) => s + p.amount, 0), [approvedPayments, thisMonthKey]);
   // Bộ lọc chỉ áp cho 2 biểu đồ theo thời gian bên dưới (StatCard/Pie/bảng giữ tổng quan).
   const filteredPayments = useMemo(() => {
     let r = approvedPayments;
@@ -71,7 +68,11 @@ export default function AdminRevenuePage() {
   const revenueSeries = useMemo<RevenuePoint[]>(() => {
     const groups: Record<string, number> = {};
     filteredPayments.forEach(p => {
-      const k = p.createdAt.slice(0, keyLength(effectiveMode));
+      // Cùng một hàm với bộ lọc bên trên. Cắt thẳng chuỗi ISO là gom theo giờ UTC
+      // trong khi lọc theo giờ Việt Nam: giao dịch lúc 05:00 ngày 01/08 lọt vào
+      // khoảng đã lọc nhưng bị vẽ sang cột 31/07 — hai con số cãi nhau trên cùng
+      // một màn hình mà không chỗ nào báo lỗi.
+      const k = khoaThoiGian(p.createdAt, keyLength(effectiveMode));
       groups[k] = (groups[k] ?? 0) + p.amount;
     });
     return fillGaps(groups, effectiveMode, 0, fromDate, toDate).map(({ key, value }) => ({
@@ -90,7 +91,7 @@ export default function AdminRevenuePage() {
     const groups: Record<string, number> = {};
     users.forEach(u => {
       if (!u.createdAt) return;
-      const k = u.createdAt.slice(0, keyLength(effectiveMode));
+      const k = khoaThoiGian(u.createdAt, keyLength(effectiveMode));
       groups[k] = (groups[k] ?? 0) + 1;
     });
     const rows = fillGaps(groups, effectiveMode, 0, fromDate, toDate);
@@ -98,7 +99,7 @@ export default function AdminRevenuePage() {
     // gần đây mà đường lũy kế bắt đầu từ 0 thì thành "hệ thống mới có người dùng".
     const firstKey = rows[0]?.key ?? '';
     let running = firstKey
-      ? users.filter(u => u.createdAt && u.createdAt.slice(0, keyLength(effectiveMode)) < firstKey).length
+      ? users.filter(u => u.createdAt && khoaThoiGian(u.createdAt, keyLength(effectiveMode)) < firstKey).length
       : 0;
     return rows.map(({ key, value }) => {
       running += value;

@@ -104,6 +104,32 @@ export function homNay(): string {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
+/**
+ * KHÓA GOM NHÓM theo giờ địa phương: 4 ký tự = năm, 7 = tháng, 10 = ngày.
+ *
+ * Tồn tại để không ai còn viết `dateStr.slice(0, doDai)` nữa. Cắt thẳng chuỗi ISO
+ * là cắt trên giờ UTC — cùng một lỗi với `ngayDiaPhuong` nhưng khó thấy hơn nhiều,
+ * vì khi lọc dùng giờ Việt Nam mà gom nhóm dùng giờ UTC thì một giao dịch **lọt vào
+ * khoảng nhưng bị vẽ sang cột hôm trước**. Hai con số cùng trên một màn hình, cãi
+ * nhau, không chỗ nào báo lỗi.
+ *
+ * Dùng chung một hàm cho cả lọc lẫn gom nhóm là cách duy nhất chắc chắn hai bên
+ * không lệch (xem `keyLength()` trong `lib/chart.ts` để biết độ dài theo mốc).
+ */
+export function khoaThoiGian(dateStr: string, doDai: number): string {
+  return ngayDiaPhuong(dateStr).slice(0, doDai);
+}
+
+/** Tháng của một mốc thời gian theo giờ địa phương, dạng 'YYYY-MM'. */
+export function thangDiaPhuong(dateStr: string): string {
+  return khoaThoiGian(dateStr, 7);
+}
+
+/** Tháng này theo giờ địa phương, cùng dạng với `thangDiaPhuong`. */
+export function thangNay(): string {
+  return homNay().slice(0, 7);
+}
+
 export function formatPaymentMethod(method: string): string {
   const map: Record<string, string> = {
     cash: 'Tiền mặt',
