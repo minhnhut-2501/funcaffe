@@ -279,8 +279,19 @@ class SubscriptionController extends Controller
         $validated = $request->validate([
             'package_id' => 'required|string',
             'time_subscription_id' => 'nullable|string',
-            'payment_method' => 'required|string|in:cash,bank_transfer,qr_code,e_wallet,vnpay,momo',
+            // CHỈ cổng online. Trước đây danh sách này còn nhận cash / bank_transfer /
+            // qr_code / e_wallet, và đó là một lỗ thủng thẳng: nhánh "không phải cổng"
+            // KÍCH HOẠT GÓI NGAY (xem $subscriptionStatus bên dưới) vì nó được viết cho
+            // thời còn khâu admin duyệt tay. Khâu đó đã gỡ từ 22/07/2026, nhưng nhánh
+            // thì còn — nên chỉ cần gọi thẳng API với payment_method='cash' là có Pro Max
+            // miễn phí, không qua cổng nào. Giao diện chưa bao giờ hiện các lựa chọn đó,
+            // nhưng giao diện không phải chốt chặn.
+            //
+            // Dựng từ chính hằng số để hai danh sách không thể lệch nhau.
+            'payment_method' => ['required', 'string', 'in:' . implode(',', PackagePayment::ONLINE_GATEWAYS)],
             'note' => 'nullable|string|max:500',
+        ], [
+            'payment_method.in' => 'Chỉ thanh toán gói qua VNPay hoặc MoMo.',
         ]);
 
         $package = Package::findOrFail($validated['package_id']);
@@ -313,19 +324,17 @@ class SubscriptionController extends Controller
             }
         }
 
-        // Chỉ đơn 'pending' THỰC SỰ chờ admin (tiền mặt/chuyển khoản) mới chặn thao tác mới.
-        // Đơn cổng còn trong hạn chờ thì KHÔNG chặn: khách quay lại mua tiếp là chuyện bình
-        // thường, và nếu sau đó họ vẫn trả tiền cho đơn cũ thì callback vẫn cấp gói đúng.
-        $hasPendingPayment = PackagePayment::where('cafe_id', $cafeId)
-            ->where('payment_status', 'pending')
-            ->whereNotIn('payment_method', PackagePayment::ONLINE_GATEWAYS)
-            ->exists();
-
-        if ($hasPendingPayment) {
-            return response()->json([
-                'message' => 'Quán này đang có giao dịch chờ admin kiểm tra. Vui lòng chờ xử lý trước khi thực hiện thao tác mới.'
-            ], 400);
-        }
+        // ĐÃ GỠ chốt chặn "đang có giao dịch chờ admin kiểm tra".
+        //
+        // Nó chặn quán khi tồn tại một giao dịch 'pending' không phải của cổng, và bảo
+        // người ta chờ admin xử lý. Nhưng khâu admin duyệt tay đã gỡ từ 22/07/2026 —
+        // Admin\PaymentController nay CHỈ ĐỌC, không còn nút duyệt hay từ chối nào.
+        // Nghĩa là chốt này không còn cửa ra: quán nào rơi vào đó thì vĩnh viễn không
+        // mua, gia hạn hay nâng cấp được nữa, và câu thông báo hứa hẹn một thao tác mà
+        // không ai thực hiện được.
+        //
+        // Từ nay không đường nào tạo ra giao dịch như vậy (payment_method chỉ nhận cổng
+        // online). Gỡ chốt cũng chính là lối thoát cho các bản ghi cũ còn kẹt lại.
 
         // Lấy time_subscription để tính giá và duration
         $timeSub = null;
