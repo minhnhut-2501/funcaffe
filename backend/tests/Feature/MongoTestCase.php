@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 use Throwable;
@@ -36,6 +37,12 @@ abstract class MongoTestCase extends TestCase
         } catch (Throwable $e) {
             $this->markTestSkipped('Không kết nối được MongoDB: ' . $e->getMessage());
         }
+
+        // Bộ đếm tần suất nằm trong cache. Không dọn thì các bài NỐI ĐUÔI nhau trên
+        // cùng một bộ đếm (khách chưa đăng nhập đều đếm theo IP 127.0.0.1): bài chạy
+        // sau vô cớ nhận 429 vì bài chạy trước đã tiêu hết lượt. Cache lúc kiểm thử
+        // là 'array' (xem phpunit.xml) nên dọn ở đây không đụng gì thật.
+        Cache::flush();
 
         $this->wipe();
     }
