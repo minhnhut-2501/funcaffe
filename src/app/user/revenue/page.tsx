@@ -170,8 +170,24 @@ export default function RevenuePage() {
           toExcelDate(inv.paidAt || inv.createdAt),
         ]),
       );
-    } catch {
-      toast({ description: 'Xuất file thất bại, vui lòng thử lại.', variant: 'destructive' });
+    } catch (e) {
+      // KHÔNG nuốt lý do. "Xuất file thất bại, vui lòng thử lại" là lời khuyên sai
+      // trong hầu hết trường hợp: thử lại bao nhiêu lần cũng hỏng như nhau. Ba nguyên
+      // nhân thật, mỗi cái cần một hành động khác hẳn:
+      //   · bộ tạo tệp (exceljs) được nạp động nên là gói mã TẢI RIÊNG lúc bấm nút —
+      //     bản dựng cũ còn nằm trong trình duyệt thì gói đó 404 và chỉ mình nút này
+      //     hỏng, phần còn lại của trang vẫn chạy. Đây là ca hay gặp nhất.
+      //   · trình duyệt chặn tải tệp tự động.
+      //   · dữ liệu có ô mà bộ tạo tệp không ghi được.
+      console.error('[Xuất Excel] thất bại:', e);
+      const chiTiet = e instanceof Error ? e.message : String(e);
+      const laLoiTaiMa = /chunk|import|dynamically imported|Failed to fetch|NetworkError/i.test(chiTiet);
+      toast({
+        description: laLoiTaiMa
+          ? 'Không tải được bộ tạo tệp Excel. Trang đang chạy trên bản dựng cũ — tải lại trang bằng Ctrl+F5 rồi bấm lại.'
+          : `Xuất file thất bại: ${chiTiet}`,
+        variant: 'destructive',
+      });
     } finally {
       setExporting(false);
     }
