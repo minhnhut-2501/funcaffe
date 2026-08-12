@@ -10,6 +10,9 @@ import {
   formatPaymentMethod,
   ngayDiaPhuong,
   homNay,
+  khoaThoiGian,
+  thangDiaPhuong,
+  thangNay,
 } from './format';
 
 describe('formatCurrency', () => {
@@ -122,6 +125,41 @@ describe('ngày ghi nhận doanh thu (giờ Việt Nam)', () => {
   it('homNay() cùng dạng và khớp với ngayDiaPhuong của thời điểm hiện tại', () => {
     expect(homNay()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(homNay()).toBe(ngayDiaPhuong(new Date().toISOString()));
+  });
+});
+
+describe('khóa gom nhóm cho biểu đồ', () => {
+  /**
+   * Lọc và gom nhóm PHẢI dùng chung một phép quy đổi. Lệch nhau thì một giao dịch
+   * lọt vào khoảng đã lọc nhưng bị vẽ sang cột hôm trước — hai con số cãi nhau trên
+   * cùng một màn hình mà không chỗ nào báo lỗi.
+   */
+  it('gom theo tháng dùng giờ Việt Nam, không phải giờ UTC', () => {
+    // 2026-07-31T18:00Z = 01/08 lúc 01:00 giờ Việt Nam -> thuộc THÁNG 8.
+    // Cắt chuỗi ISO — cách cũ — cho ra '2026-07', đẩy doanh thu sang tháng trước.
+    expect(thangDiaPhuong('2026-07-31T18:00:00.000Z')).toBe('2026-08');
+    expect(khoaThoiGian('2026-07-31T18:00:00.000Z', 7)).toBe('2026-08');
+  });
+
+  it('gom theo ngày và theo năm cũng vậy', () => {
+    expect(khoaThoiGian('2026-07-31T18:00:00.000Z', 10)).toBe('2026-08-01');
+    expect(khoaThoiGian('2025-12-31T18:00:00.000Z', 4)).toBe('2026');
+  });
+
+  it('giao dịch giữa ngày không đổi nhóm', () => {
+    expect(thangDiaPhuong('2026-08-15T05:00:00.000Z')).toBe('2026-08');
+  });
+
+  it('khóa gom nhóm luôn là tiền tố của khóa ngày — hai bên không thể lệch', () => {
+    const moc = '2026-07-31T18:00:00.000Z';
+    const ngay = ngayDiaPhuong(moc);
+    expect(ngay.startsWith(thangDiaPhuong(moc))).toBe(true);
+    expect(khoaThoiGian(moc, 10)).toBe(ngay);
+  });
+
+  it('thangNay() cùng dạng và khớp với thangDiaPhuong của hiện tại', () => {
+    expect(thangNay()).toMatch(/^\d{4}-\d{2}$/);
+    expect(thangNay()).toBe(thangDiaPhuong(new Date().toISOString()));
   });
 });
 

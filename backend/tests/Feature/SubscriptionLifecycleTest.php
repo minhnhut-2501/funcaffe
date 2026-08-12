@@ -85,13 +85,57 @@ class SubscriptionLifecycleTest extends MongoTestCase
         ]);
     }
 
-    private function mua(Package $goi, ?TimeSubscription $thoiHan = null, string $cach = 'cash')
+    /**
+     * MUA TRỌN VẸN một gói: gọi API rồi để cổng xác nhận đã thu tiền.
+     *
+     * Trước đây bộ này mua bằng `payment_method: 'cash'` vì đường đó áp mọi hệ quả
+     * ngay tại `store()`, tiện cho việc khẳng định liền sau lượt gọi. Nhưng `cash`
+     * không phải một đường có thật: giao diện chưa bao giờ hiện nó, và nó KÍCH HOẠT
+     * GÓI MÀ KHÔNG THU ĐỒNG NÀO (di sản của thời còn khâu admin duyệt tay). Nay
+     * `payment_method` chỉ nhận cổng online, nên bộ kiểm thử phải đi đúng đường mà
+     * người dùng thật đi: gọi API → cổng gọi về báo đã thu tiền.
+     *
+     * Không tự nhận thanh toán ở đây khi lượt gọi hỏng (4xx) — bài kiểm thử nào cần
+     * xem trạng thái "chờ cổng xác nhận" thì gọi `dat()` rồi tự quyết định.
+     */
+    private function mua(Package $goi, ?TimeSubscription $thoiHan = null, string $cach = 'vnpay')
+    {
+        $res = $this->dat($goi, $thoiHan, $cach);
+
+        if ($res->getStatusCode() < 300) {
+            $this->congXacNhanDaThu();
+        }
+
+        return $res;
+    }
+
+    /** Chỉ ĐẶT mua — dừng ở bước chờ cổng, chưa có đồng nào vào. */
+    private function dat(Package $goi, ?TimeSubscription $thoiHan = null, string $cach = 'vnpay')
     {
         return $this->postJson("/api/cafes/{$this->cafe->id}/subscriptions", array_filter([
             'package_id' => (string) $goi->id,
             'time_subscription_id' => $thoiHan ? (string) $thoiHan->id : null,
             'payment_method' => $cach,
         ]));
+    }
+
+    /**
+     * Cổng gọi về báo đã thu tiền — đúng việc mà callback VNPay/MoMo làm.
+     *
+     * Đi qua chính `SubscriptionActivator` mà callback dùng, nên bài kiểm thử nào
+     * cũng chạy trên đường thật: cộng hạn, hủy gói cũ khi nâng cấp, đánh dấu đã dùng
+     * gói thử… đều do nó làm, không phải do `store()`.
+     */
+    private function congXacNhanDaThu(): void
+    {
+        $choXacNhan = PackagePayment::where('cafe_id', (string) $this->cafe->id)
+            ->where('payment_status', 'pending')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($choXacNhan) {
+            app(\App\Services\SubscriptionActivator::class)->markPaidAndActivate($choXacNhan);
+        }
     }
 
     // === 6.2.1 Mua mới ============================================================
@@ -359,7 +403,37 @@ class SubscriptionLifecycleTest extends MongoTestCase
 
     // === 6.1.4 Giao dịch đang chờ ==================================================
 
-    public function test_dang_co_giao_dich_cho_admin_thi_chan_thao_tac_moi(): void
+    /**
+     * KHÔNG cách nào tự cấp gói cho mình mà không trả tiền.
+     *
+     * `payment_method` từng nhận cả `cash`, `bank_transfer`, `qr_code`, `e_wallet`.
+     * Nhánh "không phải cổng" trong `store()` KÍCH HOẠT GÓI NGAY — nó được viết cho
+     * thời còn khâu admin duyệt tay, mà khâu đó đã gỡ từ 22/07/2026. Giao diện chưa
+     * bao giờ hiện các lựa chọn đó, nhưng giao diện không phải chốt chặn: gọi thẳng
+     * API với `payment_method: 'cash'` là có Pro Max miễn phí, không qua cổng nào.
+     */
+    public function test_khong_tu_cap_goi_duoc_bang_cach_khai_tra_tien_mat(): void
+    {
+        $th = $this->thoiHan($this->goiPro);
+
+        foreach (['cash', 'bank_transfer', 'qr_code', 'e_wallet'] as $cach) {
+            $this->dat($this->goiPro, $th, $cach)
+                ->assertStatus(422)
+                ->assertJsonValidationErrors('payment_method');
+        }
+
+        $this->assertSame(0, Subscription::where('cafe_id', (string) $this->cafe->id)->count(),
+            'Có gói được cấp dù không giao dịch nào qua cổng.');
+    }
+
+    /**
+     * Một giao dịch 'pending' cũ KHÔNG được khóa quán lại vĩnh viễn.
+     *
+     * Chốt chặn cũ bảo người ta "chờ admin kiểm tra", trong khi
+     * `Admin\PaymentController` nay chỉ đọc — không còn nút duyệt hay từ chối nào.
+     * Quán nào rơi vào đó thì không mua, gia hạn hay nâng cấp được nữa, mãi mãi.
+     */
+    public function test_giao_dich_cu_con_treo_khong_khoa_quan_lai(): void
     {
         $sub = $this->capGoi($this->goiPro, 10);
         $sub->packagePayments()->create([
@@ -370,9 +444,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
             'action_type' => 'renew',
         ]);
 
-        $this->mua($this->goiPro, $this->thoiHan($this->goiPro))
-            ->assertStatus(400)
-            ->assertJsonPath('message', 'Quán này đang có giao dịch chờ admin kiểm tra. Vui lòng chờ xử lý trước khi thực hiện thao tác mới.');
+        $this->dat($this->goiPro, $this->thoiHan($this->goiPro))->assertStatus(200);
     }
 
     // === 6.6 Gói dùng thử ==========================================================
@@ -399,7 +471,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
         $quanMoi = $this->user->cafes()->create(['name' => 'Quán thứ hai', 'status' => 'open']);
 
         $this->postJson("/api/cafes/{$quanMoi->id}/subscriptions", [
-            'package_id' => (string) $this->goiThu->id, 'payment_method' => 'cash',
+            'package_id' => (string) $this->goiThu->id, 'payment_method' => 'vnpay',
         ])->assertStatus(400)
           ->assertJsonPath('message', 'Tài khoản của bạn đã dùng gói dùng thử miễn phí rồi. Mỗi tài khoản chỉ được dùng thử một lần — vui lòng chọn gói trả phí cho quán này.');
     }
