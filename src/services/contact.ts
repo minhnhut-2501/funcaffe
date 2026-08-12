@@ -37,6 +37,18 @@ export const contactService = {
     );
     return [first, ...rest].flatMap((p) => (p.data ?? []).map(mapContact));
   },
+  /**
+   * Vài tin CHƯA ĐỌC gần nhất — cho chuông báo ở khung quản trị.
+   *
+   * Chỉ một trang nhỏ, và để MÁY CHỦ lọc chưa đọc. `adminList()` gom mọi trang, quá
+   * đắt cho một thứ chạy ở mọi màn hình quản trị; còn lấy vài tin mới nhất rồi tự lọc
+   * thì mười tin mới nhất đều đã đọc là chuông im, dù tin chưa đọc vẫn nằm bên dưới.
+   */
+  chuaDocGanDay: async (soLuong = 10): Promise<ContactMessage[]> => {
+    const res = await api.get<any>(`/admin/contacts?is_read=0&per_page=${soLuong}`);
+    const rows = Array.isArray(res) ? res : (res.data ?? []);
+    return rows.map(mapContact);
+  },
   /** Đặt trạng thái đã đọc. Truyền giá trị mong muốn, không đảo — xem ContactController. */
   setRead: async (id: string, isRead: boolean) => {
     return api.put(`/admin/contacts/${id}/read`, { is_read: isRead });

@@ -30,9 +30,16 @@ class ContactController extends Controller
     {
         $perPage = min(max((int) $request->query('per_page', 50), 1), 200);
 
-        return response()->json(
-            ContactMessage::orderBy('created_at', 'desc')->paginate($perPage)
-        );
+        $query = ContactMessage::orderBy('created_at', 'desc');
+
+        // Lọc ở MÁY CHỦ khi nơi gọi chỉ cần tin chưa đọc (chuông báo ở khung quản
+        // trị). Lấy vài tin mới nhất rồi tự lọc ở trình duyệt là sai: mười tin mới
+        // nhất đều đã đọc thì chuông im, trong khi tin chưa đọc vẫn nằm bên dưới.
+        if ($request->has('is_read')) {
+            $query->where('is_read', $request->boolean('is_read'));
+        }
+
+        return response()->json($query->paginate($perPage));
     }
 
     /**
@@ -66,7 +73,20 @@ class ContactController extends Controller
             'reply' => 'required|string|min:10|max:5000',
         ]);
 
-        Mail::to($contact->email)->send(new ContactReplyMail($contact, $validated['reply']));
+        try {
+            Mail::to($contact->email)->send(new ContactReplyMail($contact, $validated['reply']));
+        } catch (\Throwable $e) {
+            // Để lỗi bay thẳng lên thì frontend nhận 500 và hiện câu chung "Máy chủ gặp
+            // sự cố, vui lòng thử lại sau ít phút" — sai hướng dẫn: chờ bao lâu cũng
+            // không hết, thứ cần sửa là cấu hình SMTP. Nói đúng chuyện đang xảy ra.
+            \Illuminate\Support\Facades\Log::warning(
+                "Gửi thư trả lời liên hệ thất bại ({$contact->email}): " . $e->getMessage()
+            );
+
+            return response()->json([
+                'message' => "Không gửi được thư tới {$contact->email}. Tin nhắn VẪN ở trạng thái chưa trả lời — kiểm tra cấu hình SMTP rồi gửi lại.",
+            ], 502);
+        }
 
         $contact->update([
             'reply'      => $validated['reply'],
