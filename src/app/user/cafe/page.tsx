@@ -6,7 +6,7 @@ import MediaUploader from '@/components/ui/MediaUploader';
 import { useAuth } from '@/context/AuthContext';
 import { cafeService, createCafe, invoiceService, revenueService, type RevenueOverview } from '@/services';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, ngayDiaPhuong } from '@/lib/format';
 import type { CafeInfo, Invoice } from '@/types';
 import { VN_BANKS } from '@/lib/banks';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
@@ -37,7 +37,7 @@ const TRANG_THAI_GIAI_THICH: Record<string, string> = {
 const emptyForm: CafeInfo = { id: '', name: '', address: '', phone: '', description: '', status: 'open' };
 
 /** Ngày thanh toán 'YYYY-MM-DD'; hóa đơn cũ thiếu paid_at thì lấy ngày tạo. */
-const dayOf = (i: Invoice) => (i.paidAt || i.createdAt).slice(0, 10);
+const dayOf = (i: Invoice) => ngayDiaPhuong(i.paidAt || i.createdAt);
 const now = new Date();
 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 const thisMonthStr = todayStr.slice(0, 7);

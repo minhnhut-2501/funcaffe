@@ -78,6 +78,32 @@ export function formatDateTime(dateStr: string): string {
   return `${pad(h)}:${pad(min)} ${pad(d)}/${pad(m)}/${y}`;
 }
 
+/**
+ * NGÀY của một mốc thời gian, theo giờ ĐỊA PHƯƠNG, dạng 'YYYY-MM-DD'.
+ *
+ * Máy chủ trả về chuỗi ISO theo giờ UTC: một hóa đơn thu lúc 00:23 ngày 05/08 giờ
+ * Việt Nam đi trên dây là `2026-08-04T17:23:55Z`. Cắt 10 ký tự đầu — cách các trang
+ * làm trước đây — cho ra "2026-08-04", tức là ĐẨY doanh thu của bảy tiếng đầu mỗi
+ * ngày sang ngày hôm trước.
+ *
+ * Hậu quả không nhỏ: quán bán tới khuya thì mỗi đêm một khoản tiền rơi nhầm ngày,
+ * "doanh thu hôm nay" trên màn hình lệch với số máy chủ tự tính (máy chủ dùng giờ
+ * Việt Nam), và lọc "từ ngày → đến ngày" bỏ sót đúng những hóa đơn ở rìa khoảng.
+ *
+ * Chuỗi chỉ có ngày ('2026-08-05') thì giữ nguyên — không có giờ để mà quy đổi.
+ */
+export function ngayDiaPhuong(dateStr: string): string {
+  if (!dateStr) return '';
+  const { d, m, y } = parseDateStr(dateStr);
+  return `${y}-${pad(m)}-${pad(d)}`;
+}
+
+/** Hôm nay theo giờ địa phương, cùng dạng với `ngayDiaPhuong`. */
+export function homNay(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+}
+
 export function formatPaymentMethod(method: string): string {
   const map: Record<string, string> = {
     cash: 'Tiền mặt',

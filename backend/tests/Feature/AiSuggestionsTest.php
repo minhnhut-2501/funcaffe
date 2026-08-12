@@ -165,4 +165,46 @@ class AiSuggestionsTest extends MongoTestCase
 
         $this->getJson("/api/cafes/{$this->cafe->id}/ai/suggestions")->assertStatus(403);
     }
+
+    /**
+     * Việc 5.6.1: MỌI đường AI đều phải khóa, không riêng đường gợi ý.
+     *
+     * Đi qua bảng route thật thay vì liệt kê tay — thêm một endpoint AI mới mà quên
+     * gắn middleware thì bài này đỏ ngay, không cần ai nhớ cập nhật danh sách.
+     * Nút ở giao diện chỉ để cho đẹp; chốt chặn thật nằm ở đây.
+     */
+    public function test_moi_duong_ai_deu_bi_chan_khi_goi_khong_cho_dung_ai(): void
+    {
+        Package::query()->update(['can_use_ai' => false]);
+
+        $duongAi = collect(\Illuminate\Support\Facades\Route::getRoutes())->filter(function ($r) {
+            $mw = $r->gatherMiddleware();
+            return (in_array('ai', $mw, true) || in_array(\App\Http\Middleware\RequiresAI::class, $mw, true))
+                && str_contains($r->uri(), '/ai/');
+        });
+
+        $this->assertGreaterThanOrEqual(4, $duongAi->count(),
+            'Số đường AI ít bất thường — có thể ai đó vừa gỡ middleware.');
+
+        $lot = [];
+        foreach ($duongAi as $route) {
+            $duong = '/' . ltrim(str_replace('{cafe}', (string) $this->cafe->id, $route->uri()), '/');
+            $cach = collect($route->methods())->first(fn ($m) => !in_array($m, ['HEAD', 'OPTIONS'], true));
+            $res = $this->json($cach, $duong, ['message' => 'xin chào']);
+            if ($res->getStatusCode() !== 403) {
+                $lot[] = "{$cach} {$route->uri()} -> {$res->getStatusCode()}";
+            }
+        }
+
+        $this->assertSame([], $lot, "Đường AI gọi được bằng gói không có quyền:\n" . implode("\n", $lot));
+    }
+
+    /** Gói có quyền nhưng ĐÃ HẾT HẠN cũng không được dùng AI. */
+    public function test_goi_het_han_thi_khong_dung_duoc_ai_du_goi_do_co_quyen(): void
+    {
+        Subscription::where('cafe_id', (string) $this->cafe->id)
+            ->update(['end_date' => now()->subDay()]);
+
+        $this->getJson("/api/cafes/{$this->cafe->id}/ai/suggestions")->assertStatus(403);
+    }
 }

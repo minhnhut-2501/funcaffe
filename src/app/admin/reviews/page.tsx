@@ -9,13 +9,13 @@ import DateRangePicker from '@/components/ui/DateRangePicker';
 import { reviewService } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 import { Star, AlertCircle, Eye, History, RotateCcw, MessageSquareText } from 'lucide-react';
-import { formatDate, formatDateTime } from '@/lib/format';
+import { formatDate, formatDateTime, ngayDiaPhuong } from '@/lib/format';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge from '@/components/user/StatusBadge';
 import type { Review } from '@/types';
 
 /** Ngày dùng để lọc — cùng quy ước 'YYYY-MM-DD' với các trang doanh thu. */
-const dayOf = (r: Review) => (r.createdAt ?? '').slice(0, 10);
+const dayOf = (r: Review) => ngayDiaPhuong(r.createdAt ?? '');
 
 function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'lg' }) {
   const cls = size === 'lg' ? 'w-6 h-6' : 'w-4 h-4';

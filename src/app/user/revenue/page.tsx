@@ -11,7 +11,7 @@ import CafeRevenueComparison from '@/components/user/CafeRevenueComparison';
 import { useAuth } from '@/context/AuthContext';
 import { invoiceService } from '@/services';
 import { useApi } from '@/hooks/use-api';
-import { formatCurrency, formatPaymentMethod } from '@/lib/format';
+import { formatCurrency, formatPaymentMethod, ngayDiaPhuong } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { Download, TrendingUp, Receipt, DollarSign, BarChart3, AlertCircle, Store, Trophy } from 'lucide-react';
 import { downloadExcel, toExcelDate } from '@/lib/utils';
@@ -21,7 +21,8 @@ import type { Invoice } from '@/types';
 import { fillGaps, keyLength, axisLabel, fullLabel, suggestMode, type ChartMode } from '@/lib/chart';
 
 /** Ngày thanh toán dạng 'YYYY-MM-DD'; hóa đơn cũ thiếu paid_at thì lấy ngày tạo. */
-const dayOf = (i: Invoice) => (i.paidAt || i.createdAt).slice(0, 10);
+// Ngày ghi nhận doanh thu, theo giờ ĐỊA PHƯƠNG — xem chú thích ở ngayDiaPhuong().
+const dayOf = (i: Invoice) => ngayDiaPhuong(i.paidAt || i.createdAt);
 
 function groupBy(
   invoices: Invoice[],
@@ -32,7 +33,10 @@ function groupBy(
   const len = keyLength(mode);
   const groups: Record<string, number> = {};
   invoices.forEach(inv => {
-    const k = (inv.paidAt || inv.createdAt).slice(0, len);
+    // Cắt trên NGÀY ĐỊA PHƯƠNG chứ không trên chuỗi UTC gốc: hóa đơn thu lúc 00:23
+    // sáng nếu cắt chuỗi UTC sẽ rơi vào cột của ngày hôm trước — và ở cuối tháng thì
+    // rơi luôn sang cột tháng trước.
+    const k = dayOf(inv).slice(0, len);
     groups[k] = (groups[k] ?? 0) + inv.totalAmount;
   });
   // fillGaps: ngày nghỉ / ngày ế phải hiện cột 0 chứ không được biến mất khỏi trục.

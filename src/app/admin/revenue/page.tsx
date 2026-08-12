@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import StatCard from '@/components/ui/StatCard';
 import { userService, paymentService } from '@/services';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, ngayDiaPhuong } from '@/lib/format';
 import type { User, Payment } from '@/types';
 import { DollarSign, TrendingUp, Users, BarChart3, AlertCircle } from 'lucide-react';
 import { ComposedChart, Bar, Line, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -59,7 +59,7 @@ export default function AdminRevenuePage() {
   // Bộ lọc chỉ áp cho 2 biểu đồ theo thời gian bên dưới (StatCard/Pie/bảng giữ tổng quan).
   const filteredPayments = useMemo(() => {
     let r = approvedPayments;
-    const day = (p: Payment) => p.createdAt.slice(0, 10);
+    const day = (p: Payment) => ngayDiaPhuong(p.createdAt);
     if (fromDate) r = r.filter(p => day(p) >= fromDate);
     if (toDate) r = r.filter(p => day(p) <= toDate);
     return r;

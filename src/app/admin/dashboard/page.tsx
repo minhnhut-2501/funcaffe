@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import StatCard from '@/components/ui/StatCard';
 import { userService, paymentService } from '@/services';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, ngayDiaPhuong } from '@/lib/format';
 import type { User, Payment } from '@/types';
 import {
   Users, CreditCard, TrendingUp, PackageCheck, AlertCircle, BarChart3, Package,
@@ -72,13 +72,16 @@ export default function AdminDashboard() {
     const now = new Date();
     const cur = monthKey(now);
     const prev = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-    const sumIn = (k: string) => paidPayments.filter(p => p.createdAt.startsWith(k)).reduce((s, p) => s + p.amount, 0);
+    // So theo THÁNG ĐỊA PHƯƠNG. Chuỗi máy chủ gửi là UTC nên `startsWith('2026-08')`
+    // đẩy mọi giao dịch của bảy tiếng đầu ngày mùng 1 sang tháng trước.
+    const thangCua = (iso?: string) => ngayDiaPhuong(iso ?? '').slice(0, 7);
+    const sumIn = (k: string) => paidPayments.filter(p => thangCua(p.createdAt) === k).reduce((s, p) => s + p.amount, 0);
     const curRev = sumIn(cur);
     const prevRev = sumIn(prev);
     return {
       thisMonthRevenue: curRev,
       monthDelta: prevRev > 0 ? Math.round(((curRev - prevRev) / prevRev) * 100) : null,
-      newUsersThisMonth: users.filter(u => u.createdAt?.startsWith(cur)).length,
+      newUsersThisMonth: users.filter(u => thangCua(u.createdAt) === cur).length,
       pendingCount: payments.filter(p => p.status === 'pending').length,
     };
   }, [paidPayments, payments, users]);
@@ -86,7 +89,9 @@ export default function AdminDashboard() {
   const revenueData = useMemo(() => {
     const groups: Record<string, number> = {};
     paidPayments.forEach(p => {
-      const m = p.createdAt.slice(0, 7);
+      // Cắt trên ngày ĐỊA PHƯƠNG: giao dịch lúc 00:30 ngày mùng 1 nếu cắt chuỗi UTC
+      // gốc sẽ rơi vào cột của tháng trước.
+      const m = ngayDiaPhuong(p.createdAt).slice(0, 7);
       groups[m] = (groups[m] ?? 0) + p.amount;
     });
     // Điền tháng trống trước rồi mới lấy 6 tháng CUỐI: nếu không, tháng không có

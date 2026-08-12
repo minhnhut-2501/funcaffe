@@ -8,6 +8,8 @@ import {
   formatDateTime,
   formatDuration,
   formatPaymentMethod,
+  ngayDiaPhuong,
+  homNay,
 } from './format';
 
 describe('formatCurrency', () => {
@@ -76,6 +78,50 @@ describe('ngày giờ', () => {
   it('quá nửa đêm giờ VN thì sang ngày mới', () => {
     // 17:30 UTC ngày 11 = 00:30 ngày 12 giờ VN.
     expect(formatDateTime('2026-08-11T17:30:00.000000Z')).toBe('00:30 12/08/2026');
+  });
+});
+
+describe('ngày ghi nhận doanh thu (giờ Việt Nam)', () => {
+  // vitest.setup.ts ghim TZ = Asia/Ho_Chi_Minh, nên các mốc dưới đây là +07:00.
+
+  it('hóa đơn thu lúc 00:23 sáng thuộc về NGÀY HÔM ĐÓ, không phải hôm trước', () => {
+    // 2026-08-04T17:23Z = 2026-08-05 00:23 giờ Việt Nam.
+    // Cắt 10 ký tự đầu — cách cũ — cho ra '2026-08-04', tức đẩy doanh thu bảy tiếng
+    // đầu mỗi ngày sang ngày hôm trước.
+    expect(ngayDiaPhuong('2026-08-04T17:23:55.628000Z')).toBe('2026-08-05');
+  });
+
+  it('hóa đơn thu lúc 23:59 vẫn thuộc ngày đó', () => {
+    // 2026-08-05T16:59Z = 2026-08-05 23:59 giờ Việt Nam.
+    expect(ngayDiaPhuong('2026-08-05T16:59:00.000Z')).toBe('2026-08-05');
+  });
+
+  it('mốc ngay sau nửa đêm và ngay trước nửa đêm rơi vào hai ngày khác nhau', () => {
+    const truoc = ngayDiaPhuong('2026-08-05T16:59:59.000Z'); // 23:59:59 ngày 05
+    const sau   = ngayDiaPhuong('2026-08-05T17:00:01.000Z'); // 00:00:01 ngày 06
+    expect(truoc).toBe('2026-08-05');
+    expect(sau).toBe('2026-08-06');
+  });
+
+  it('mốc giữa trưa không bị đổi ngày', () => {
+    expect(ngayDiaPhuong('2026-08-05T05:00:00.000Z')).toBe('2026-08-05'); // 12:00 VN
+  });
+
+  it('chuỗi chỉ có ngày thì giữ nguyên', () => {
+    expect(ngayDiaPhuong('2026-08-05')).toBe('2026-08-05');
+  });
+
+  it('chuỗi rỗng không làm hỏng phép so sánh', () => {
+    expect(ngayDiaPhuong('')).toBe('');
+  });
+
+  it('luôn đủ hai chữ số cho tháng và ngày', () => {
+    expect(ngayDiaPhuong('2026-01-02T05:00:00.000Z')).toBe('2026-01-02');
+  });
+
+  it('homNay() cùng dạng và khớp với ngayDiaPhuong của thời điểm hiện tại', () => {
+    expect(homNay()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(homNay()).toBe(ngayDiaPhuong(new Date().toISOString()));
   });
 });
 

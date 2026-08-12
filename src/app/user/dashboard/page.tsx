@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { invoiceService, orderService, tableService } from '@/services';
 import { useApi } from '@/hooks/use-api';
 import { isSubscriptionExpired } from '@/lib/permission';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, ngayDiaPhuong } from '@/lib/format';
 
 const quickActions = [
   { href: '/user/sales', icon: ShoppingCart, label: 'Tạo order mới', desc: 'Mở màn bán hàng' },
@@ -57,10 +57,14 @@ export default function DashboardPage() {
   const yStr = iso(new Date(now.getTime() - 86400000));
 
   const paid = (invoices ?? []).filter(i => i.status === 'paid');
-  const revOn = (day: string) => paid.filter(i => (i.paidAt || i.createdAt)?.startsWith(day)).reduce((s, i) => s + i.totalAmount, 0);
+  // Ngày của hóa đơn phải quy về giờ ĐỊA PHƯƠNG rồi mới so. Máy chủ gửi chuỗi ISO
+  // theo UTC, nên `startsWith('2026-08-05')` bỏ sót mọi hóa đơn thu trong bảy tiếng
+  // đầu ngày (00:00–06:59 giờ Việt Nam nằm ở ngày UTC hôm trước) — xem ngayDiaPhuong().
+  const ngayHoaDon = (i: { paidAt?: string; createdAt: string }) => ngayDiaPhuong(i.paidAt || i.createdAt);
+  const revOn = (day: string) => paid.filter(i => ngayHoaDon(i) === day).reduce((s, i) => s + i.totalAmount, 0);
   const todayRevenue = revOn(todayStr);
   const yesterdayRevenue = revOn(yStr);
-  const todayInvoicesCount = (invoices ?? []).filter(i => (i.paidAt || i.createdAt)?.startsWith(todayStr)).length;
+  const todayInvoicesCount = (invoices ?? []).filter(i => ngayHoaDon(i) === todayStr).length;
   const totalTables = tables?.length ?? 0;
   const availableTables = tables?.filter(t => t.status === 'empty').length ?? 0;
 

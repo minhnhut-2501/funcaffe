@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { invoiceService } from '@/services';
 import { useApi } from '@/hooks/use-api';
 import { canPrint } from '@/lib/permission';
-import { formatCurrency, formatDate, formatDateTime, formatPaymentMethod } from '@/lib/format';
+import { formatCurrency, formatDate, formatDateTime, formatPaymentMethod, ngayDiaPhuong } from '@/lib/format';
 import type { Invoice } from '@/types';
 import { Eye, Printer, RotateCcw, AlertCircle, Receipt } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
@@ -38,7 +38,7 @@ export default function InvoicesPage() {
 
   const filtered = (invoices ?? []).filter(inv => {
     // BUG-24 FIX: Lọc theo paidAt (ngày thanh toán) thay vì createdAt
-    const paidDate = inv.paidAt ? inv.paidAt.slice(0, 10) : inv.createdAt.slice(0, 10);
+    const paidDate = ngayDiaPhuong(inv.paidAt || inv.createdAt);
     return (
       matchesMethod(inv.paymentMethod) &&
       (search === '' || inv.invoiceCode.toLowerCase().includes(search.toLowerCase()) || inv.tableName.includes(search)) &&
