@@ -6,6 +6,8 @@ import AvatarUploader from '@/components/ui/AvatarUploader';
 import { useAuth } from '@/context/AuthContext';
 import { userService } from '@/services';
 import { getPackageBadgeClass } from '@/lib/permission';
+import { MAT_KHAU_TOI_THIEU, HO_TEN_TOI_DA, soDienThoaiHopLe, LOI_SO_DIEN_THOAI } from '@/lib/validate';
+import { useCanhBaoChuaLuu } from '@/hooks/use-canh-bao-chua-luu';
 import { Eye, EyeOff, AlertCircle, Mail, User as UserIcon, Phone, ShieldCheck, Check } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -21,19 +23,30 @@ export default function ProfilePage() {
   const [profileErr, setProfileErr] = useState('');
   const [pwErr, setPwErr] = useState('');
 
+  // Còn thay đổi chưa lưu? So với giá trị đang có trên tài khoản, không phải với ô
+  // trống — mở trang xong chưa gõ gì thì không được coi là đang sửa.
+  const coThayDoiChuaLuu =
+    profileForm.fullName !== (user?.fullName ?? '')
+    || profileForm.phone !== (user?.phone ?? '')
+    || avatar !== (user?.avatarUrl ?? '');
+  useCanhBaoChuaLuu(coThayDoiChuaLuu && !saving);
+
   const handleSaveProfile = async () => {
+    // Kiểm ở đây cùng một luật với máy chủ: không có bước này thì máy chủ trả 422 và
+    // người dùng chỉ thấy một câu lỗi chung, không biết ô nào sai.
+    if (!soDienThoaiHopLe(profileForm.phone)) { setProfileErr(LOI_SO_DIEN_THOAI); return; }
     setSaving(true); setProfileErr(''); setProfileSaved(false);
     try {
       await userService.updateProfile({ full_name: profileForm.fullName, phone: profileForm.phone, avatar });
       if (refreshUser) await refreshUser();
       setProfileSaved(true);
     } catch (e: any) {
-      setProfileErr(e.message || 'Lỗi khi lưu thông tin');
+      setProfileErr(e.errors?.phone?.[0] || e.message || 'Lỗi khi lưu thông tin');
     } finally { setSaving(false); }
   };
 
   const handleChangePassword = async () => {
-    if (pwForm.newPw.length < 8) { setPwErr('Mật khẩu phải có ít nhất 8 ký tự'); return; }
+    if (pwForm.newPw.length < MAT_KHAU_TOI_THIEU) { setPwErr(`Mật khẩu phải có ít nhất ${MAT_KHAU_TOI_THIEU} ký tự`); return; }
     if (pwForm.newPw !== pwForm.confirm) { setPwErr('Mật khẩu xác nhận không khớp'); return; }
     setChangingPw(true); setPwErr(''); setPwSaved(false);
     try {
@@ -77,7 +90,7 @@ export default function ProfilePage() {
               <label className="label-funcafe">Họ và tên</label>
               <div className="relative">
                 <UserIcon className="w-4 h-4 text-cafe-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input className="input-funcafe pl-10" value={profileForm.fullName} onChange={e => setProfileForm({ ...profileForm, fullName: e.target.value })} placeholder="Họ và tên của bạn" />
+                <input className="input-funcafe pl-10" maxLength={HO_TEN_TOI_DA} value={profileForm.fullName} onChange={e => setProfileForm({ ...profileForm, fullName: e.target.value })} placeholder="Họ và tên của bạn" />
               </div>
             </div>
             <div>
@@ -91,13 +104,29 @@ export default function ProfilePage() {
               <label className="label-funcafe">Số điện thoại</label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-cafe-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input type="tel" className="input-funcafe pl-10" value={profileForm.phone} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} placeholder="VD: 0901 234 567" />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  maxLength={20}
+                  aria-invalid={!soDienThoaiHopLe(profileForm.phone)}
+                  className={`input-funcafe pl-10 ${soDienThoaiHopLe(profileForm.phone) ? '' : 'border-red-300 focus:border-red-500 focus:ring-red-500/30'}`}
+                  value={profileForm.phone}
+                  onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  placeholder="VD: 0901 234 567"
+                />
               </div>
+              {!soDienThoaiHopLe(profileForm.phone) && (
+                <p className="mt-1.5 flex items-start gap-1.5 text-xs text-red-600">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />{LOI_SO_DIEN_THOAI}
+                </p>
+              )}
             </div>
             {profileErr && <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-xl p-3 text-sm"><AlertCircle className="w-4 h-4 shrink-0" /><span>{profileErr}</span></div>}
             <div className="flex items-center gap-3 pt-1">
               <button onClick={handleSaveProfile} disabled={saving} className="btn-primary">{saving ? 'Đang lưu...' : 'Lưu thông tin'}</button>
-              {profileSaved && <span className="inline-flex items-center gap-1 text-pine text-sm font-medium"><Check className="w-4 h-4" />Đã lưu</span>}
+              {profileSaved && !coThayDoiChuaLuu && <span className="inline-flex items-center gap-1 text-pine text-sm font-medium"><Check className="w-4 h-4" />Đã lưu</span>}
+              {/* Nói ra trước khi người dùng rời trang, chứ không chỉ chặn lúc họ đã đứng lên đi. */}
+              {coThayDoiChuaLuu && !saving && <span className="text-sm text-cafe-500">Có thay đổi chưa lưu</span>}
             </div>
           </div>
         </div>

@@ -49,7 +49,24 @@ return [
     |
     */
 
-    'expiration' => null,
+    /*
+     * CHÍNH SÁCH HẠN DÙNG TOKEN (việc 2.5.3): 30 ngày.
+     *
+     * Để `null` là token sống mãi. Nghĩa là một token bị chép lại — máy bán hàng để
+     * mở ở quán, một lần đăng nhập trên máy công cộng, ảnh chụp `localStorage` — mở
+     * được tài khoản đó vô thời hạn, cả sau khi chủ quán đã đổi mật khẩu trên máy khác
+     * (đổi mật khẩu chỉ thu hồi token KHÁC, giữ token đang dùng).
+     *
+     * 30 ngày là mức đủ để chủ quán không bị hỏi lại mật khẩu trong lúc làm việc (mở
+     * hằng ngày thì gần như không bao giờ chạm hạn) nhưng vẫn đặt điểm dừng cho token
+     * đã rời tay chủ. Con số này áp cho mọi token, bất kể ô "Ghi nhớ đăng nhập" —
+     * ô đó chỉ quyết định trình duyệt giữ token ở đâu.
+     *
+     * Bản ghi token đã quá hạn vẫn nằm lại trong bảng: dọn bằng
+     * `php artisan sanctum:prune-expired --hours=24` (chưa hẹn giờ tự chạy vì gói
+     * miễn phí của Render không có bộ hẹn giờ — ghi trong báo cáo triển khai).
+     */
+    'expiration' => env('SANCTUM_EXPIRATION_MINUTES', 60 * 24 * 30),
 
     /*
     |--------------------------------------------------------------------------
