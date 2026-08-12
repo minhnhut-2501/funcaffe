@@ -130,6 +130,83 @@ class SubscriptionController extends Controller
     }
 
     /**
+     * XEM TRƯỚC số tiền phải trả, TRƯỚC khi tạo bất cứ giao dịch nào.
+     *
+     * Lý do có endpoint này thay vì để giao diện tự tính: phần cấn trừ khi nâng cấp
+     * giữa kỳ dựa vào `calculateProratedCredit()` — tỉ lệ theo giây giữa start_date và
+     * end_date của gói cũ. Cài lại công thức đó ở phía trình duyệt là tạo ra hai bản
+     * chắc chắn sẽ lệch nhau ở lần sửa tiếp theo, mà lệch ở đây nghĩa là màn hình hứa
+     * một con số còn cổng thanh toán thu một con số khác.
+     *
+     * Trước khi có nó, hộp thoại thanh toán hiện "Tổng thanh toán = giá gói + VAT" cho
+     * cả trường hợp nâng cấp — tức là một số CAO HƠN số thật sự bị trừ, và người dùng
+     * không có cách nào biết mình được cấn trừ bao nhiêu cho tới lúc đã trả tiền xong.
+     *
+     * KHÔNG ghi gì vào CSDL.
+     */
+    public function preview(Request $request, Cafe $cafe)
+    {
+        $this->authorizeCafe($cafe);
+
+        $validated = $request->validate([
+            'package_id'           => 'required|string',
+            'time_subscription_id' => 'nullable|string',
+        ]);
+
+        $package = Package::find($validated['package_id']);
+        if (!$package) {
+            return response()->json(['message' => 'Không tìm thấy gói dịch vụ.'], 404);
+        }
+
+        $vatRate = (float) config('funcafe.vat_rate', 10);
+        $subtotal = 0.0;
+
+        if ($package->is_trial) {
+            $vatRate = 0;
+        } else {
+            $timeSub = !empty($validated['time_subscription_id'])
+                ? TimeSubscription::find($validated['time_subscription_id'])
+                : null;
+            if (!$timeSub) {
+                return response()->json(['message' => 'Vui lòng chọn thời hạn gói.'], 400);
+            }
+            $subtotal = (float) $timeSub->price;
+        }
+
+        $vatAmount = round($subtotal * $vatRate / 100);
+        $gross     = $subtotal + $vatAmount;
+
+        // Cùng phép so cấp bậc như store(), để nhãn hành động khớp với việc sẽ xảy ra.
+        $activeSub = Subscription::latestForCafe((string) $cafe->id)->first();
+        $oldLevel  = $activeSub ? (Package::find($activeSub->package_id)->level ?? 0) : null;
+        $newLevel  = $package->level ?? 0;
+
+        $actionType = match (true) {
+            !$activeSub            => 'new',
+            $newLevel > $oldLevel  => 'upgrade',
+            $newLevel === $oldLevel => 'renew',
+            default                => 'downgrade',
+        };
+
+        $credit  = $actionType === 'upgrade'
+            ? min($this->calculateProratedCredit($activeSub), $gross)
+            : 0.0;
+        $payable = max(0, round($gross - $credit));
+
+        return response()->json([
+            'action_type' => $actionType,
+            'subtotal'    => $subtotal,
+            'vat_rate'    => $vatRate,
+            'vat_amount'  => $vatAmount,
+            'gross'       => $gross,
+            'credit'      => $credit,
+            'payable'     => $payable,
+            // Nâng cấp mà cấn trừ phủ hết giá gói mới thì không phải qua cổng nào cả.
+            'needs_gateway' => $payable > 0,
+        ]);
+    }
+
+    /**
      * B7: sinh mã giao dịch TXN-yyyymmdd-#### không trùng — count()+1 rồi dò
      * tiếp tới số chưa dùng (count đơn thuần có thể trùng khi request song song).
      */

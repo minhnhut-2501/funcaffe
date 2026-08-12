@@ -42,6 +42,34 @@ export const subscriptionService = {
       createdAt: raw.created_at,
     } : null;
   },
+  /**
+   * Xem trước số phải trả TRƯỚC khi tạo giao dịch.
+   *
+   * Phải hỏi máy chủ chứ không tự tính: phần cấn trừ khi nâng cấp giữa kỳ là tỉ lệ
+   * theo giây giữa ngày bắt đầu và ngày hết hạn của gói cũ. Cài lại công thức đó ở
+   * đây là tạo ra hai bản chắc chắn sẽ lệch nhau ở lần sửa sau — mà lệch nghĩa là
+   * màn hình hứa một con số còn cổng thanh toán thu một con số khác.
+   */
+  preview: async (packageId: string, timeSubscriptionId?: string) => {
+    const cafeId = await getCafeId();
+    const q = new URLSearchParams({ package_id: packageId });
+    if (timeSubscriptionId) q.set('time_subscription_id', timeSubscriptionId);
+    const raw = await api.get<{
+      action_type: 'new' | 'renew' | 'upgrade' | 'downgrade';
+      subtotal: number; vat_rate: number; vat_amount: number;
+      gross: number; credit: number; payable: number; needs_gateway: boolean;
+    }>(`/cafes/${cafeId}/subscriptions/preview?${q.toString()}`);
+    return {
+      actionType: raw.action_type,
+      subtotal: raw.subtotal,
+      vatRate: raw.vat_rate,
+      vatAmount: raw.vat_amount,
+      gross: raw.gross,
+      credit: raw.credit,
+      payable: raw.payable,
+      needsGateway: raw.needs_gateway,
+    };
+  },
   create: async (data: { package_id: string; time_subscription_id?: string; payment_method: string; note?: string }) => {
     const cafeId = await getCafeId();
     const raw = await api.post<any>(`/cafes/${cafeId}/subscriptions`, data);

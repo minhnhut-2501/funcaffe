@@ -129,6 +129,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('cafes/{cafe}/subscriptions', [SubscriptionController::class, 'index']);
     Route::get('cafes/{cafe}/subscriptions/active', [SubscriptionController::class, 'active']);
     Route::get('cafes/{cafe}/subscriptions/payments', [SubscriptionController::class, 'payments']);
+    // Xem trước số phải trả (gồm phần cấn trừ khi nâng cấp) — chỉ đọc, không tạo giao dịch.
+    Route::get('cafes/{cafe}/subscriptions/preview', [SubscriptionController::class, 'preview']);
     Route::post('cafes/{cafe}/subscriptions', [SubscriptionController::class, 'store']);
 
     // Tổng doanh thu gộp tất cả quán của user (không theo quán cụ thể)

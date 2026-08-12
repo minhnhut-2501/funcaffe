@@ -108,6 +108,35 @@ export default function SubscriptionPage() {
   const selected = (packages ?? []).find(p => p.id === selectedPkg);
   const gateway = GATEWAYS.find(g => g.id === paymentMethod) ?? GATEWAYS[0];
 
+  /**
+   * Số phải trả do MÁY CHỦ tính, hỏi lại mỗi lần đổi gói hoặc đổi thời hạn.
+   *
+   * Trước đây hộp thoại này tự cộng "giá gói + VAT" rồi gọi đó là tổng thanh toán —
+   * đúng khi mua mới hay gia hạn, nhưng SAI khi nâng cấp giữa kỳ: phần còn lại của
+   * gói cũ được cấn trừ ở máy chủ, nên số thật sự bị trừ thấp hơn số đang hiện, và
+   * chủ quán chỉ biết mình được cấn trừ bao nhiêu sau khi đã trả tiền xong.
+   */
+  const [xemTruoc, setXemTruoc] = useState<Awaited<ReturnType<typeof subscriptionService.preview>> | null>(null);
+  const [dangTinh, setDangTinh] = useState(false);
+
+  useEffect(() => {
+    if (!paymentModal || !selected) { setXemTruoc(null); return; }
+
+    const tsId = getTimeSubId(timeSubsMap[selected.id] ?? [], selectedDur);
+    if (!selected.isTrial && !tsId) { setXemTruoc(null); return; }
+
+    let conHieuLuc = true;
+    setDangTinh(true);
+    subscriptionService.preview(selected.id, tsId ?? undefined)
+      .then(kq => { if (conHieuLuc) setXemTruoc(kq); })
+      // Hỏi không được thì để trống: khối tóm tắt tự lùi về cách tính cũ (giá + VAT),
+      // vẫn đúng cho mua mới và gia hạn — hai trường hợp chiếm gần hết lượt dùng.
+      .catch(() => { if (conHieuLuc) setXemTruoc(null); })
+      .finally(() => { if (conHieuLuc) setDangTinh(false); });
+
+    return () => { conHieuLuc = false; };
+  }, [paymentModal, selected, selectedDur, timeSubsMap]);
+
   // Hành động tương ứng khi chọn 1 gói, dựa trên gói đang dùng (khớp logic backend):
   // chưa có gói -> mua mới; cao hơn -> nâng cấp; bằng -> gia hạn; thấp hơn -> KHÔNG cho (hạ gói).
   const actionFor = (p: Package): 'new' | 'upgrade' | 'renew' | 'downgrade' => {
@@ -428,12 +457,15 @@ export default function SubscriptionPage() {
               </div>
             )}
 
-            {/* Tóm tắt (giá gói + VAT = tổng thanh toán, khớp cách backend tính) */}
+            {/* Tóm tắt tiền. Ưu tiên số của MÁY CHỦ (đã gồm phần cấn trừ khi nâng cấp);
+                hỏi không được thì lùi về cách tính cũ giá + VAT, vẫn đúng cho mua mới
+                và gia hạn. */}
             {(() => {
-              const price = getPrice(timeSubsMap[selected.id] ?? [], selectedDur);
-              const vatRate = selected.isTrial ? 0 : (selected.vatRate ?? 10);
-              const vatAmount = Math.round(price * vatRate / 100);
-              const total = price + vatAmount;
+              const price = xemTruoc?.subtotal ?? getPrice(timeSubsMap[selected.id] ?? [], selectedDur);
+              const vatRate = selected.isTrial ? 0 : (xemTruoc?.vatRate ?? selected.vatRate ?? 10);
+              const vatAmount = xemTruoc?.vatAmount ?? Math.round(price * vatRate / 100);
+              const canTru = xemTruoc?.credit ?? 0;
+              const total = xemTruoc?.payable ?? (price + vatAmount);
               return (
                 <div className="space-y-1.5 text-sm border-t border-line pt-3">
                   <div className="flex justify-between text-cafe-600"><span>Gói {selected.name}</span><span>{selected.isTrial ? 'Miễn phí' : formatCurrency(price)}</span></div>
@@ -441,7 +473,23 @@ export default function SubscriptionPage() {
                   {!selected.isTrial && vatRate > 0 && (
                     <div className="flex justify-between text-cafe-500"><span>Thuế VAT ({vatRate}%)</span><span>{formatCurrency(vatAmount)}</span></div>
                   )}
-                  <div className="flex justify-between font-bold text-ink border-t border-line pt-1.5"><span>Tổng thanh toán</span><span className="text-bean text-base">{selected.isTrial ? 'Miễn phí' : formatCurrency(total)}</span></div>
+                  {canTru > 0 && (
+                    <div className="flex justify-between text-pine font-semibold">
+                      <span>Cấn trừ gói đang dùng</span><span>− {formatCurrency(canTru)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-ink border-t border-line pt-1.5">
+                    <span>{canTru > 0 ? 'Còn phải trả' : 'Tổng thanh toán'}</span>
+                    <span className="text-bean text-base">
+                      {selected.isTrial ? 'Miễn phí' : dangTinh ? 'Đang tính…' : formatCurrency(total)}
+                    </span>
+                  </div>
+                  {canTru > 0 && total === 0 && (
+                    <p className="text-xs text-pine leading-relaxed pt-0.5">
+                      Phần còn lại của gói đang dùng đã phủ hết giá gói mới — bạn không phải trả thêm đồng nào,
+                      gói mới chạy ngay sau khi xác nhận.
+                    </p>
+                  )}
                 </div>
               );
             })()}

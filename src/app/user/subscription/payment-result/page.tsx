@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle2, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { lyDoLoi } from '@/lib/payment-codes';
 
 function Result() {
   const params = useSearchParams();
@@ -16,6 +17,7 @@ function Result() {
   // Cổng nào trả về — backend đính kèm ?gateway=vnpay|momo. Thiếu thì không nêu tên
   // cổng chứ không đoán bừa.
   const gatewayName = ({ vnpay: 'VNPay', momo: 'MoMo' } as Record<string, string>)[params.get('gateway') ?? ''] ?? '';
+  const lyDo = lyDoLoi(code, params.get('gateway'));
   const { refreshUser } = useAuth();
   const [refreshing, setRefreshing] = useState(true);
 
@@ -66,9 +68,10 @@ function Result() {
             <div className="w-16 h-16 rounded-full bg-red-50 grid place-items-center mx-auto mb-4"><XCircle className="w-9 h-9 text-red-500" /></div>
             <h1 className="text-xl font-bold text-ink mb-2">Thanh toán không thành công</h1>
             <p className="text-sm text-cafe-600">
-              Giao dịch {gatewayName && `qua ${gatewayName} `}chưa hoàn tất hoặc đã bị hủy. Bạn có thể thử lại.
+              {lyDo ?? `Giao dịch ${gatewayName ? `qua ${gatewayName} ` : ''}chưa hoàn tất hoặc đã bị hủy. Bạn có thể thử lại.`}
             </p>
-            {code && <p className="text-xs text-cafe-400 mt-2">Mã lỗi: {code}</p>}
+            <p className="text-sm text-cafe-600 mt-2">Chưa có khoản tiền nào bị trừ cho gói này.</p>
+            {code && <p className="text-xs text-cafe-400 mt-3">Mã lỗi{gatewayName && ` từ ${gatewayName}`}: {code}</p>}
           </>
         )}
 

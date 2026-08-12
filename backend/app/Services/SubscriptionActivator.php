@@ -41,11 +41,30 @@ class SubscriptionActivator
      */
     public function markPaidAndActivate(PackagePayment $payment): bool
     {
-        if (!in_array($payment->payment_status, self::ACTIVATABLE_STATUSES, true)) {
-            return false; // đã paid/rejected rồi -> không làm lại
+        // GIÀNH QUYỀN XỬ LÝ BẰNG MỘT PHÉP GHI CÓ ĐIỀU KIỆN.
+        //
+        // Đọc trạng thái rồi mới ghi là không đủ, và ở đây không phải chuyện hiếm:
+        // VNPay gửi Return URL (trình duyệt) và IPN (máy chủ) cho CÙNG một giao dịch,
+        // thường cách nhau vài phần nghìn giây. Cả hai cùng đọc thấy 'pending' rồi
+        // cùng đi tiếp thì nhánh gia hạn chạy hai lần: end_date cộng thêm hai chu kỳ
+        // và total_amount nhân đôi — quán được thêm một tháng mà không trả tiền, và
+        // lần nâng cấp sau cấn trừ theo con số sai.
+        //
+        // Mongo standalone không có transaction nên `atomic()` ở nơi gọi chạy thẳng.
+        // Điều kiện phải nằm trong chính câu lệnh ghi: MongoDB cập nhật một tài liệu
+        // là thao tác nguyên tử, nên chỉ MỘT bên đổi được trạng thái, bên kia nhận 0
+        // dòng đổi và dừng lại ngay đây.
+        $daGianh = PackagePayment::where('_id', $payment->id)
+            ->whereIn('payment_status', self::ACTIVATABLE_STATUSES)
+            ->update(['payment_status' => 'paid', 'paid_at' => now()]);
+
+        if ($daGianh === 0) {
+            return false; // đã paid/rejected rồi, hoặc lần gọi song song kia vừa thắng
         }
 
-        $payment->update(['payment_status' => 'paid', 'paid_at' => now()]);
+        // Đối tượng trong tay đang giữ trạng thái cũ — nạp lại để phần bên dưới đọc
+        // đúng những gì vừa ghi.
+        $payment->refresh();
 
         $sub = $payment->subscription;
         if ($sub) {
@@ -131,11 +150,19 @@ class SubscriptionActivator
      */
     public function rejectAndRollback(PackagePayment $payment): bool
     {
-        if ($payment->payment_status !== 'pending') {
+        // Ghi có điều kiện như markPaidAndActivate(): chặn cảnh một callback báo hủy
+        // chạy song song với một callback báo thu tiền thành công. Nếu để hai bên cùng
+        // đi tiếp, đơn có thể vừa được đánh 'rejected' vừa đã cấp gói — hoặc ngược
+        // lại, gói bị hủy ngay sau khi tiền đã vào.
+        $daGianh = PackagePayment::where('_id', $payment->id)
+            ->where('payment_status', 'pending')
+            ->update(['payment_status' => 'rejected', 'paid_at' => null]);
+
+        if ($daGianh === 0) {
             return false; // đã paid/rejected rồi -> không làm lại
         }
 
-        $payment->update(['payment_status' => 'rejected', 'paid_at' => null]);
+        $payment->refresh();
 
         $sub = $payment->subscription;
         if (!$sub) {
