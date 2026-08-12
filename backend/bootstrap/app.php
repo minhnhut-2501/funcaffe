@@ -20,6 +20,19 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->statefulApi();
+
+        // Giới hạn tần suất cho TOÀN BỘ /api (giới hạn xem ở AppServiceProvider).
+        // Trước đây chỉ 5 endpoint tự gắn throttle, phần còn lại — tạo order, tạo
+        // giao dịch gói, mọi lượt ghi thực đơn — không có trần nào. Một script vòng
+        // lặp là đủ lấp hạn mức 512MB của MongoDB Atlas bậc miễn phí, mà hạn mức đó
+        // dùng chung cho MỌI quán.
+        $middleware->throttleApi();
+
+        // Khóa tài khoản có hiệu lực ngay với token đang cầm. Xếp SAU throttle để
+        // kẻ thử token hàng loạt vẫn bị chặn ở cửa trước.
+        $middleware->api(append: [
+            \App\Http\Middleware\EnsureAccountActive::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
