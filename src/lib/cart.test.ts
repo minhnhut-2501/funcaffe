@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcItemBase, calcItemTopping, calcCartItem, calcSubtotal, clampDiscount, calcTotal, calcChange, type CartItem } from './cart';
+import { calcItemBase, calcItemTopping, calcCartItem, calcSubtotal, clampDiscount, calcTotal, calcChange, isSameCartLine, type CartItem } from './cart';
 import type { MenuItem, MenuItemSize, Topping } from '@/types';
 
 const mon = (basePrice: number, ten = 'Cà phê sữa'): MenuItem => ({
@@ -106,6 +106,50 @@ describe('giảm giá', () => {
 
   it('giỏ rỗng thì không giảm được gì', () => {
     expect(clampDiscount(50_000, 0)).toBe(0);
+  });
+});
+
+describe('cộng dồn hay tách dòng', () => {
+  const tc = (price: number, id: string, name: string) => ({ id, name, price, isAvailable: true });
+
+  it('hai dòng giống hệt thì cộng dồn', () => {
+    expect(isSameCartLine(dong(), dong({ id: 'ci2' }))).toBe(true);
+  });
+
+  it('khác món thì tách', () => {
+    expect(isSameCartLine(dong(), dong({ item: { ...mon(30_000), id: 'i2' } }))).toBe(false);
+  });
+
+  it('khác size thì tách — cùng tên món nhưng ly L không phải ly M', () => {
+    expect(isSameCartLine(dong({ size: size(45_000, 'L') }), dong({ size: { ...size(35_000, 'M'), id: 's2' } }))).toBe(false);
+  });
+
+  it('món có size với món không chọn size là hai dòng khác nhau', () => {
+    expect(isSameCartLine(dong({ size: size(45_000) }), dong())).toBe(false);
+  });
+
+  it('khác ghi chú thì tách — pha chế cần thấy ly "ít đường" riêng', () => {
+    expect(isSameCartLine(dong({ note: 'ít đường' }), dong({ note: '' }))).toBe(false);
+  });
+
+  it('ghi chú chỉ khác khoảng trắng thừa vẫn là một dòng', () => {
+    expect(isSameCartLine(dong({ note: ' ít đá ' }), dong({ note: 'ít đá' }))).toBe(true);
+  });
+
+  it('cùng bộ topping nhưng chọn khác thứ tự vẫn cộng dồn', () => {
+    const a = dong({ toppings: [{ topping: tc(10_000, 't1', 'Trân châu'), quantity: 1 }, { topping: tc(6_000, 't2', 'Thạch'), quantity: 2 }] });
+    const b = dong({ id: 'ci2', toppings: [{ topping: tc(6_000, 't2', 'Thạch'), quantity: 2 }, { topping: tc(10_000, 't1', 'Trân châu'), quantity: 1 }] });
+    expect(isSameCartLine(a, b)).toBe(true);
+  });
+
+  it('cùng topping nhưng KHÁC SỐ PHẦN thì tách', () => {
+    const a = dong({ toppings: [{ topping: tc(10_000, 't1', 'Trân châu'), quantity: 1 }] });
+    const b = dong({ id: 'ci2', toppings: [{ topping: tc(10_000, 't1', 'Trân châu'), quantity: 2 }] });
+    expect(isSameCartLine(a, b)).toBe(false);
+  });
+
+  it('có topping với không topping thì tách', () => {
+    expect(isSameCartLine(dong({ toppings: [{ topping: tc(10_000, 't1', 'Trân châu'), quantity: 1 }] }), dong())).toBe(false);
   });
 });
 

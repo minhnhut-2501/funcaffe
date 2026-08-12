@@ -24,6 +24,16 @@ const STATUS_META: Record<string, { label: string; cls: string; dot: string }> =
   inactive: { label: 'Ngừng hoạt động', cls: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
 };
 
+/**
+ * Ý nghĩa ba trạng thái quán — phải khớp với ChecksCafeStatus ở máy chủ, vì máy chủ
+ * mới là nơi thật sự chặn. Đổi câu chữ ở đây thì đổi cả bên đó.
+ */
+const TRANG_THAI_GIAI_THICH: Record<string, string> = {
+  open: 'Bán hàng và sửa thực đơn bình thường.',
+  closed: 'Tạm nghỉ: không mở đơn mới, nhưng bàn đang ngồi vẫn gọi thêm và thanh toán được. Thực đơn vẫn sửa được để chuẩn bị cho hôm sau.',
+  inactive: 'Đóng hẳn: chỉ tra cứu số liệu cũ, không bán hàng và không sửa thực đơn. Dữ liệu vẫn giữ nguyên, đổi lại "Đang mở cửa" là chạy tiếp.',
+};
+
 const emptyForm: CafeInfo = { id: '', name: '', address: '', phone: '', description: '', status: 'open' };
 
 /** Ngày thanh toán 'YYYY-MM-DD'; hóa đơn cũ thiếu paid_at thì lấy ngày tạo. */
@@ -258,6 +268,10 @@ export default function CafePage() {
                         <option value="closed">Đã đóng cửa</option>
                         <option value="inactive">Ngừng hoạt động</option>
                       </select>
+                      {/* Ba trạng thái này đổi hành vi thật của hệ thống, không phải nhãn
+                          màu — nói rõ ngay tại đây để không ai chọn nhầm rồi tự hỏi vì
+                          sao không mở được đơn. */}
+                      <p className="text-xs text-cafe-500 mt-2 leading-relaxed">{TRANG_THAI_GIAI_THICH[form.status]}</p>
                     </div>
                   )}
                 </div>

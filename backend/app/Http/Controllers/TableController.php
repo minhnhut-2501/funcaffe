@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Cafe;
 use App\Models\CafeTable;
 use App\Http\Controllers\Concerns\ChecksCafeOwnership;
+use App\Http\Controllers\Concerns\ChecksCafeStatus;
 use App\Http\Controllers\Concerns\EnforcesPackageLimits;
 use Illuminate\Http\Request;
 
 class TableController extends Controller
 {
-    use ChecksCafeOwnership, EnforcesPackageLimits;
+    use ChecksCafeOwnership, EnforcesPackageLimits, ChecksCafeStatus;
 
     public function __construct()
     {
@@ -26,6 +27,7 @@ class TableController extends Controller
     public function store(Request $request, Cafe $cafe)
     {
         $this->authorizeCafe($cafe);
+        $this->guardSuaDoi($cafe);
         $this->enforcePackageLimit($cafe, 'tables', $cafe->tables()->count());
 
         $validated = $request->validate([
@@ -35,6 +37,13 @@ class TableController extends Controller
             'display_order' => 'nullable|integer|min:0',
         ]);
 
+        if ($this->trungTen($cafe, $validated['name'])) {
+            return response()->json([
+                'message' => 'Quán đã có bàn tên "' . trim($validated['name']) . '".',
+                'errors'  => ['name' => ['Tên bàn bị trùng với một bàn đang có.']],
+            ], 422);
+        }
+
         $table = $cafe->tables()->create($validated);
         return response()->json($table, 201);
     }
@@ -42,6 +51,7 @@ class TableController extends Controller
     public function update(Request $request, Cafe $cafe, CafeTable $table)
     {
         $this->authorizeCafe($cafe);
+        $this->guardSuaDoi($cafe);
 
         if ((string) $table->cafe_id !== (string) $cafe->id) {
             return response()->json(['message' => 'Not found'], 404);
@@ -54,13 +64,37 @@ class TableController extends Controller
             'display_order' => 'nullable|integer|min:0',
         ]);
 
+        if (isset($validated['name']) && $this->trungTen($cafe, $validated['name'], (string) $table->id)) {
+            return response()->json([
+                'message' => 'Quán đã có bàn tên "' . trim($validated['name']) . '".',
+                'errors'  => ['name' => ['Tên bàn bị trùng với một bàn đang có.']],
+            ], 422);
+        }
+
         $table->update($validated);
         return response()->json($table);
+    }
+
+    /**
+     * Hai cái bàn cùng tên trong một quán là lỗi vận hành chứ không phải lỗi dữ liệu:
+     * thu ngân nhìn sơ đồ thấy hai ô "Bàn 5", bưng nhầm đồ và thu nhầm tiền của bàn
+     * bên cạnh. So sánh sau khi bỏ khoảng trắng thừa và bỏ phân biệt hoa thường —
+     * "bàn 5" với "Bàn 5 " là cùng một cái bàn dưới mắt người dùng.
+     */
+    private function trungTen(Cafe $cafe, string $ten, ?string $boQuaId = null): bool
+    {
+        $chuan = mb_strtolower(trim($ten));
+
+        return $cafe->tables()->get()->contains(
+            fn ($ban) => (string) $ban->id !== $boQuaId
+                && mb_strtolower(trim((string) $ban->name)) === $chuan
+        );
     }
 
     public function destroy(Cafe $cafe, CafeTable $table)
     {
         $this->authorizeCafe($cafe);
+        $this->guardSuaDoi($cafe);
 
         if ((string) $table->cafe_id !== (string) $cafe->id) {
             return response()->json(['message' => 'Not found'], 404);

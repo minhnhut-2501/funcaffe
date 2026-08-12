@@ -23,6 +23,27 @@ export interface CartItem {
   note: string;
 }
 
+/**
+ * Hai dòng giỏ hàng có phải CÙNG MỘT THỨ không — dùng để quyết định gọi thêm một ly
+ * nữa thì cộng dồn số lượng hay tách thành dòng mới.
+ *
+ * Cùng một thứ nghĩa là: cùng món, cùng size, cùng ghi chú, và cùng bộ topping với
+ * cùng số phần. Lệch bất kỳ điểm nào cũng phải tách dòng — hai ly cùng tên nhưng một
+ * ly "ít đường" thì pha chế cần thấy hai dòng riêng, gộp lại là làm sai đồ cho khách.
+ *
+ * Ghi chú so sánh sau khi bỏ khoảng trắng thừa; topping so sánh không phụ thuộc thứ
+ * tự chọn (chọn trân châu trước hay thạch dừa trước vẫn là một ly như nhau).
+ */
+export function isSameCartLine(a: CartItem, b: CartItem): boolean {
+  if (a.item.id !== b.item.id) return false;
+  if ((a.size?.id ?? '') !== (b.size?.id ?? '')) return false;
+  if ((a.note ?? '').trim() !== (b.note ?? '').trim()) return false;
+  if (a.toppings.length !== b.toppings.length) return false;
+  const norm = (list: CartItem['toppings']) =>
+    list.map(t => `${t.topping.id}:${t.quantity}`).sort().join('|');
+  return norm(a.toppings) === norm(b.toppings);
+}
+
 /** Tiền món (chưa topping). Có size thì giá theo size THẮNG giá gốc của món. */
 export function calcItemBase(c: CartItem): number {
   return (c.size ? c.size.price : c.item.basePrice) * c.quantity;

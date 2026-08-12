@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\ItemPrice;
 use App\Models\Topping;
 use App\Http\Controllers\Concerns\ChecksCafeOwnership;
+use App\Http\Controllers\Concerns\ChecksCafeStatus;
 use App\Http\Controllers\Concerns\RunsAtomically;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 class OrderController extends Controller
 {
     use ChecksCafeOwnership;
+    use ChecksCafeStatus;
     use RunsAtomically;
 
     public function __construct()
@@ -99,6 +101,9 @@ class OrderController extends Controller
     public function store(Request $request, Cafe $cafe)
     {
         $this->authorizeCafe($cafe);
+        // Mở đơn MỚI thì quán phải đang mở cửa (xem ChecksCafeStatus). Bàn đang ngồi
+        // vẫn gọi thêm và thanh toán được — update()/pay()/cancel() không bị chặn.
+        $this->guardBanHang($cafe);
 
         $validated = $request->validate([
             'table_id'                              => 'required|string',
@@ -132,7 +137,11 @@ class OrderController extends Controller
             return response()->json($existing, 200);
         }
 
-        $order = $this->atomic(function () use ($cafe, $validated) {
+        // Kiểm hết mọi dòng TRƯỚC khi tạo đơn: dòng nào hỏng thì 422 bay ra từ đây,
+        // lúc CSDL còn chưa có gì mới. Không còn cảnh đơn rỗng nằm lại làm kẹt bàn.
+        $cacDong = $this->chuanBiCacDong($cafe, $validated['items']);
+
+        $order = $this->atomic(function () use ($cafe, $validated, $cacDong) {
             $todayStr = now()->format('Ymd');
             // B7: count()+1 có thể trùng khi 2 request chạy song song — dò tiếp
             // tới số chưa dùng trước khi chốt mã.
@@ -152,9 +161,9 @@ class OrderController extends Controller
 
             $orderSubtotal = 0;
 
-            foreach ($validated['items'] as $itemData) {
-                [$detail, $itemTotalPrice] = $this->createOrderDetail($cafe, $order, $itemData);
-                $orderSubtotal += $itemTotalPrice;
+            foreach ($cacDong as $dong) {
+                $this->ghiDong($order, $dong);
+                $orderSubtotal += $dong['total'];
             }
 
             $order->update([
@@ -209,7 +218,12 @@ class OrderController extends Controller
 
         $oldTableId = $order->table_id;
 
-        $this->atomic(function () use ($request, $cafe, $order, $validated, $oldTableId) {
+        // Kiểm hết trước khi động vào đơn đang có: trước đây các dòng cũ bị xóa ngay
+        // đầu vòng lặp, nên một request bị từ chối giữa chừng làm mất luôn đơn của
+        // bàn đang ngồi.
+        $cacDong = $request->has('items') ? $this->chuanBiCacDong($cafe, $validated['items']) : [];
+
+        $this->atomic(function () use ($request, $cafe, $order, $validated, $oldTableId, $cacDong) {
             $updateData = [];
             if ($request->has('table_id'))       $updateData['table_id']       = $validated['table_id'];
             if ($request->has('note'))           $updateData['note']           = $validated['note'] ?? '';
@@ -222,9 +236,9 @@ class OrderController extends Controller
                 $order->orderDetails()->delete();
 
                 $orderSubtotal = 0;
-                foreach ($validated['items'] as $itemData) {
-                    [$detail, $itemTotalPrice] = $this->createOrderDetail($cafe, $order, $itemData);
-                    $orderSubtotal += $itemTotalPrice;
+                foreach ($cacDong as $dong) {
+                    $this->ghiDong($order, $dong);
+                    $orderSubtotal += $dong['total'];
                 }
 
                 $updateData['subtotal'] = $orderSubtotal;
@@ -275,6 +289,14 @@ class OrderController extends Controller
             return response()->json(['message' => $reason], 400);
         }
 
+        // Đơn không còn dòng món nào thì không có gì để thu. Trước đây vẫn chốt được:
+        // ra một hóa đơn 0₫ nằm trong sổ, đếm vào "số hóa đơn hôm nay" và kéo giá trị
+        // trung bình một đơn xuống. Xảy ra khi thu ngân bấm X gỡ hết món rồi bấm nhầm
+        // Thanh toán thay vì Hủy order.
+        if ($order->orderDetails()->count() === 0) {
+            return response()->json(['message' => 'Đơn chưa có món nào, không thể thanh toán.'], 422);
+        }
+
         $validated = $request->validate([
             'payment_method'  => 'required|string|in:cash,vietqr',
             'discount_amount' => 'nullable|numeric|min:0',
@@ -317,9 +339,20 @@ class OrderController extends Controller
 
         $now = now();
 
-        $this->atomic(function () use ($order, $cafe, $invoiceCode, $discount, $total, $validated, $now, $cashReceived, $changeAmount) {
-            // Order tự "nhận" toàn bộ thông tin thanh toán (dòng món đã ở order_details).
-            $order->update([
+        // CHỐT ĐƠN BẰNG MỘT PHÉP GHI CÓ ĐIỀU KIỆN (4.6.10).
+        //
+        // Kiểm `status !== 'active'` ở đầu hàm không đủ: hai request song song (bấm
+        // đúp, mở hai tab, mạng chập chờn nên trình duyệt gửi lại) đều đọc thấy
+        // 'active' rồi cùng đi tiếp, ra HAI mã phiếu cho một đơn. Mongo standalone
+        // không có transaction nên `atomic()` chạy thẳng, không cứu được chỗ này.
+        //
+        // Cách chắc chắn: đưa điều kiện vào chính câu lệnh ghi. MongoDB cập nhật một
+        // tài liệu là thao tác nguyên tử, nên chỉ request nào còn thấy status='active'
+        // mới ghi được; request đến sau nhận về 0 dòng đổi và bị từ chối. Mã phiếu mà
+        // nó lỡ sinh ra chưa ghi vào đâu cả nên tự tan.
+        $daChot = Order::where('_id', $order->id)
+            ->where('status', 'active')
+            ->update([
                 'status'          => 'paid',
                 'invoice_code'    => $invoiceCode,
                 'payment_method'  => $validated['payment_method'],
@@ -331,13 +364,17 @@ class OrderController extends Controller
                 'change_amount'   => $changeAmount,
             ]);
 
-            // Thanh toán xong -> bàn về TRỐNG luôn (bỏ trạng thái 'cleaning').
-            $cafe->tables()->where('_id', $order->table_id)->update([
-                'status'           => 'empty',
-                'current_order_id' => null,
-            ]);
-        });
+        if ($daChot === 0) {
+            return response()->json(['message' => 'Order này đã được thanh toán.'], 400);
+        }
 
+        // Thanh toán xong -> bàn về TRỐNG luôn (bỏ trạng thái 'cleaning').
+        $cafe->tables()->where('_id', $order->table_id)->update([
+            'status'           => 'empty',
+            'current_order_id' => null,
+        ]);
+
+        $order->refresh();
         return response()->json($order->load(['table', 'orderDetails.orderDetailToppings.topping']));
     }
 
@@ -357,27 +394,50 @@ class OrderController extends Controller
             return response()->json(['message' => 'Order đã thanh toán, không thể hủy.'], 400);
         }
 
-        $this->atomic(function () use ($order, $cafe) {
-            $order->update(['status' => 'cancelled']);
+        // Ghi có điều kiện như bên pay(): chặn trường hợp một tab bấm Hủy trong khi
+        // tab kia đang chốt tiền — nếu không, đơn có thể vừa mang mã phiếu vừa mang
+        // trạng thái 'cancelled', tức tiền đã thu mà sổ ghi là đã hủy.
+        $daHuy = Order::where('_id', $order->id)
+            ->where('status', 'active')
+            ->update(['status' => 'cancelled']);
 
-            $cafe->tables()->where('_id', $order->table_id)->update([
-                'status'           => 'empty',
-                'current_order_id' => null,
-            ]);
-        });
+        if ($daHuy === 0) {
+            $order->refresh();
+            // Thua cuộc trước lệnh thanh toán -> không được phép hủy nữa.
+            if ($order->status === 'paid') {
+                return response()->json(['message' => 'Order đã thanh toán, không thể hủy.'], 400);
+            }
+            // Còn lại là đơn vốn đã hủy từ trước: coi như thành công (giao diện gọi
+            // lại lệnh hủy sau khi mất mạng là chuyện bình thường), vẫn dọn bàn.
+        }
 
+        $cafe->tables()->where('_id', $order->table_id)->update([
+            'status'           => 'empty',
+            'current_order_id' => null,
+        ]);
+
+        $order->refresh();
         return response()->json($order->load(['table']));
     }
 
     /**
-     * Helper: tạo order_detail và order_detail_toppings, tính giá từ DB.
-     * Trả về [$detail, $itemTotalPrice].
+     * KIỂM VÀ TÍNH một dòng món — KHÔNG ghi gì vào CSDL.
+     *
+     * Tách khỏi khâu ghi vì Mongo standalone không có transaction: mọi thứ đã ghi là
+     * ở lại vĩnh viễn. Trước đây kiểm-và-ghi làm chung một lượt, nên một đơn ba món
+     * mà món thứ ba không hợp lệ sẽ để lại hai dòng đầu đã ghi cùng con số tạm tính
+     * chưa cập nhật — đơn tự mâu thuẫn. Ở update() còn nặng hơn: các dòng cũ đã bị
+     * xóa trước vòng lặp, nên một request bị từ chối làm mất luôn đơn đang có.
+     *
+     * Cách làm bây giờ: kiểm hết mọi dòng trước; qua được hết mới bắt đầu ghi.
      *
      * BUG-FIX (B1): item / size / topping BẮT BUỘC tồn tại và thuộc đúng quán.
      * Trước đây Item::find() không kiểm tra gì — id không tồn tại → giá 0 vẫn
      * tạo được dòng order ("món ma"), hoặc dùng được giá của quán khác.
+     *
+     * @return array{detail: array, toppings: array, total: float}
      */
-    private function createOrderDetail(Cafe $cafe, Order $order, array $itemData): array
+    private function chuanBiDong(Cafe $cafe, array $itemData): array
     {
         $fail = function (string $msg) {
             throw new \Illuminate\Http\Exceptions\HttpResponseException(
@@ -396,6 +456,16 @@ class OrderController extends Controller
         }
         if (!($item->is_available ?? true)) {
             $fail('Món "' . $item->name . '" đã ngừng bán, vui lòng bỏ khỏi đơn.');
+        }
+
+        // Ẩn danh mục = ẩn cả món bên trong (quy tắc 4.2.2, màn hình Bán hàng cũng
+        // lọc như vậy). Chặn lại ở đây vì đơn nháp nằm phía máy chủ: chủ quán có thể
+        // tắt cả danh mục ở tab khác trong lúc nhân viên đang gọi món.
+        if (!empty($item->category_id)) {
+            $danhMuc = \App\Models\Category::find($item->category_id);
+            if ($danhMuc && !($danhMuc->is_active ?? true)) {
+                $fail('Danh mục "' . $danhMuc->name . '" đang ẩn nên món "' . $item->name . '" không bán được.');
+            }
         }
 
         // Tự lấy giá từ DB
@@ -443,24 +513,44 @@ class OrderController extends Controller
 
         $itemTotalPrice = $itemSubtotal + $toppingTotal;
 
-        $detail = $order->orderDetails()->create([
-            'item_id'            => $itemData['item_id'],
-            // Snapshot tên lấy từ DB — không tin tên client gửi lên (in lên hóa đơn)
-            'item_name_snapshot' => $item->name,
-            'item_price_id'      => $itemData['item_price_id'] ?? null,
-            'size_name_snapshot' => $itemData['size_name_snapshot'] ?? null,
-            'quantity'           => $quantity,
-            'unit_price'         => $unitPrice,
-            'subtotal'           => $itemSubtotal,
-            'topping_total'      => $toppingTotal,
-            'total_price'        => $itemTotalPrice,
-            'note'               => $itemData['note'] ?? '',
-        ]);
+        return [
+            'detail' => [
+                'item_id'            => $itemData['item_id'],
+                // Snapshot tên lấy từ DB — không tin tên client gửi lên (in lên hóa đơn)
+                'item_name_snapshot' => $item->name,
+                'item_price_id'      => $itemData['item_price_id'] ?? null,
+                'size_name_snapshot' => $itemData['size_name_snapshot'] ?? null,
+                'quantity'           => $quantity,
+                'unit_price'         => $unitPrice,
+                'subtotal'           => $itemSubtotal,
+                'topping_total'      => $toppingTotal,
+                'total_price'        => $itemTotalPrice,
+                'note'               => $itemData['note'] ?? '',
+            ],
+            'toppings' => $toppingRows,
+            'total'    => $itemTotalPrice,
+        ];
+    }
 
-        foreach ($toppingRows as $topRow) {
+    /**
+     * Kiểm TOÀN BỘ các dòng món trước khi ghi bất cứ thứ gì.
+     * Dòng nào không hợp lệ thì ném phản hồi 422 ngay tại đây — lúc đó CSDL còn
+     * nguyên vẹn như trước khi có request.
+     *
+     * @return array<int, array{detail: array, toppings: array, total: float}>
+     */
+    private function chuanBiCacDong(Cafe $cafe, array $items): array
+    {
+        return array_map(fn ($itemData) => $this->chuanBiDong($cafe, $itemData), $items);
+    }
+
+    /** Ghi một dòng đã được kiểm xong vào đơn. Không còn chỗ nào để hỏng. */
+    private function ghiDong(Order $order, array $daChuanBi): void
+    {
+        $detail = $order->orderDetails()->create($daChuanBi['detail']);
+
+        foreach ($daChuanBi['toppings'] as $topRow) {
             $detail->orderDetailToppings()->create($topRow);
         }
-
-        return [$detail, $itemTotalPrice];
     }
 }

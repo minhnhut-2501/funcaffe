@@ -5,7 +5,7 @@ import { generateId } from '@/lib/utils';
 import { tableService, menuService, categoryService, toppingService, orderService, cafeService } from '@/services';
 import type { CafeTable, MenuItem, MenuItemSize, Topping, Order, OrderItem, CafeInfo } from '@/types';
 // Phép tính tiền nằm ở lib/cart để kiểm được bằng bài kiểm thử — xem src/lib/cart.test.ts.
-import { calcItemBase, calcItemTopping, calcCartItem, clampDiscount, calcChange, type CartItem } from '@/lib/cart';
+import { calcItemBase, calcItemTopping, calcCartItem, clampDiscount, calcChange, isSameCartLine, type CartItem } from '@/lib/cart';
 import { buildVietQrImageUrl } from '@/lib/banks';
 import Link from 'next/link';
 import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, Receipt, Banknote } from 'lucide-react';
@@ -19,17 +19,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { canManage } from '@/lib/permission';
 
-
-// Hai dòng giỏ được coi là trùng khi cùng món, cùng size, cùng ghi chú và cùng topping (id + số lượng)
-function isSameCartLine(a: CartItem, b: CartItem): boolean {
-  if (a.item.id !== b.item.id) return false;
-  if ((a.size?.id ?? '') !== (b.size?.id ?? '')) return false;
-  if ((a.note ?? '').trim() !== (b.note ?? '').trim()) return false;
-  if (a.toppings.length !== b.toppings.length) return false;
-  const norm = (list: CartItem['toppings']) =>
-    list.map(t => `${t.topping.id}:${t.quantity}`).sort().join('|');
-  return norm(a.toppings) === norm(b.toppings);
-}
 
 /** Chặn trên cho số lượng: một lần lỡ tay không đẻ ra hóa đơn hàng tỉ đồng.
  *  Món 999 vì có bàn gọi cả thùng; topping 20 vì đó là số phần thêm vào MỘT ly —
@@ -223,8 +212,26 @@ export default function SalesPage() {
 
   const filteredTables = tablesLive.filter(t => tableFilter === 'all' || t.status === tableFilter);
 
+  /**
+   * QUY TẮC ĐÃ CHỐT (4.2.2): ẩn một danh mục thì MỌI MÓN bên trong cũng biến khỏi
+   * màn hình bán hàng.
+   *
+   * Trước đây chỉ cái tab biến mất: món vẫn nằm trong lưới khi đang xem "Tất cả", tức
+   * chủ quán tắt "Đồ ăn vặt" hết mùa mà nhân viên vẫn bán được — chỉ là không còn
+   * đường nào bấm tới nó theo danh mục. `is_available` của từng món không bị đụng
+   * tới, nên bật lại danh mục là mọi thứ trở về đúng như cũ.
+   *
+   * Máy chủ chặn lần nữa ở OrderController: giỏ hàng nằm ở phía máy chủ nên món có
+   * thể bị ẩn trong khoảng giữa lúc bỏ vào giỏ và lúc chốt đơn.
+   */
+  const danhMucDangAn = useMemo(
+    () => new Set(categories.filter(c => !c.isActive).map(c => c.id)),
+    [categories],
+  );
+
   const filteredMenu = menuItems.filter(i =>
     i.isAvailable &&
+    !danhMucDangAn.has(i.categoryId) &&
     (catFilter === 'all' || i.categoryId === catFilter) &&
     i.name.toLowerCase().includes(menuSearch.toLowerCase())
   );
@@ -408,9 +415,12 @@ export default function SalesPage() {
       const existingId = draftOrderIds[tableId];
       if (existingId) {
         if (items.length === 0) {
-          await orderService.update(existingId, {
-            tableId, items: [], subtotal: 0, discountAmount: 0, totalAmount: 0,
-          });
+          // Gỡ nốt dòng cuối = không còn gì để bán ở bàn này, nên HỦY đơn chứ không
+          // lưu một đơn rỗng. Trước đây chỗ này gửi `items: []`: máy chủ giữ đơn ở
+          // trạng thái đang phục vụ với 0₫, `activeOrders` phía giao diện cũng không
+          // được cập nhật — tải lại trang là thấy bàn "đang phục vụ" mà giỏ trống,
+          // không cách nào dọn ngoài việc thêm món vào rồi hủy.
+          await releaseTable(tableId, existingId);
         } else {
           const updated = await orderService.update(existingId, {
             tableId, items: orderItems, subtotal: bs, discountAmount: 0, totalAmount: tot,
@@ -580,6 +590,19 @@ export default function SalesPage() {
           <p className="text-cafe-500 text-sm">Chọn bàn, chọn món và thanh toán</p>
         </div>
       </div>
+
+      {/* Quán không ở trạng thái mở cửa thì máy chủ từ chối mở đơn mới. Nói trước ở
+          đây, đừng để nhân viên chọn xong cả giỏ mới nhận một thông báo lỗi. */}
+      {!loading && cafeInfo && cafeInfo.status !== 'open' && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-gold/25 bg-gold/10 px-4 py-3 text-sm text-gold-deep">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>
+            Quán đang ở trạng thái <strong>{cafeInfo.status === 'closed' ? 'Đã đóng cửa' : 'Ngừng hoạt động'}</strong> nên
+            không mở được đơn mới. Bàn đang ngồi vẫn gọi thêm và thanh toán bình thường.{' '}
+            <Link href="/user/cafe" className="font-semibold underline">Đổi trạng thái quán</Link> để bán tiếp.
+          </p>
+        </div>
+      )}
 
       {loading ? <div className="flex-1"><LoadingSkeleton variant="table" rows={6} cols={4} /></div> : (
       <>

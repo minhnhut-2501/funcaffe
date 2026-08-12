@@ -6,12 +6,13 @@ use App\Models\Cafe;
 use App\Models\Item;
 use App\Models\ItemTopping;
 use App\Http\Controllers\Concerns\ChecksCafeOwnership;
+use App\Http\Controllers\Concerns\ChecksCafeStatus;
 use App\Http\Controllers\Concerns\EnforcesPackageLimits;
 use Illuminate\Http\Request;
 
 class ItemController extends Controller
 {
-    use ChecksCafeOwnership, EnforcesPackageLimits;
+    use ChecksCafeOwnership, EnforcesPackageLimits, ChecksCafeStatus;
 
     public function __construct()
     {
@@ -28,6 +29,7 @@ class ItemController extends Controller
     public function store(Request $request, Cafe $cafe)
     {
         $this->authorizeCafe($cafe);
+        $this->guardSuaDoi($cafe);
         $this->enforcePackageLimit($cafe, 'items', $cafe->items()->count());
 
         $validated = $request->validate([
@@ -100,6 +102,7 @@ class ItemController extends Controller
     public function update(Request $request, Cafe $cafe, Item $item)
     {
         $this->authorizeCafe($cafe);
+        $this->guardSuaDoi($cafe);
 
         if ((string) $item->cafe_id !== (string) $cafe->id) {
             return response()->json(['message' => 'Not found'], 404);
