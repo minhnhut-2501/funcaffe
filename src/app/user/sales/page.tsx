@@ -2,7 +2,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
 import { generateId } from '@/lib/utils';
-import { tableService, menuService, categoryService, toppingService, orderService, cafeService } from '@/services';
+import { tableService, menuService, categoryService, toppingService, orderService, invoiceService, cafeService } from '@/services';
+import { ApiError } from '@/lib/api-client';
 import type { CafeTable, MenuItem, MenuItemSize, Topping, Order, OrderItem, CafeInfo } from '@/types';
 // Phép tính tiền nằm ở lib/cart để kiểm được bằng bài kiểm thử — xem src/lib/cart.test.ts.
 import { calcItemBase, calcItemTopping, calcCartItem, clampDiscount, calcChange, isSameCartLine, type CartItem } from '@/lib/cart';
@@ -45,7 +46,7 @@ export default function SalesPage() {
   const [optionModal, setOptionModal] = useState<{ item: MenuItem } | null>(null);
   const [editCartItemId, setEditCartItemId] = useState<string | null>(null);
   const [paymentModal, setPaymentModal] = useState(false);
-  const [successModal, setSuccessModal] = useState<{ code: string; total: number; method: string; cashGiven?: number; change?: number } | null>(null);
+  const [successModal, setSuccessModal] = useState<{ code: string; orderId: string; total: number; method: string; cashGiven?: number; change?: number } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [cashGiven, setCashGiven] = useState('');
   // Giảm giá (đồng) do thu ngân nhập khi thanh toán. Backend đã hỗ trợ đầy đủ từ
@@ -528,11 +529,40 @@ export default function SalesPage() {
       const orderId = draftOrderIds[selectedTable.id];
       if (!orderId) { showToast('Không tìm thấy order, vui lòng thêm món lại'); setProcessing(false); return; }
 
-      const payResult = await orderService.pay(orderId, {
-        payment_method: paymentMethod,
-        discount_amount: discount,
-        ...(paymentMethod === 'cash' && cashReceived > 0 ? { cash_received: cashReceived } : {}),
-      });
+      let payResult;
+      try {
+        payResult = await orderService.pay(orderId, {
+          payment_method: paymentMethod,
+          discount_amount: discount,
+          ...(paymentMethod === 'cash' && cashReceived > 0 ? { cash_received: cashReceived } : {}),
+        });
+      } catch (err) {
+        // MẤT MẠNG GIỮA LÚC THANH TOÁN, RỒI BẤM LẠI (4.6.15).
+        //
+        // Trường hợp khó: máy chủ đã chốt xong đơn nhưng phản hồi không về tới nơi
+        // (rớt mạng, quá hạn 15 giây). Thu ngân thấy "thanh toán thất bại" nên bấm
+        // lại; lần này máy chủ trả 400 "đã được thanh toán". Nếu cứ coi đó là lỗi
+        // thì cái bàn đứng mãi ở trạng thái đang phục vụ dù tiền đã thu và sổ đã
+        // ghi — không cách nào dọn ngoài việc sửa tay trong CSDL.
+        //
+        // Đọc lại đơn: đã 'paid' thì đây là lần bấm thứ hai của một giao dịch ĐÃ
+        // THÀNH CÔNG, nên đi tiếp bình thường và in biên lai từ số của máy chủ.
+        const daChot = err instanceof ApiError && err.status === 400
+          ? await orderService.getById(orderId).catch(() => null)
+          : null;
+
+        if (!daChot || daChot.status !== 'paid') throw err;
+
+        const hoaDon = await invoiceService.getById(orderId).catch(() => null);
+        payResult = {
+          invoice_code: hoaDon?.invoiceCode || daChot.code,
+          total_amount: hoaDon?.totalAmount ?? daChot.totalAmount,
+          cash_received: hoaDon?.cashReceived,
+          change_amount: hoaDon?.changeAmount,
+        };
+
+        showToast('Đơn này đã được ghi nhận thanh toán từ lần bấm trước.');
+      }
 
       // Order nay tự mang mã phiếu (invoice_code) sau khi thanh toán — bỏ bảng invoices.
       const invoiceCode = payResult?.invoice_code
@@ -559,6 +589,7 @@ export default function SalesPage() {
       setDiscountInput(0);
       setSuccessModal({
         code: invoiceCode,
+        orderId,
         total: paidTotal,
         method: paymentMethod,
         cashGiven: paidCash ?? (paymentMethod === 'cash' && cashReceived > 0 ? cashReceived : undefined),
@@ -1067,7 +1098,10 @@ export default function SalesPage() {
         size="sm"
         footer={
           <div className="flex gap-2">
-            <button onClick={() => { setSuccessModal(null); window.open('/user/invoices', '_blank'); }} className="btn-secondary flex-1 text-sm"><Receipt className="w-4 h-4" />In hóa đơn</button>
+            {/* Mở THẲNG hóa đơn vừa lập, không phải danh sách: khách đang đứng chờ,
+                thu ngân không có thời gian dò lại đúng dòng — dò nhầm là đưa khách
+                hóa đơn của bàn khác. */}
+            <button onClick={() => { const id = successModal?.orderId; setSuccessModal(null); window.open(`/user/invoices${id ? `?hoadon=${encodeURIComponent(id)}` : ''}`, '_blank'); }} className="btn-secondary flex-1 text-sm"><Receipt className="w-4 h-4" />In hóa đơn</button>
             <button onClick={() => setSuccessModal(null)} className="btn-primary flex-1 text-sm">Tạo order mới</button>
           </div>
         }

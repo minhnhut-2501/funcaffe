@@ -70,6 +70,27 @@ export default function InvoicesPage() {
     return () => cancelAnimationFrame(id);
   }, [choIn, viewInvoice]);
 
+  /**
+   * Đến thẳng một hóa đơn từ nơi khác: `/user/invoices?hoadon=<id>`.
+   *
+   * Màn hình Bán hàng dùng đường này ngay sau khi thu tiền. Trước đây nút "In hóa
+   * đơn" ở đó chỉ mở DANH SÁCH hóa đơn, thu ngân phải tự dò lại tờ vừa lập trong khi
+   * khách đang đứng chờ — và nếu dò nhầm dòng thì đưa khách hóa đơn của bàn khác.
+   *
+   * Mở đúng hộp thoại chi tiết cũng bảo đảm bản in sau thanh toán và bản in lại từ
+   * trang này là MỘT: cùng một khối .print-area, không có bản thứ hai để lệch nhau.
+   */
+  useEffect(() => {
+    if (!invoices?.length) return;
+    const cauHoi = new URLSearchParams(window.location.search).get('hoadon');
+    if (!cauHoi) return;
+
+    const canIn = invoices.find(inv => inv.id === cauHoi || inv.invoiceCode === cauHoi);
+    if (canIn) setViewInvoice(canIn);
+    // Xóa tham số khỏi thanh địa chỉ: tải lại trang không nên mở lại hộp thoại cũ.
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [invoices]);
+
   if (loading) return <div><PageHeader title="Hóa đơn" description="Xem, lọc và in hóa đơn thanh toán." /><LoadingSkeleton variant="table" rows={6} cols={7} /></div>;
   if (error) return <div><PageHeader title="Hóa đơn" /><div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-2xl p-4"><AlertCircle className="w-5 h-5" /><span>Không thể tải danh sách hóa đơn.</span></div></div>;
 

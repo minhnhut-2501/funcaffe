@@ -1,0 +1,73 @@
+@startuml FunCafe-Statechart-Order
+' So do TRANG THAI cua mot don hang tai quay (viec 4.6.1).
+' draw.io -> + (Insert) -> Advanced -> PlantUML... dan tron khoi nay.
+'
+' NGUON: App\Http\Controllers\OrderController (store / update / pay / cancel) va
+' man hinh Ban hang src/app/user/sales/page.tsx. Moi mui ten o day deu co mot
+' duong di that trong ma nguon — khong ve trang thai nao chua duoc cai dat.
+'
+' Ba trang thai luu trong CSDL: orders.status = active | paid | cancelled.
+' Khong co trang thai trung gian nao khac: don hoac dang phuc vu, hoac da chot
+' tien, hoac da huy. "Da thanh toan" va "da huy" deu la trang thai CUOI —
+' khong co duong nao di ra khoi chung.
+
+skinparam shadowing false
+skinparam state {
+  BackgroundColor<<cuoi>> #F5EFE6
+  BorderColor #6F4E37
+}
+
+[*] --> DangPhucVu : **Mo don**\nPOST /orders\n(ban phai trong, quan phai **dang mo cua**)
+
+state "Đang phục vụ\n(active)" as DangPhucVu {
+  DangPhucVu : Bàn chuyển sang "đang phục vụ"
+  DangPhucVu : orders.subtotal / total_amount tính lại từ CSDL sau mỗi lần sửa
+}
+
+state "Đã thanh toán\n(paid)" as DaThanhToan <<cuoi>> {
+  DaThanhToan : Mang mã phiếu invoice_code
+  DaThanhToan : Bàn trở về trống
+  DaThanhToan : Là "hóa đơn" ở trang Tra cứu hóa đơn
+}
+
+state "Đã hủy\n(cancelled)" as DaHuy <<cuoi>> {
+  DaHuy : Bàn trở về trống
+  DaHuy : Không tính vào doanh thu
+}
+
+DangPhucVu --> DangPhucVu : **Thêm / bớt / sửa món**\nPUT /orders/{id}\n(kiểm hết mọi dòng rồi mới ghi)
+DangPhucVu --> DangPhucVu : **Đặt giảm giá**\nkẹp trong [0, tạm tính]
+DangPhucVu --> DangPhucVu : **Đổi bàn**\nbàn cũ về trống, bàn mới sang phục vụ
+
+DangPhucVu --> DaThanhToan : **Thanh toán**\nPOST /orders/{id}/pay\nghi có điều kiện: chỉ khi còn là active
+DangPhucVu --> DaHuy : **Hủy order**\nPOST /orders/{id}/cancel\nghi có điều kiện: chỉ khi còn là active
+DangPhucVu --> DaHuy : **Gỡ hết món khỏi giỏ**\n(màn hình Bán hàng tự gọi lệnh hủy)
+
+DaThanhToan --> [*]
+DaHuy --> [*]
+
+note right of DangPhucVu
+  **Bốn cửa bị khóa ở trạng thái này**
+  • Món / topping bị ẩn giữa chừng → chốt đơn bị chặn
+  • Danh mục bị ẩn → món bên trong không bán được
+  • Đơn không còn dòng món nào → không thanh toán được
+  • Khách đưa thiếu tiền mặt → không thanh toán được
+end note
+
+note bottom of DaThanhToan
+  **Vì sao là ghi có điều kiện**
+  Hai request song song (bấm đúp, hai tab) đều đọc thấy
+  `active` rồi cùng đi tiếp → hai mã phiếu cho một đơn.
+  MongoDB standalone không có transaction, nên điều kiện
+  phải nằm trong chính câu lệnh ghi:
+  `where status = 'active' → update(...)`.
+  Bên thua nhận 0 dòng đổi và bị từ chối.
+end note
+
+note bottom of DaHuy
+  Hủy lại một đơn đã hủy vẫn trả về thành công:
+  giao diện gọi lại lệnh sau khi mất mạng là chuyện thường.
+  Nhưng đơn **đã thanh toán** thì không hủy được nữa.
+end note
+
+@enduml
