@@ -12,10 +12,10 @@ class OrderDetail extends Model
 
     protected $casts = [
         'quantity' => 'integer',
-        'unit_price' => 'float',
-        'subtotal' => 'float',
-        'topping_total' => 'float',
-        'total_price' => 'float',
+        'unit_price' => 'integer',
+        'subtotal' => 'integer',
+        'topping_total' => 'integer',
+        'total_price' => 'integer',
     ];
 
     public function order()

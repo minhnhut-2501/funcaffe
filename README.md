@@ -37,11 +37,27 @@ cd backend
 composer install
 cp .env.example .env
 php artisan key:generate
+
+# Tệp SQLite KHÔNG nằm trong kho (xem database/.gitignore) nên máy trắng chưa có nó.
+# Thiếu bước này thì `migrate` dừng lại hỏi có tạo không — kịch bản tự động sẽ treo.
+touch database/database.sqlite
+
 php artisan migrate          # bảng token Sanctum, cache và queue (SQLite)
-php artisan db:indexes       # tạo chỉ mục MongoDB
-php artisan db:seed          # dữ liệu khởi tạo: gói dịch vụ và thời hạn gói
+php artisan db:indexes       # tạo chỉ mục MongoDB — BẮT BUỘC, xem ghi chú bên dưới
+php artisan db:seed          # tối thiểu: 3 gói, 7 mốc thời hạn, 1 tài khoản quản trị
 php artisan serve            # http://localhost:8000
 ```
+
+Muốn có **dữ liệu demo đầy đủ** để xem giao diện có gì (nhiều quán, thực đơn, ~2.000 đơn
+trải 60 ngày, hóa đơn, giao dịch gói) thì chạy thêm:
+
+```bash
+php artisan db:seed --class=DemoSeeder
+```
+
+> `DemoSeeder` **xóa sạch rồi gieo lại** các collection nó quản lý. Đừng chạy trên cơ sở
+> dữ liệu đang có dữ liệu thật. Muốn thử an toàn thì trỏ sang CSDL khác:
+> `MONGODB_DATABASE=funcafe_thu php artisan db:seed --class=DemoSeeder`
 
 > `php artisan db:indexes` là lệnh **bắt buộc**, không phải tuỳ chọn. MongoDB không đi qua hệ thống migration của Laravel nên chỉ mục phải khai báo và tạo bằng lệnh riêng. Bỏ qua bước này thì hệ thống vẫn chạy, nhưng mọi truy vấn phải quét toàn bộ collection. Lệnh chạy lại được nhiều lần mà không hỏng gì.
 
@@ -55,6 +71,9 @@ Các biến trong `backend/.env` cần chú ý:
 | `GEMINI_API_KEY` | Thiếu thì trợ lý AI không chạy, phần còn lại vẫn bình thường |
 | `VNPAY_*`, `MOMO_*` | Khoá của môi trường thử nghiệm; thiếu thì không mua được gói |
 | `CLOUDINARY_URL` | Bỏ trống ở local sẽ tự lưu ảnh vào thư mục `public` |
+| `CA_BUNDLE` | **Chỉ Windows.** PHP trên Windows không kèm bộ chứng chỉ gốc, nên mọi lời gọi HTTPS ra ngoài (Gemini, MoMo) báo `cURL error 60`. Tải `cacert.pem` về rồi trỏ tới đây. Trên Linux/Render để trống |
+| `CORS_ALLOWED_ORIGINS` | Local để `*`. Khi triển khai **phải** đặt đúng tên miền frontend — để `*` nghĩa là bất kỳ trang web nào cũng gọi được API bằng token của người đang đăng nhập |
+| `SANCTUM_EXPIRATION_MINUTES` | Hạn dùng token đăng nhập, mặc định 43200 (30 ngày). Để rỗng là token sống mãi |
 
 ### 2. Frontend
 
@@ -75,27 +94,52 @@ NEXT_PUBLIC_STORAGE_URL=http://localhost:8000
 ```bash
 npm run dev            # chạy frontend ở chế độ phát triển
 npm run build          # dựng bản production
-npm run typecheck      # kiểm tra kiểu TypeScript
+npm run typecheck      # kiểm tra kiểu TypeScript (phải 0 lỗi)
+npm run lint           # soát mã
+npm test               # bộ kiểm thử frontend (Vitest)
 
 cd backend
-php artisan serve      # chạy API
-php artisan test       # bộ kiểm thử tự động (29 bài)
-php artisan db:indexes # tạo lại chỉ mục MongoDB
+php artisan serve             # chạy API
+php artisan test              # bộ kiểm thử máy chủ
+php artisan db:indexes        # tạo lại chỉ mục MongoDB
+php artisan db:normalize-money # đưa mọi trường tiền về số nguyên (mặc định chỉ báo cáo)
+php artisan sanctum:prune-expired --hours=24  # dọn token đã quá hạn
 ```
+
+> **`npm run build` xóa sạch thư mục `.next`, mà `npm run dev` cũng dùng chung thư mục
+> đó.** Dựng lại trong lúc server dev đang chạy sẽ làm hỏng nó theo kiểu khó đoán: những
+> gì đã nạp vào trình duyệt vẫn chạy, nhưng gói mã nạp động (`exceljs` — nút Xuất Excel)
+> không sinh ra được nữa, nên chỉ mình nút đó hỏng. Gặp thì: `rm -rf .next && npm run dev`.
+
+### Kịch bản kiểm trên trình duyệt
+
+Bốn lệnh trên **không mở trình duyệt và không bấm nút nào**. Hai kịch bản dưới đây bù vào
+chỗ đó — cần cả `php artisan serve` (cổng 8000) và frontend đang chạy:
+
+```bash
+node scripts/thu-xuat-excel.mjs       # bấm nút Xuất Excel, mở lại tệp đối chiếu kiểu dữ liệu
+node scripts/thu-ban-in-hoa-don.mjs   # bản in A4 + giấy nhiệt 58/80mm
+node scripts/doi-chieu-doanh-thu.mjs  # doanh thu ở năm nơi phải ra cùng một số
+```
+
+Cả ba chỉ đọc, không tạo hay sửa bản ghi nào.
 
 ## Kiểm thử
 
-Bộ kiểm thử tự động viết bằng PHPUnit, tập trung vào các quy tắc liên quan tới tiền và tới quyền — những chỗ sai sót không hiện ra trên giao diện:
+**195 bài máy chủ** (PHPUnit) và **126 bài frontend** (Vitest), tập trung vào các quy tắc liên quan tới **tiền** và tới **quyền** — những chỗ sai sót không hiện ra trên giao diện:
 
-| Bộ | Loại | Nội dung |
-|---|---|---|
-| `VnpaySignatureTest` | Unit | Xác thực chữ ký HMAC-SHA512 của VNPay |
-| `ProratedCreditTest` | Unit | Cấn trừ theo tỉ lệ khi nâng cấp gói giữa kỳ |
-| `SubscriptionActivatorTest` | Feature | Kích hoạt gói khi cổng thanh toán xác nhận |
-| `OrderPricingTest` | Feature | Tính tiền đơn hàng, giảm giá, tiền thối |
-| `AiSuggestionsTest` | Feature | Gợi ý trợ lý AI và chặn quyền theo gói |
+| Bộ | Nội dung |
+|---|---|
+| `VnpaySignatureTest` · `MomoSignatureTest` | Xác thực chữ ký HMAC của hai cổng thanh toán |
+| `GatewayCallbackTest` | Cổng gọi về hai đường (Return + IPN) không được cộng hạn hai lần |
+| `SubscriptionLifecycleTest` · `SubscriptionActivatorTest` | Mua mới, gia hạn cộng dồn, nâng cấp cấn trừ giữa kỳ |
+| `OrderLifecycleTest` · `OrderPricingTest` | Vòng đời đơn, tính tiền, giảm giá, tiền thối, thanh toán hai lần |
+| `AuthFlowTest` | Đăng ký/đăng nhập/đặt lại mật khẩu; token chết đúng lúc; không tự nâng quyền |
+| `AdminPanelTest` · `AdminUserGuardTest` | Ranh giới quyền quản trị; không xóa cứng thứ đã bán |
+| `CatalogRulesTest` · `PackageLimitTest` · `TableGuardTest` · `CafeStatusTest` | Hạn mức gói, trạng thái quán, quy tắc thực đơn |
+| `ReviewRulesTest` · `AiSuggestionsTest` | Đánh giá không lộ thông tin cá nhân; chặn AI theo gói |
 
-Các bài kiểm thử ghi vào cơ sở dữ liệu riêng `funcafe_testing` và từ chối chạy nếu bị trỏ nhầm vào dữ liệu thật.
+Các bài kiểm thử ghi vào cơ sở dữ liệu riêng `funcafe_testing` và **từ chối chạy nếu bị trỏ nhầm vào dữ liệu thật**. Máy không chạy MongoDB thì các bài Feature tự bỏ qua thay vì báo đỏ.
 
 ## Cấu trúc mã nguồn
 
@@ -127,6 +171,22 @@ Frontend đưa lên Vercel, backend đóng gói Docker đưa lên Render, cơ s�
 1. Backend cần phần mở rộng MongoDB cho PHP mà môi trường dựng sẵn không có — đã có `backend/Dockerfile` để cài.
 2. Đĩa của máy chủ bị xoá sạch sau mỗi lần triển khai lại, nên ảnh phải đẩy sang Cloudinary thay vì ghi vào thư mục ứng dụng.
 3. Frontend và backend nằm ở hai tên miền khác nhau — khai báo `CORS_ALLOWED_ORIGINS` và `FRONTEND_URL` cho đúng.
+
+### Bốn thứ phải kiểm trước khi coi là xong
+
+Ba cái đầu **không làm hỏng gì ngay** — ứng dụng chạy bình thường, không báo lỗi nào — nên
+rất dễ lên mạng rồi vẫn còn nguyên. Ứng dụng tự ghi cảnh báo vào log khi phát hiện, nhưng
+đừng đợi tới đó:
+
+| Biến | Phải là | Nếu sai thì sao |
+|---|---|---|
+| `APP_DEBUG` | `false` | Một lỗi 500 bất kỳ là in ra **toàn bộ biến môi trường** — khóa cổng thanh toán, chuỗi kết nối CSDL — cho người gây ra lỗi đó |
+| `CORS_ALLOWED_ORIGINS` | tên miền frontend thật | Mọi trang web gọi được API này bằng token của người dùng đang đăng nhập |
+| `APP_KEY` | đã sinh | Mọi thứ Laravel mã hóa đều không đáng tin |
+| `APP_TIMEZONE` | `Asia/Ho_Chi_Minh` | Doanh thu bán từ 0h–7h sáng bị tính sang ngày hôm trước |
+
+Máy chủ ở gói miễn phí của Render **ngủ sau một thời gian không dùng**; lượt gọi đầu tiên
+sau đó mất vài chục giây. Trước buổi trình bày nên mở trước một lượt cho nó dậy.
 
 ---
 

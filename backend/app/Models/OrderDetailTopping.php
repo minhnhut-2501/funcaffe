@@ -12,8 +12,8 @@ class OrderDetailTopping extends Model
 
     protected $casts = [
         'quantity' => 'integer',
-        'price_at_time' => 'float',
-        'subtotal' => 'float',
+        'price_at_time' => 'integer',
+        'subtotal' => 'integer',
     ];
 
     public function orderDetail()

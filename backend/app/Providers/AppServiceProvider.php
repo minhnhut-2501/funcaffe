@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\PersonalAccessToken;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -21,6 +22,42 @@ class AppServiceProvider extends ServiceProvider
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         $this->dinhNghiaGioiHanTanSuat();
+        $this->canhBaoCauHinhTrienKhai();
+    }
+
+    /**
+     * Kêu to khi bản đã triển khai đang chạy với cấu hình chỉ hợp cho máy phát triển.
+     *
+     * Ba thứ dưới đây đều KHÔNG làm hỏng gì ngay — ứng dụng chạy bình thường, không
+     * báo lỗi nào — nên rất dễ lên mạng rồi vẫn còn nguyên. Mỗi cái là một cửa mở:
+     *
+     *  · `APP_DEBUG=true` in ra đường dẫn tệp, đoạn mã và **toàn bộ biến môi trường**
+     *    trên trang lỗi. Một lỗi 500 bất kỳ là lộ khóa cổng thanh toán và chuỗi kết
+     *    nối CSDL cho bất kỳ ai gây ra được lỗi đó.
+     *  · CORS `*` cho phép **mọi trang web** gọi API này bằng token của người dùng
+     *    đang đăng nhập.
+     *  · `APP_KEY` rỗng thì mọi thứ Laravel mã hóa đều không đáng tin.
+     *
+     * Chỉ ghi log, không chặn khởi động: dựng được nhưng không vào được thì còn tệ
+     * hơn, nhất là trong buổi bảo vệ.
+     */
+    private function canhBaoCauHinhTrienKhai(): void
+    {
+        if (!app()->isProduction()) {
+            return;
+        }
+
+        if (config('app.debug')) {
+            Log::warning('[TRIỂN KHAI] APP_DEBUG đang BẬT trên production — trang lỗi sẽ lộ biến môi trường (khóa cổng thanh toán, chuỗi kết nối CSDL). Đặt APP_DEBUG=false.');
+        }
+
+        if (in_array('*', (array) config('cors.allowed_origins'), true)) {
+            Log::warning('[TRIỂN KHAI] CORS đang mở cho MỌI tên miền — đặt CORS_ALLOWED_ORIGINS = địa chỉ frontend thật.');
+        }
+
+        if (empty(config('app.key'))) {
+            Log::warning('[TRIỂN KHAI] APP_KEY đang rỗng — chạy `php artisan key:generate`.');
+        }
     }
 
     /**
