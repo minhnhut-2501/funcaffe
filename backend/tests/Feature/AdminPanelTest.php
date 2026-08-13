@@ -247,6 +247,59 @@ class AdminPanelTest extends MongoTestCase
         $this->assertCount(1, $this->getJson('/api/admin/packages')->json());
     }
 
+    /**
+     * `features` lưu dạng CHUỖI JSON (dữ liệu cũ) vẫn phải trả ra MẢNG.
+     *
+     * Chuyện đã xảy ra thật trên bản triển khai: CSDL được gieo lúc model còn ép kiểu
+     * `features => 'array'` — cast đó `json_encode` trước khi ghi nên trường này nằm
+     * trong Mongo dưới dạng chuỗi. Bỏ cast đi (đúng cho dữ liệu mới) thì máy chủ trả
+     * nguyên chuỗi ra API, `features.map(...)` ở giao diện ném lỗi, và trang Bảng giá
+     * CÔNG KHAI trắng trơn. Máy phát triển không thấy gì vì CSDL ở đó đã đúng dạng.
+     *
+     * Bài học được ghim ở đây: đổi cách lưu một trường thì phải đọc được cả dạng cũ,
+     * không được phụ thuộc vào việc ai đó nhớ chạy lệnh dọn dữ liệu.
+     */
+    public function test_features_luu_dang_chuoi_json_van_tra_ra_mang(): void
+    {
+        // Ghi THẲNG vào Mongo, không qua model — đúng như dữ liệu cũ đang nằm đó.
+        \Illuminate\Support\Facades\DB::connection('mongodb')
+            ->getDatabase()
+            ->selectCollection('packages')
+            ->updateOne(
+                ['_id' => new \MongoDB\BSON\ObjectId((string) $this->goi->id)],
+                ['$set' => ['features' => json_encode(['Tính năng A', 'Tính năng B'], JSON_UNESCAPED_UNICODE)]],
+            );
+
+        $congKhai = $this->getJson('/api/packages')->assertStatus(200)->json();
+
+        $this->assertIsArray($congKhai[0]['features'], 'features trả ra chuỗi — trang Bảng giá sẽ trắng.');
+        $this->assertSame(['Tính năng A', 'Tính năng B'], $congKhai[0]['features']);
+
+        $this->laAdmin();
+        $cuaAdmin = $this->getJson('/api/admin/packages')->assertStatus(200)->json();
+        $this->assertIsArray($cuaAdmin[0]['features'], 'Màn hình quản trị gói cũng phải đọc được dạng cũ.');
+    }
+
+    /** Lệnh dọn đưa dữ liệu về đúng chuẩn mảng BSON. */
+    public function test_lenh_don_dua_features_ve_mang(): void
+    {
+        \Illuminate\Support\Facades\DB::connection('mongodb')
+            ->getDatabase()
+            ->selectCollection('packages')
+            ->updateOne(
+                ['_id' => new \MongoDB\BSON\ObjectId((string) $this->goi->id)],
+                ['$set' => ['features' => json_encode(['Một', 'Hai'], JSON_UNESCAPED_UNICODE)]],
+            );
+
+        $this->artisan('db:fix-package-features --apply')->assertSuccessful();
+
+        $tho = \Illuminate\Support\Facades\DB::connection('mongodb')
+            ->getDatabase()->selectCollection('packages')
+            ->findOne(['_id' => new \MongoDB\BSON\ObjectId((string) $this->goi->id)]);
+
+        $this->assertFalse(is_string($tho['features']), 'Vẫn còn là chuỗi sau khi chạy lệnh dọn.');
+    }
+
     // ===== 7.4 Đối soát thanh toán =============================================
 
     /**

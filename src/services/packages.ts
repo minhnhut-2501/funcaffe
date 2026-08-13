@@ -2,6 +2,32 @@
 import type { Package, TimeSubscription } from '@/types';
 import { api } from '@/lib/api-client';
 
+/**
+ * Danh sách tính năng — LUÔN trả về mảng chuỗi, dù máy chủ gửi gì.
+ *
+ * `raw.features ?? []` là chưa đủ: nếu máy chủ gửi một CHUỖI JSON (dữ liệu cũ được
+ * ghi lúc model còn ép kiểu 'array'), phép hợp nhất đó cho chuỗi đi qua nguyên vẹn,
+ * rồi `features.map(...)` ném lỗi và làm TRẮNG cả trang Bảng giá. Đã xảy ra thật trên
+ * bản triển khai.
+ *
+ * Một trang công khai không được sập chỉ vì một trường dữ liệu sai hình dạng. Máy chủ
+ * đã vá ở `Package::getFeaturesAttribute()`, nhưng giao diện tự đứng vững thì không
+ * phụ thuộc vào phiên bản máy chủ đang chạy.
+ */
+function danhSachTinhNang(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const daGiaiMa = JSON.parse(raw);
+      if (Array.isArray(daGiaiMa)) return daGiaiMa.map(String);
+    } catch {
+      // Không phải JSON — coi cả chuỗi là một mục, còn hơn mất trắng.
+    }
+    return [raw];
+  }
+  return [];
+}
+
 export function mapPackage(raw: any): Package {
   return {
     id: raw.id ?? raw._id,
@@ -11,7 +37,7 @@ export function mapPackage(raw: any): Package {
     isTrial: raw.is_trial ?? false,
     description: raw.description ?? '',
     isActive: raw.status === 'active',
-    features: raw.features ?? [],
+    features: danhSachTinhNang(raw.features),
     maxTables: raw.max_tables ?? null,
     maxMenuItems: raw.max_menu_items ?? null,
     canUseAI: raw.can_use_ai ?? false,
