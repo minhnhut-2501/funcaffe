@@ -67,7 +67,10 @@ function mapSubscription(subs: SubscriptionData[]): UserSubscription {
     daysLeft,
     isPendingReview: active.is_pending_review ?? false,
     creditAmount: latestCredit?.credit_amount,
-    creditStatus: latestCredit?.credit_status as UserSubscription['creditStatus'],
+    // Suy từ số tiền chứ không đọc cờ `credit_status`: máy chủ không còn ghi cờ đó,
+    // nên đọc thẳng thì lời nhắc "đã cấn trừ X đồng" không bao giờ hiện ra cho khách
+    // (xem `trangThaiCanTru` trong services/payments.ts).
+    creditStatus: (latestCredit?.credit_amount ?? 0) > 0 ? 'applied' : 'none',
     cafeId: (active as any).cafe_id ? String((active as any).cafe_id) : undefined,
     maxTables: !hasLimitFields ? fallback.maxTables : (pkg?.max_tables == null ? Infinity : pkg.max_tables),
     maxMenuItems: !hasLimitFields ? fallback.maxMenuItems : (pkg?.max_menu_items == null ? Infinity : pkg.max_menu_items),

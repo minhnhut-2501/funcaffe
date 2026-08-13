@@ -3,6 +3,7 @@ import type { MyPayment } from '@/types';
 import { api } from '@/lib/api-client';
 import { getCafeId } from './cafe-id';
 import { mapPackage } from './packages';
+import { trangThaiCanTru } from './payments';
 
 // Subscriptions — ĐA QUÁN: gói theo quán đang chọn (cafes/{cafeId}/subscriptions)
 export const subscriptionService = {
@@ -90,7 +91,9 @@ export const subscriptionService = {
       createdAt: raw.created_at,
       paidAt: raw.paid_at ?? undefined,
       creditAmount: raw.credit_amount ?? 0,
-      creditStatus: raw.credit_status ?? 'none',
+      // Suy từ số tiền, không đọc cờ `credit_status` (máy chủ không còn ghi cờ đó —
+      // xem chú thích ở `trangThaiCanTru` trong services/payments.ts).
+      creditStatus: trangThaiCanTru(raw),
     } as MyPayment));
   },
 };
