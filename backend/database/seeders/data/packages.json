@@ -5,7 +5,7 @@
     "type": "free",
     "level": 0,
     "is_trial": true,
-    "description": "Dùng thử toàn bộ tính năng Pro Max trong 7 ngày (1 lần/quán)",
+    "description": "Dùng thử toàn bộ tính năng Pro Max trong 7 ngày (1 lần/tài khoản)",
     "features": [
       "Trải nghiệm TOÀN BỘ tính năng Pro Max trong 7 ngày",
       "Không giới hạn bàn & thực đơn",
@@ -13,7 +13,7 @@
       "Quản lý size & topping",
       "Bán hàng theo bàn, order & hóa đơn",
       "Thống kê & biểu đồ doanh thu",
-      "Chỉ dùng thử 1 lần / quán"
+      "Chỉ dùng thử 1 lần / tài khoản"
     ],
     "max_tables": null,
     "max_menu_items": null,
