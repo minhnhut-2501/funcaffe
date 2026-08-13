@@ -87,16 +87,42 @@ export default function RevenuePage() {
   // tổng và số theo tháng nên không đủ để lọc theo ngày hay tính top món —
   // ở đây cần dữ liệu từng hóa đơn.
   const cafeKey = cafes.map(c => c.id).join(',');
-  const { data: invoices, loading, error } = useApi(
+  const { data: ketQua, loading, error, refresh } = useApi(
     async () => {
-      if (cafes.length === 0) return [] as Invoice[];
-      const perCafe = await Promise.all(cafes.map(c => invoiceService.listByCafe(c.id, c.name)));
-      return perCafe.flat();
+      if (cafes.length === 0) return { hoaDon: [] as Invoice[], quanHong: [] as string[] };
+
+      // allSettled chứ KHÔNG phải all. Với `Promise.all`, chỉ cần MỘT quán gọi hỏng
+      // là cả trang trắng — kể cả khi mọi quán còn lại đã tải xong xuôi. Chủ quán ba
+      // quán mất sạch số liệu vì một quán chậm, và màn hình không nói được là quán nào.
+      //
+      // Lượt gọi này nặng: nó kéo TOÀN BỘ hóa đơn của từng quán kèm chi tiết món, nên
+      // quán nhiều đơn trên đường truyền chậm là ứng viên hàng đầu chạm hạn chờ 15 giây
+      // của api-client. Đó đúng là lúc cần hiện phần đọc được, không phải lúc xóa sạch.
+      const ketQuaTungQuan = await Promise.allSettled(
+        cafes.map(c => invoiceService.listByCafe(c.id, c.name)),
+      );
+
+      const hoaDon: Invoice[] = [];
+      const quanHong: string[] = [];
+      ketQuaTungQuan.forEach((kq, i) => {
+        if (kq.status === 'fulfilled') hoaDon.push(...kq.value);
+        else quanHong.push(cafes[i].name);
+      });
+
+      // Hỏng HẾT thì mới là lỗi thật — ném ra để useApi hiện màn hình lỗi.
+      if (quanHong.length === cafes.length) {
+        throw ketQuaTungQuan[0].status === 'rejected'
+          ? ketQuaTungQuan[0].reason
+          : new Error('Không tải được hóa đơn của quán nào.');
+      }
+
+      return { hoaDon, quanHong };
     },
     [cafeKey],
   );
 
-  const all = useMemo(() => invoices ?? [], [invoices]);
+  const all = useMemo(() => ketQua?.hoaDon ?? [], [ketQua]);
+  const quanHong = ketQua?.quanHong ?? [];
   const scoped = useMemo(
     () => (effectiveScope === 'all' ? all : all.filter(i => i.cafeId === effectiveScope)),
     [all, effectiveScope],
@@ -211,9 +237,15 @@ export default function RevenuePage() {
     return (
       <div>
         <PageHeader title="Doanh thu" description="Thống kê doanh thu chi tiết" />
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-xl p-4">
-          <AlertCircle className="w-5 h-5" />
-          <span>Không thể tải dữ liệu doanh thu.</span>
+        <div className="flex items-start gap-2 text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            {/* Nói ra lý do máy chủ trả về, đừng nuốt. "Không thể tải dữ liệu" một mình
+                không cho người dùng biết nên đợi, nên thử lại, hay nên gọi ai. */}
+            <p className="font-semibold">Không tải được hóa đơn của quán nào.</p>
+            <p className="mt-0.5 text-red-600/90">{error}</p>
+            <button onClick={refresh} className="btn-secondary mt-3">Thử lại</button>
+          </div>
         </div>
       </div>
     );
@@ -230,6 +262,24 @@ export default function RevenuePage() {
           </button>
         }
       />
+
+      {/* Tải được một phần. Số dưới đây là THẬT nhưng THIẾU — nói rõ thiếu của quán
+          nào, thay vì để chủ quán đọc một con số nhỏ hơn thực tế mà không hay biết. */}
+      {quanHong.length > 0 && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">
+              Số liệu đang thiếu {quanHong.length === 1 ? 'quán' : `${quanHong.length} quán`}: {quanHong.join(' · ')}
+            </p>
+            <p className="mt-0.5">
+              Các quán còn lại đã tải xong và số bên dưới là của những quán đó.
+              Quán nhiều hóa đơn có thể tải quá lâu — thử lại thường là được.
+            </p>
+            <button onClick={refresh} className="btn-secondary mt-3">Tải lại</button>
+          </div>
+        </div>
+      )}
 
       <FilterBar>
         {cafes.length > 1 && (
