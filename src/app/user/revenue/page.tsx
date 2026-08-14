@@ -9,7 +9,7 @@ import { FilterBar } from '@/components/user/FilterBar';
 import DateRangePicker from '@/components/ui/DateRangePicker';
 import CafeRevenueComparison from '@/components/user/CafeRevenueComparison';
 import { useAuth } from '@/context/AuthContext';
-import { invoiceService } from '@/services';
+import { invoiceService, revenueService } from '@/services';
 import { useApi } from '@/hooks/use-api';
 import { formatCurrency, formatPaymentMethod, ngayDiaPhuong } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
@@ -63,7 +63,24 @@ function computeTopItems(invoices: Invoice[]): { name: string; count: number; re
 
 const today = new Date();
 // Mốc ngày theo giờ địa phương (tránh lệch ngày do UTC lúc gần nửa đêm)
-const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+const nhan = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const todayStr = nhan(today);
+
+/**
+ * Khoảng MẶC ĐỊNH khi mới mở trang: 30 ngày gần nhất.
+ *
+ * Trước đây mặc định là "toàn bộ thời gian", nghĩa là mỗi lần mở trang là tải về
+ * TOÀN BỘ lịch sử bán hàng kể từ ngày khai trương của từng quán, kèm dòng món và
+ * topping. Chi phí đó tăng đều theo tháng sử dụng: quán vượt nghìn đơn cần hơn
+ * 12 giây chỉ để máy chủ dựng xong phản hồi, và không có gì chặn nó lớn tiếp.
+ *
+ * Ba mươi ngày là khoảng người ta thật sự nhìn khi mở trang doanh thu, và tải
+ * nhanh hơn nhiều lần. Muốn xem xa hơn thì bộ chọn ngày vẫn còn nguyên — chỉ là
+ * phải chọn, thay vì bắt mọi lượt mở trang phải trả giá cho nó.
+ */
+const SO_NGAY_MAC_DINH = 30;
+const tuNgayMacDinh = nhan(new Date(today.getTime() - (SO_NGAY_MAC_DINH - 1) * 86_400_000));
 
 export default function RevenuePage() {
   const { cafes, activeCafeId } = useAuth();
@@ -74,8 +91,8 @@ export default function RevenuePage() {
   // nên activeCafeId còn null, mà giá trị khởi tạo của useState chỉ dùng đúng một lần.
   const [scope, setScope] = useState<string | null>(null);
   const effectiveScope = scope ?? activeCafeId ?? 'all';
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [fromDate, setFromDate] = useState(tuNgayMacDinh);
+  const [toDate, setToDate] = useState(todayStr);
   // Cùng mẫu ba trạng thái với `scope` ở trên: null = chưa tự chọn mốc -> bám theo
   // độ dài khoảng đang lọc. Chọn "12 tháng qua" mà biểu đồ vẫn vẽ 365 cột theo ngày
   // thì không đọc được gì; ngược lại chọn "7 ngày qua" mà gom theo tháng thì ra 1 cột.
@@ -83,43 +100,65 @@ export default function RevenuePage() {
   const effectiveMode = viewMode ?? suggestMode(fromDate, toDate);
   const [exporting, setExporting] = useState(false);
 
-  // Gộp hóa đơn của TẤT CẢ quán người dùng sở hữu. /revenue/overview chỉ trả về
-  // tổng và số theo tháng nên không đủ để lọc theo ngày hay tính top món —
-  // ở đây cần dữ liệu từng hóa đơn.
-  const cafeKey = cafes.map(c => c.id).join(',');
+  /**
+   * Chỉ tải quán ĐANG XEM. Chọn "Tất cả quán" mới đi lấy hết.
+   *
+   * Bản cũ luôn tải hóa đơn của MỌI quán rồi lọc trong trình duyệt, kể cả khi màn
+   * hình chỉ hiện đúng một quán — hai phần ba lượt gọi nặng nhất ứng dụng bị vứt đi
+   * ngay sau khi tải xong.
+   */
+  const canTai = useMemo(
+    () => (effectiveScope === 'all' ? cafes : cafes.filter(c => c.id === effectiveScope)),
+    [cafes, effectiveScope],
+  );
+  const taiKey = canTai.map(c => c.id).join(',');
+
   const { data: ketQua, loading, error, refresh } = useApi(
     async () => {
-      if (cafes.length === 0) return { hoaDon: [] as Invoice[], quanHong: [] as string[] };
-
-      // allSettled chứ KHÔNG phải all. Với `Promise.all`, chỉ cần MỘT quán gọi hỏng
-      // là cả trang trắng — kể cả khi mọi quán còn lại đã tải xong xuôi. Chủ quán ba
-      // quán mất sạch số liệu vì một quán chậm, và màn hình không nói được là quán nào.
-      //
-      // Lượt gọi này nặng: nó kéo TOÀN BỘ hóa đơn của từng quán kèm chi tiết món, nên
-      // quán nhiều đơn trên đường truyền chậm là ứng viên hàng đầu chạm hạn chờ 15 giây
-      // của api-client. Đó đúng là lúc cần hiện phần đọc được, không phải lúc xóa sạch.
-      const ketQuaTungQuan = await Promise.allSettled(
-        cafes.map(c => invoiceService.listByCafe(c.id, c.name)),
-      );
+      if (canTai.length === 0) return { hoaDon: [] as Invoice[], quanHong: [] as string[] };
 
       const hoaDon: Invoice[] = [];
       const quanHong: string[] = [];
-      ketQuaTungQuan.forEach((kq, i) => {
-        if (kq.status === 'fulfilled') hoaDon.push(...kq.value);
-        else quanHong.push(cafes[i].name);
-      });
+      let loiDau: unknown = null;
+
+      // TUẦN TỰ, không Promise.all/allSettled.
+      //
+      // Máy chủ ở bản triển khai phục vụ MỘT request tại một thời điểm, nên bắn song
+      // song không rút ngắn được gì — nó chỉ khiến cả ba quán cùng bấm giờ hạn chờ
+      // trong khi hai quán đang nằm xếp hàng. Quán được phục vụ sau cùng vì thế luôn
+      // hết giờ trước khi tới lượt, dù bản thân nó chỉ cần vài giây.
+      //
+      // Chạy lần lượt thì mỗi quán được trọn hạn chờ của riêng nó. Tổng thời gian chờ
+      // y hệt, nhưng dữ liệu về ĐỦ thay vì mất quán nặng nhất.
+      for (const c of canTai) {
+        try {
+          hoaDon.push(...await invoiceService.listByCafe(c.id, c.name, {
+            from: fromDate || undefined,
+            to: toDate || undefined,
+          }));
+        } catch (e) {
+          quanHong.push(c.name);
+          loiDau ??= e;
+        }
+      }
 
       // Hỏng HẾT thì mới là lỗi thật — ném ra để useApi hiện màn hình lỗi.
-      if (quanHong.length === cafes.length) {
-        throw ketQuaTungQuan[0].status === 'rejected'
-          ? ketQuaTungQuan[0].reason
-          : new Error('Không tải được hóa đơn của quán nào.');
+      if (quanHong.length === canTai.length) {
+        throw loiDau instanceof Error ? loiDau : new Error('Không tải được hóa đơn của quán nào.');
       }
 
       return { hoaDon, quanHong };
     },
-    [cafeKey],
+    [taiKey, fromDate, toDate],
   );
+
+  /**
+   * "Doanh thu hôm nay" KHÔNG lấy từ danh sách hóa đơn ở trên: danh sách đó bị giới
+   * hạn theo khoảng đang lọc, nên chọn một khoảng không chứa hôm nay là ô này về 0 —
+   * sai, chứ không phải "chưa bán được gì". Máy chủ cộng sẵn số này trong
+   * /revenue/overview, cho từng quán, và không phụ thuộc bộ lọc.
+   */
+  const { data: tongQuan } = useApi(() => revenueService.overview(), []);
 
   const all = useMemo(() => ketQua?.hoaDon ?? [], [ketQua]);
   const quanHong = ketQua?.quanHong ?? [];
@@ -136,10 +175,11 @@ export default function RevenuePage() {
 
   const revenue = useMemo(() => filtered.reduce((s, i) => s + i.totalAmount, 0), [filtered]);
   const avgPerInvoice = filtered.length > 0 ? Math.round(revenue / filtered.length) : 0;
-  const todayRevenue = useMemo(
-    () => scoped.filter(i => dayOf(i) === todayStr).reduce((s, i) => s + i.totalAmount, 0),
-    [scoped],
-  );
+  const todayRevenue = useMemo(() => {
+    if (!tongQuan) return 0;
+    if (effectiveScope === 'all') return tongQuan.today;
+    return tongQuan.cafes.find(c => c.cafeId === effectiveScope)?.today ?? 0;
+  }, [tongQuan, effectiveScope]);
   const chartData = useMemo(
     () => groupBy(filtered, effectiveMode, fromDate, toDate),
     [filtered, effectiveMode, fromDate, toDate],
@@ -176,8 +216,11 @@ export default function RevenuePage() {
       // Cột "Quán" chỉ có nghĩa khi file gộp nhiều quán; đang xem riêng một quán mà
       // vẫn xuất thì cả cột lặp lại đúng một cái tên.
       const multi = effectiveScope === 'all' && cafes.length > 1;
+      // Tên tệp mang theo ĐÚNG khoảng đã xuất. Trang mặc định xem 30 ngày gần nhất
+      // chứ không phải toàn bộ thời gian, nên một cái tên chỉ có ngày xuất sẽ khiến
+      // người nhận tưởng đây là số liệu từ đầu tới giờ.
       await downloadExcel(
-        `doanh-thu-${todayStr}.xlsx`,
+        `doanh-thu-${fromDate || 'dau-ky'}_den_${toDate || todayStr}.xlsx`,
         'Doanh thu',
         [
           ...(multi ? [{ header: 'Quán', width: 22 }] : []),
@@ -295,7 +338,15 @@ export default function RevenuePage() {
         )}
         <DateRangePicker from={fromDate} to={toDate} onChange={(f, t) => { setFromDate(f); setToDate(t); }} />
         <ChartModePicker value={effectiveMode} onChange={setViewMode} from={fromDate} to={toDate} />
-        <button onClick={() => { setScope(null); setFromDate(''); setToDate(''); setViewMode(null); }} className="btn-secondary">Xóa lọc</button>
+        {/* Về MẶC ĐỊNH (30 ngày gần nhất), không về "toàn bộ thời gian": nút này hay
+            được bấm theo phản xạ, và đưa về toàn bộ thời gian là ném người dùng
+            thẳng vào lượt tải nặng nhất mà họ không hề chọn. */}
+        <button
+          onClick={() => { setScope(null); setFromDate(tuNgayMacDinh); setToDate(todayStr); setViewMode(null); }}
+          className="btn-secondary"
+        >
+          Xóa lọc
+        </button>
       </FilterBar>
 
       <p className="text-sm text-cafe-500 mb-4">

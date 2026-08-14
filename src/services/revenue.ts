@@ -11,12 +11,16 @@ export interface CafeRevenueRow {
   total: number;
   today: number;
   month: number;
+  /** SỐ hóa đơn đã thanh toán của quán (toàn bộ thời gian). */
+  count: number;
 }
 
 export interface RevenueOverview {
   total: number;
   today: number;
   thisMonth: number;
+  /** Tổng số hóa đơn gộp mọi quán. */
+  count: number;
   revenueByMonth: { month: string; revenue: number }[];
   cafes: CafeRevenueRow[];
 }
@@ -28,6 +32,7 @@ export const revenueService = {
       total: raw.total ?? 0,
       today: raw.today ?? 0,
       thisMonth: raw.this_month ?? 0,
+      count: raw.count ?? 0,
       revenueByMonth: Object.entries(raw.revenue_by_month ?? {}).map(([month, revenue]) => ({
         month, revenue: Number(revenue) || 0,
       })),
@@ -40,6 +45,7 @@ export const revenueService = {
         total: c.total ?? 0,
         today: c.today ?? 0,
         month: c.month ?? 0,
+        count: c.count ?? 0,
       })),
     };
   },

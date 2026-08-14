@@ -32,6 +32,7 @@ class UserRevenueController extends Controller
                 'total' => 0,
                 'today' => 0,
                 'this_month' => 0,
+                'count' => 0,
                 'revenue_by_month' => [],
                 'cafes' => [],
             ]);
@@ -60,14 +61,15 @@ class UserRevenueController extends Controller
         $thisMonthStr = Carbon::now()->format('Y-m');
 
         $byMonth = [];                 // gộp mọi quán, key 'Y-m'
-        $perCafe = [];                 // key cafe_id => ['total','today','month']
+        $perCafe = [];                 // key cafe_id => ['total','today','month','count']
         foreach ($cafeIds as $cid) {
-            $perCafe[$cid] = ['total' => 0, 'today' => 0, 'month' => 0];
+            $perCafe[$cid] = ['total' => 0, 'today' => 0, 'month' => 0, 'count' => 0];
         }
 
         $grandTotal = 0;
         $grandToday = 0;
         $grandMonth = 0;
+        $grandCount = 0;
 
         foreach ($invoices as $inv) {
             $cid = (string) $inv->cafe_id;
@@ -75,8 +77,14 @@ class UserRevenueController extends Controller
             $date = $this->toCarbon($inv->paid_at ?? $inv->created_at);
 
             $grandTotal += $amount;
+            $grandCount += 1;
             if (isset($perCafe[$cid])) {
                 $perCafe[$cid]['total'] += $amount;
+                // SỐ hóa đơn, không chỉ số tiền. Trang Quản lý quán hiện "N hóa đơn"
+                // cạnh mỗi quán; thiếu số này thì trang buộc phải tự tải về toàn bộ
+                // hóa đơn chỉ để đếm — đúng lượt gọi nặng mà endpoint này sinh ra để
+                // thay thế.
+                $perCafe[$cid]['count'] += 1;
             }
 
             if ($date) {
@@ -103,7 +111,7 @@ class UserRevenueController extends Controller
         $cafeRows = $cafes->map(function ($cafe) use ($perCafe, $activeSubs) {
             $cid = (string) $cafe->id;
             $sub = $activeSubs->get($cid);
-            $stat = $perCafe[$cid] ?? ['total' => 0, 'today' => 0, 'month' => 0];
+            $stat = $perCafe[$cid] ?? ['total' => 0, 'today' => 0, 'month' => 0, 'count' => 0];
 
             return [
                 'cafe_id' => $cid,
@@ -114,6 +122,7 @@ class UserRevenueController extends Controller
                 'total' => $stat['total'],
                 'today' => $stat['today'],
                 'month' => $stat['month'],
+                'count' => $stat['count'],
             ];
         })->values();
 
@@ -121,6 +130,7 @@ class UserRevenueController extends Controller
             'total' => $grandTotal,
             'today' => $grandToday,
             'this_month' => $grandMonth,
+            'count' => $grandCount,
             'revenue_by_month' => array_slice($byMonth, -12, 12, true),
             'cafes' => $cafeRows,
         ]);

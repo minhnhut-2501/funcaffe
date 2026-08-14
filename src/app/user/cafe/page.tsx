@@ -6,7 +6,7 @@ import MediaUploader from '@/components/ui/MediaUploader';
 import { useAuth } from '@/context/AuthContext';
 import { cafeService, createCafe, invoiceService, revenueService, type RevenueOverview } from '@/services';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, ngayDiaPhuong } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
 import type { CafeInfo, Invoice } from '@/types';
 import { VN_BANKS } from '@/lib/banks';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
@@ -15,7 +15,7 @@ import CafeRevenueComparison from '@/components/user/CafeRevenueComparison';
 import SectionCard from '@/components/user/SectionCard';
 import {
   MapPin, Store, Pencil, Landmark, RotateCcw, Receipt, BarChart3,
-  Plus, Check, ArrowLeft, DollarSign, CalendarDays, TrendingUp,
+  Plus, Check, ArrowLeft, DollarSign, CalendarDays, TrendingUp, AlertCircle,
 } from 'lucide-react';
 
 const STATUS_META: Record<string, { label: string; cls: string; dot: string }> = {
@@ -36,12 +36,6 @@ const TRANG_THAI_GIAI_THICH: Record<string, string> = {
 
 const emptyForm: CafeInfo = { id: '', name: '', address: '', phone: '', description: '', status: 'open' };
 
-/** Ngày thanh toán 'YYYY-MM-DD'; hóa đơn cũ thiếu paid_at thì lấy ngày tạo. */
-const dayOf = (i: Invoice) => ngayDiaPhuong(i.paidAt || i.createdAt);
-const now = new Date();
-const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-const thisMonthStr = todayStr.slice(0, 7);
-
 type Mode = 'list' | 'edit';
 
 export default function CafePage() {
@@ -53,15 +47,27 @@ export default function CafePage() {
   const [form, setForm] = useState<CafeInfo>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [overview, setOverview] = useState<RevenueOverview | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [quanHong, setQuanHong] = useState<string[]>([]);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  // KHÔNG nuốt lỗi. Trước đây `.catch(() => setOverview(null))` làm MỌI quán hiện
+  // "Chưa có gói · Mua ngay" kể cả quán đang dùng Pro Max, và mọi con số tiền về 0 —
+  // trông y hệt một quán chưa bán được gì, không có chỗ nào nói là đã hỏng.
   const loadOverview = useCallback(() => {
-    revenueService.overview().then(setOverview).catch(() => setOverview(null));
+    setOverviewError(null);
+    revenueService.overview()
+      .then((d) => { setOverview(d); setOverviewError(null); })
+      .catch((e) => {
+        setOverview(null);
+        setOverviewError(e instanceof Error ? e.message : 'Không tải được số liệu doanh thu.');
+      });
   }, []);
 
   useEffect(() => {
@@ -77,68 +83,110 @@ export default function CafePage() {
     setLoading(false);
   }, [cafes.length, loadOverview]);
 
-  // Thông tin GÓI của từng quán lấy từ /revenue/overview (endpoint này không lọc
-  // được theo ngày nên phần tiền bên dưới tính từ hóa đơn).
+  // /revenue/overview trả về cho TỪNG quán: tên gói, tổng tiền, hôm nay, tháng này
+  // và số hóa đơn. Cả phần gói lẫn phần tiền của trang này đều lấy từ đây.
+  const pkgList = useMemo(() => overview?.cafes ?? [], [overview]);
   const pkgByCafe = useMemo(() => {
     const m: Record<string, RevenueOverview['cafes'][number]> = {};
-    (overview?.cafes ?? []).forEach((c) => { m[c.cafeId] = c; });
+    pkgList.forEach((c) => { m[c.cafeId] = c; });
     return m;
-  }, [overview]);
-
-  // Hóa đơn của mọi quán -> cho phép lọc doanh thu theo khoảng ngày, thứ mà
-  // /revenue/overview không làm được (nó chỉ trả tổng, hôm nay và tháng này).
-  const cafeKey = cafes.map(c => c.id).join(',');
-  useEffect(() => {
-    if (cafes.length === 0) { setInvoices([]); return; }
-    let cancelled = false;
-    Promise.all(cafes.map(c => invoiceService.listByCafe(c.id, c.name)))
-      .then(res => { if (!cancelled) setInvoices(res.flat()); })
-      .catch(() => { if (!cancelled) setInvoices([]); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cafeKey]);
+  }, [pkgList]);
 
   const hasRange = !!(fromDate || toDate);
-  const ranged = useMemo(() => {
-    let r = invoices;
-    if (fromDate) r = r.filter(i => dayOf(i) >= fromDate);
-    if (toDate) r = r.filter(i => dayOf(i) <= toDate);
-    return r;
-  }, [invoices, fromDate, toDate]);
 
-  // Doanh thu từng quán trong khoảng đang lọc — dùng cho bảng so sánh.
-  const statByCafe = useMemo(() => {
-    const m: Record<string, { total: number; count: number }> = {};
-    cafes.forEach(c => { m[c.id] = { total: 0, count: 0 }; });
+  /**
+   * Hóa đơn CHỈ tải khi người dùng thực sự chọn một khoảng ngày.
+   *
+   * Đường đi mặc định — cái mở ra 95% số lần — không cần đến chúng: /revenue/overview
+   * đã trả sẵn tổng tiền, hôm nay, tháng này VÀ số hóa đơn cho từng quán, tất cả
+   * trong một request duy nhất chỉ đọc bốn trường. Trước đây trang này gọi nó rồi
+   * chỉ lấy mỗi tên gói, xong đi tải lại toàn bộ hóa đơn của MỌI quán kèm dòng món
+   * và topping để cộng ra đúng những con số đó — vài megabyte để thay cho vài chục
+   * kilobyte, trên một máy chủ phục vụ một request tại một thời điểm.
+   *
+   * Hai điểm nữa của lượt gọi này, khác hẳn bản cũ:
+   *
+   *  · TUẦN TỰ, không `Promise.all`. Máy chủ ở bản triển khai chỉ chạy được một
+   *    request một lúc, nên bắn song song không nhanh hơn được chút nào — chỉ khiến
+   *    cả ba cùng bấm giờ trong khi hai cái phải nằm chờ. Chạy lần lượt thì mỗi quán
+   *    được trọn hạn chờ của riêng nó.
+   *  · Hỏng quán nào chỉ mất quán đó. `Promise.all` cũ reject ngay khi MỘT quán hỏng
+   *    và nhánh catch xoá sạch mảng, nên chỉ cần quán nặng nhất quá hạn là cả trang
+   *    hiện 0 ₫ — kể cả khi những quán khác đã tải xong và có doanh thu thật.
+   */
+  const cafeKey = cafes.map(c => c.id).join(',');
+  useEffect(() => {
+    if (!hasRange || cafes.length === 0) {
+      setInvoices([]);
+      setQuanHong([]);
+      setRangeLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRangeLoading(true);
+    (async () => {
+      const gom: Invoice[] = [];
+      const hong: string[] = [];
+      for (const c of cafes) {
+        if (cancelled) return;
+        try {
+          // Lọc NGAY TRÊN MÁY CHỦ: kéo cả đời rồi cắt trong trình duyệt là trả tiền
+          // băng thông cho phần dữ liệu chắc chắn bị vứt đi.
+          gom.push(...await invoiceService.listByCafe(c.id, c.name, {
+            from: fromDate || undefined,
+            to: toDate || undefined,
+          }));
+        } catch {
+          hong.push(c.name);
+        }
+      }
+      if (cancelled) return;
+      setInvoices(gom);
+      setQuanHong(hong);
+      setRangeLoading(false);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cafeKey, fromDate, toDate, hasRange]);
+
+  // Máy chủ đã lọc theo khoảng rồi nên không cắt lại ở đây nữa.
+  const ranged = invoices;
+
+  // Chưa lọc -> lấy thẳng số máy chủ đã cộng sẵn. Có lọc -> cộng từ hóa đơn vừa tải.
+  const rangeRevenue = useMemo(
+    () => (hasRange ? ranged.reduce((s, i) => s + i.totalAmount, 0) : overview?.total ?? 0),
+    [hasRange, ranged, overview],
+  );
+  const rangeCount = hasRange ? ranged.length : overview?.count ?? 0;
+  const todayRevenue = overview?.today ?? 0;
+  const monthRevenue = overview?.thisMonth ?? 0;
+  const avgPerInvoice = rangeCount > 0 ? Math.round(rangeRevenue / rangeCount) : 0;
+
+  const comparisonRows = useMemo(() => {
+    if (!hasRange) {
+      const m = new Map(pkgList.map(c => [c.cafeId, c]));
+      return cafes.map(c => ({
+        id: c.id,
+        name: c.name,
+        revenue: m.get(c.id)?.total ?? 0,
+        count: m.get(c.id)?.count ?? 0,
+      }));
+    }
+    const stat: Record<string, { total: number; count: number }> = {};
+    cafes.forEach(c => { stat[c.id] = { total: 0, count: 0 }; });
     ranged.forEach(i => {
-      const e = m[i.cafeId ?? ''];
+      const e = stat[i.cafeId ?? ''];
       if (!e) return;
       e.total += i.totalAmount;
       e.count += 1;
     });
-    return m;
-  }, [cafes, ranged]);
-
-  const rangeRevenue = useMemo(() => ranged.reduce((s, i) => s + i.totalAmount, 0), [ranged]);
-  const todayRevenue = useMemo(
-    () => invoices.filter(i => dayOf(i) === todayStr).reduce((s, i) => s + i.totalAmount, 0),
-    [invoices],
-  );
-  const monthRevenue = useMemo(
-    () => invoices.filter(i => dayOf(i).startsWith(thisMonthStr)).reduce((s, i) => s + i.totalAmount, 0),
-    [invoices],
-  );
-  const avgPerInvoice = ranged.length > 0 ? Math.round(rangeRevenue / ranged.length) : 0;
-
-  const comparisonRows = useMemo(
-    () => cafes.map(c => ({
+    return cafes.map(c => ({
       id: c.id,
       name: c.name,
-      revenue: statByCafe[c.id]?.total ?? 0,
-      count: statByCafe[c.id]?.count ?? 0,
-    })),
-    [cafes, statByCafe],
-  );
+      revenue: stat[c.id]?.total ?? 0,
+      count: stat[c.id]?.count ?? 0,
+    }));
+  }, [cafes, hasRange, pkgList, ranged]);
 
   const rangeLabel = hasRange
     ? `${fromDate ? fromDate.split('-').reverse().join('/') : 'đầu kỳ'} → ${toDate ? toDate.split('-').reverse().join('/') : 'nay'}`
@@ -337,9 +385,37 @@ export default function CafePage() {
           </button>
         )}
         <span className="text-sm text-cafe-500">
-          Đang xem <span className="font-semibold text-ink">{rangeLabel}</span> · {ranged.length} hóa đơn
+          Đang xem <span className="font-semibold text-ink">{rangeLabel}</span> ·{' '}
+          {rangeLoading ? 'đang tải…' : `${rangeCount} hóa đơn`}
         </span>
       </FilterBar>
+
+      {/* Hỏng thì NÓI RA. Số 0 im lặng trông giống hệt một quán chưa bán được gì. */}
+      {overviewError && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Không tải được số liệu doanh thu.</p>
+            <p className="mt-0.5 text-red-600/90">{overviewError}</p>
+            <button onClick={loadOverview} className="btn-secondary mt-3">Thử lại</button>
+          </div>
+        </div>
+      )}
+
+      {/* Tải được một phần: số bên dưới là THẬT nhưng THIẾU quán nào thì nói rõ quán đó. */}
+      {quanHong.length > 0 && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">
+              Số liệu trong khoảng đang thiếu {quanHong.length === 1 ? 'quán' : `${quanHong.length} quán`}: {quanHong.join(' · ')}
+            </p>
+            <p className="mt-0.5">
+              Các quán còn lại đã tải xong. Thu hẹp khoảng ngày sẽ tải nhanh hơn hẳn.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Băng tổng doanh thu gộp mọi quán */}
       <section className="rounded-2xl border border-line bg-white shadow-card overflow-hidden mb-6">
@@ -360,7 +436,7 @@ export default function CafePage() {
           <dl className="stagger flex-1 grid grid-cols-3 divide-x divide-line">
             {hasRange ? (
               <>
-                <SummaryStat icon={Receipt} label="Số hóa đơn" value={String(ranged.length)} />
+                <SummaryStat icon={Receipt} label="Số hóa đơn" value={String(rangeCount)} />
                 <SummaryStat icon={TrendingUp} label="TB/hóa đơn" value={formatCurrency(avgPerInvoice)} />
                 <SummaryStat icon={Store} label="Số quán" value={String(cafes.length)} />
               </>

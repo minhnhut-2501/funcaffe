@@ -12,6 +12,20 @@ if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_API_URL) {
 const REQUEST_TIMEOUT_MS = 15_000;
 /** Tải ảnh đi qua Cloudinary nên chậm hơn hẳn, cho thêm thời gian. */
 const UPLOAD_TIMEOUT_MS = 60_000;
+/**
+ * Hạn chờ cho lượt lấy DANH SÁCH DÀI (hóa đơn của cả một quán).
+ *
+ * 15 giây là mức hợp lý cho một request thường, nhưng sai cho lượt gọi này: quán
+ * bán được hơn nghìn đơn cần hơn 12 giây chỉ để máy chủ dựng xong phản hồi, và
+ * máy chủ ở bản triển khai phục vụ MỘT request tại một thời điểm nên lượt sau còn
+ * phải chờ lượt trước xong. Cắt ở 15 giây là vứt đi phản hồi mà máy chủ sắp trả
+ * tới nơi, rồi hiện "không tải được" trên một trang mà dữ liệu vẫn còn nguyên vẹn.
+ *
+ * Hủy phía trình duyệt KHÔNG dừng được việc phía máy chủ: nó vẫn cày nốt để trả
+ * một phản hồi không ai đọc. Nên cắt sớm còn làm chậm chính lượt bấm "Thử lại"
+ * ngay sau đó.
+ */
+const LIST_TIMEOUT_MS = 45_000;
 
 /** `status = 0` nghĩa là request KHÔNG tới được máy chủ (mất mạng, sai địa chỉ, CORS). */
 export const NETWORK_ERROR_STATUS = 0;
@@ -197,6 +211,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const api = {
   get: <T>(endpoint: string) => request<T>(endpoint),
+  /**
+   * GET cho danh sách dài — dùng hạn chờ rộng hơn (xem LIST_TIMEOUT_MS).
+   * Chỉ dùng cho lượt gọi thật sự nặng; mọi chỗ khác cứ `api.get` để hỏng nhanh.
+   */
+  getList: <T>(endpoint: string) =>
+    request<T>(endpoint, { signal: AbortSignal.timeout(LIST_TIMEOUT_MS) }),
   post: <T>(endpoint: string, data?: unknown) =>
     request<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
   put: <T>(endpoint: string, data?: unknown) =>

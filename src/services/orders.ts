@@ -192,7 +192,10 @@ export const invoiceService = {
    * trả về tổng và số theo tháng nên không đủ để lọc theo ngày hay tính top món.
    */
   listByCafe: async (cafeId: string, cafeName?: string, query: Omit<OrderQuery, 'status'> = {}) => {
-    const orders = await api.get<RawOrder[]>(`/cafes/${cafeId}/orders${orderQueryString({ ...query, status: 'paid' })}`);
+    // getList chứ không phải get: đây là lượt gọi NẶNG NHẤT của cả ứng dụng (toàn bộ
+    // hóa đơn của một quán kèm dòng món và topping) và là lượt duy nhất từng chạm
+    // hạn chờ mặc định. Xem LIST_TIMEOUT_MS trong api-client.
+    const orders = await api.getList<RawOrder[]>(`/cafes/${cafeId}/orders${orderQueryString({ ...query, status: 'paid' })}`);
     return orders
       .map(mapInvoice)
       .map((inv) => ({ ...inv, cafeId, cafeName }));
