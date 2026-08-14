@@ -28,6 +28,21 @@ function danhSachTinhNang(raw: unknown): string[] {
   return [];
 }
 
+/**
+ * Dọn các dòng tính năng trước khi gửi đi: bỏ khoảng thừa, bỏ dòng trống.
+ *
+ * Ô nhập là một khung nhiều dòng, nên dòng trống là chuyện đương nhiên xảy ra —
+ * gõ Enter thừa một cái, hay dán từ chỗ khác sang. Gửi nguyên như vậy thì trang
+ * Bảng giá công khai mọc ra những gạch đầu dòng RỖNG, thứ trông như lỗi hiển thị
+ * chứ không ai đoán được là do người nhập.
+ *
+ * Dọn ở tầng service chứ không ở màn hình: đây là ràng buộc của dữ liệu, đúng cho
+ * mọi nơi gọi tới, kể cả nơi viết sau này.
+ */
+export function donDongTinhNang(dong: readonly string[]): string[] {
+  return dong.map((d) => d.trim()).filter(Boolean);
+}
+
 export function mapPackage(raw: any): Package {
   return {
     id: raw.id ?? raw._id,
@@ -70,7 +85,7 @@ export const packageService = {
     if (data.name !== undefined) body.name = data.name;
     if (data.isActive !== undefined) body.status = data.isActive ? 'active' : 'inactive';
     if (data.description !== undefined) body.description = data.description;
-    if (data.features !== undefined) body.features = data.features;
+    if (data.features !== undefined) body.features = donDongTinhNang(data.features);
     if (data.maxTables !== undefined) body.max_tables = data.maxTables;
     if (data.maxMenuItems !== undefined) body.max_menu_items = data.maxMenuItems;
     if (data.canUseAI !== undefined) body.can_use_ai = data.canUseAI;

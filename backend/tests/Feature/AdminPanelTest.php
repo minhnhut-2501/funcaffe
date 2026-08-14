@@ -280,6 +280,47 @@ class AdminPanelTest extends MongoTestCase
         $this->assertIsArray($cuaAdmin[0]['features'], 'Màn hình quản trị gói cũng phải đọc được dạng cũ.');
     }
 
+    /**
+     * Quản trị viên sửa được TOÀN BỘ nội dung khách nhìn thấy trên trang bảng giá.
+     *
+     * Trước đây các dòng tính năng chỉ đổi được bằng cách sửa mã rồi triển khai lại,
+     * nên chúng lệch với hạn mức thật lúc nào không hay: có thời điểm bản trên mạng
+     * quảng cáo "Tối đa 10 bàn" trong khi hệ thống đã cho 20. Quảng cáo sai hạn mức là
+     * lời hứa hệ thống không giữ, và người phát hiện ra thường là khách chứ không phải
+     * người viết mã.
+     */
+    public function test_quan_tri_sua_duoc_moi_thu_hien_o_trang_bang_gia(): void
+    {
+        $this->laAdmin();
+
+        $this->putJson("/api/admin/packages/{$this->goi->id}", [
+            'name' => 'Pro',
+            'description' => 'Đủ dùng cho vận hành hằng ngày (tối đa 25 bàn, 50 món)',
+            'features' => ['Quản lý thông tin quán', 'Tối đa 25 bàn', 'Thực đơn tối đa 50 món'],
+            'max_tables' => 25,
+            'max_menu_items' => 50,
+        ])->assertStatus(200);
+
+        // Đọc qua đường CÔNG KHAI — đó mới là thứ khách thấy.
+        $congKhai = collect($this->getJson('/api/packages')->assertStatus(200)->json())
+            ->firstWhere('name', 'Pro');
+
+        $this->assertIsArray($congKhai['features'], 'features phải ra mảng, nếu không trang bảng giá trắng.');
+        $this->assertSame(
+            ['Quản lý thông tin quán', 'Tối đa 25 bàn', 'Thực đơn tối đa 50 món'],
+            $congKhai['features'],
+        );
+        $this->assertSame(25, (int) $congKhai['max_tables']);
+        $this->assertSame(50, (int) $congKhai['max_menu_items']);
+        $this->assertStringContainsString('25 bàn', $congKhai['description']);
+
+        // Và hạn mức mới có hiệu lực THẬT, không chỉ hiện trên bảng giá.
+        $tho = \Illuminate\Support\Facades\DB::connection('mongodb')->getDatabase()
+            ->selectCollection('packages')
+            ->findOne(['_id' => new \MongoDB\BSON\ObjectId((string) $this->goi->id)]);
+        $this->assertFalse(is_string($tho['features']), 'features phải lưu dạng mảng BSON, không phải chuỗi JSON.');
+    }
+
     /** Lệnh dọn đưa dữ liệu về đúng chuẩn mảng BSON. */
     public function test_lenh_don_dua_features_ve_mang(): void
     {

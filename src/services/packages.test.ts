@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapPackage } from './packages';
+import { mapPackage, donDongTinhNang } from './packages';
 
 /**
  * Một trang CÔNG KHAI không được sập chỉ vì một trường dữ liệu sai hình dạng.
@@ -43,5 +43,37 @@ describe('mapPackage — features luôn ra mảng', () => {
       expect(Array.isArray(kq)).toBe(true);
       expect(() => kq.map((x) => x.toString())).not.toThrow();
     }
+  });
+});
+
+/**
+ * Quản trị viên sửa các dòng tính năng bằng một ô nhập NHIỀU DÒNG, nên dòng trống
+ * và khoảng thừa là chuyện đương nhiên xảy ra: gõ Enter thừa một cái, hay dán từ
+ * Word sang. Gửi nguyên như vậy thì trang Bảng giá công khai mọc ra gạch đầu dòng
+ * rỗng — trông như lỗi hiển thị, và người thấy nó là khách chứ không phải người
+ * vừa bấm Lưu.
+ */
+describe('donDongTinhNang — dọn dòng trước khi gửi lên máy chủ', () => {
+  it('bỏ dòng trống và khoảng thừa hai đầu', () => {
+    expect(donDongTinhNang(['  Tối đa 20 bàn  ', '', '   ', 'Thực đơn 40 món']))
+      .toEqual(['Tối đa 20 bàn', 'Thực đơn 40 món']);
+  });
+
+  it('giữ nguyên THỨ TỰ — đó là thứ tự hiện ra ở trang bảng giá', () => {
+    expect(donDongTinhNang(['Ba', 'Một', 'Hai'])).toEqual(['Ba', 'Một', 'Hai']);
+  });
+
+  it('không gộp dòng trùng: quản trị viên muốn nhắc lại thì đó là quyền của họ', () => {
+    expect(donDongTinhNang(['Hỗ trợ 24/7', 'Hỗ trợ 24/7'])).toEqual(['Hỗ trợ 24/7', 'Hỗ trợ 24/7']);
+  });
+
+  it('xóa sạch ô nhập thì ra mảng rỗng, không phải một dòng rỗng', () => {
+    expect(donDongTinhNang([''])).toEqual([]);
+    expect(donDongTinhNang([])).toEqual([]);
+  });
+
+  it('dấu tiếng Việt và ký tự đặc biệt còn nguyên vẹn', () => {
+    expect(donDongTinhNang([' Không giới hạn bàn · món ']))
+      .toEqual(['Không giới hạn bàn · món']);
   });
 });

@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { packageService, timeSubscriptionService } from '@/services';
+import { packageService, timeSubscriptionService, donDongTinhNang } from '@/services';
+import { ApiError } from '@/lib/api-client';
 import { formatCurrency } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import type { Package, TimeSubscription } from '@/types';
@@ -49,11 +50,20 @@ export default function AdminPackagesPage() {
     if (!editTarget) return;
     setSaving(true);
     try {
-      await packageService.update(editTarget.id, form);
-      setPackages(prev => prev.map(p => p.id === editTarget.id ? { ...p, ...form } as Package : p));
+      // Hiển thị lại theo BẢN MÁY CHỦ TRẢ VỀ, không ghép lại từ `form`: form chỉ là
+      // thứ vừa gõ, còn máy chủ mới là thứ trang bảng giá công khai sẽ đọc — dòng
+      // trống đã dọn, số đã ép kiểu. Ghép từ form thì bảng ở đây nói một đằng, trang
+      // công khai hiện một nẻo, mà không ai biết cho tới khi khách nhìn thấy.
+      const daLuu = await packageService.update(editTarget.id, form);
+      setPackages(prev => prev.map(p => p.id === editTarget.id ? daLuu : p));
+      setForm(daLuu);
       toast({ description: 'Đã cập nhật gói dịch vụ' });
-    } catch {
-      toast({ description: 'Cập nhật thất bại', variant: 'destructive' });
+    } catch (e) {
+      // Nói ra lý do máy chủ trả về — "Cập nhật thất bại" một mình không cho admin
+      // biết là sai dữ liệu, mất mạng hay hết phiên. `detail` của ApiError đã gộp
+      // sẵn lỗi từng ô của phản hồi 422 (vd đặt số bàn về 0).
+      const loi = e instanceof ApiError ? e.detail : 'Cập nhật thất bại';
+      toast({ description: loi, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -232,6 +242,40 @@ export default function AdminPackagesPage() {
                 <label className="label-funcafe">Mô tả</label>
                 <textarea rows={2} className="input-funcafe resize-none" value={form.description ?? ''} onChange={e => setForm({ ...form, description: e.target.value })} />
               </div>
+              {/*
+                Danh sách dòng tính năng hiện trên TRANG BẢNG GIÁ CÔNG KHAI — thứ khách
+                đọc trước khi quyết định mua. Trước đây nó chỉ sửa được bằng cách sửa mã
+                rồi triển khai lại, nên nó lệch với hạn mức thật lúc nào không hay: có
+                thời điểm bản trên mạng quảng cáo "Tối đa 10 bàn" trong khi hệ thống đã
+                cho 20. Quảng cáo sai hạn mức là lời hứa hệ thống không giữ.
+
+                Mỗi dòng một ý — dạng nhập gần nhất với thứ hiện ra ở trang bảng giá.
+              */}
+              <div>
+                <label className="label-funcafe">
+                  Dòng tính năng hiện ở trang bảng giá
+                  <span className="text-cafe-400 font-normal"> · mỗi dòng một ý</span>
+                </label>
+                <textarea
+                  rows={7}
+                  className="input-funcafe resize-y font-mono text-xs leading-relaxed"
+                  placeholder={'Quản lý thông tin quán\nTối đa 20 bàn\nThực đơn tối đa 40 món'}
+                  value={(form.features ?? []).join('\n')}
+                  onChange={e => setForm({ ...form, features: e.target.value.split('\n') })}
+                  onBlur={e => setForm({
+                    // Dọn lúc RỜI ô, không dọn lúc đang gõ: bỏ dòng trống ngay khi người
+                    // ta vừa bấm Enter để xuống dòng thì con trỏ nhảy lung tung. Lúc gửi
+                    // đi tầng service dọn lại lần nữa, phòng khi bấm Lưu mà chưa rời ô.
+                    ...form,
+                    features: donDongTinhNang(e.target.value.split('\n')),
+                  })}
+                />
+                <p className="mt-1.5 text-xs text-cafe-500">
+                  {(form.features ?? []).filter(d => d.trim()).length} dòng ·
+                  đổi hạn mức bên dưới thì nhớ sửa dòng tương ứng ở đây cho khớp.
+                </p>
+              </div>
+
               <label className="flex items-center gap-2 text-sm text-cafe-700 cursor-pointer">
                 <input type="checkbox" checked={form.isActive ?? true} onChange={e => setForm({ ...form, isActive: e.target.checked })} />
                 Hiển thị gói này cho khách hàng
