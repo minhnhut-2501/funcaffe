@@ -21,7 +21,12 @@ export default function AdminPaymentsPage() {
   const [packageFilter, setPackageFilter] = useState<string>('all');
   // Đối soát với sao kê ngân hàng luôn là "những giao dịch ĐÃ THU trong khoảng này",
   // nên thiếu hai bộ lọc dưới đây thì phải dò bằng mắt trên cả bảng.
-  const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
+  // Hai lựa chọn, không phải bốn. Câu hỏi khi đối soát chỉ có một: giao dịch này có
+  // tiền vào tài khoản hay không. CSDL ghi ba dạng KHÔNG có tiền — 'rejected' (khách
+  // hủy trên cổng), 'failed' (đơn treo quá hạn bị dọn), 'pending' (bản ghi cũ còn
+  // sót; đơn cổng đang chờ đã bị máy chủ lọc bỏ). Bắt admin nhớ ba từ đó rồi lọc ba
+  // lần mới ra "những giao dịch không thu được" là bắt họ làm việc của máy.
+  const [statusFilter, setStatusFilter] = useState<'all' | 'thanh-cong' | 'that-bai'>('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [viewPayment, setViewPayment] = useState<Payment | null>(null);
@@ -46,8 +51,13 @@ export default function AdminPaymentsPage() {
     // ngayDiaPhuong: máy chủ gửi chuỗi ISO theo UTC. Cắt 10 ký tự đầu thì giao dịch
     // lúc 05:00 sáng 01/08 giờ Việt Nam bị xếp vào 31/07 — lọc "tháng 8" sẽ thiếu nó.
     const ngay = ngayDiaPhuong(p.createdAt);
+    // 'that-bai' là "mọi thứ KHÔNG phải paid", không phải danh sách liệt kê: thêm một
+    // trạng thái mới ở máy chủ mà quên sửa chỗ này thì nó vẫn lọc ra được, thay vì
+    // biến mất khỏi cả hai lựa chọn.
+    const hopTrangThai = statusFilter === 'all'
+      || (statusFilter === 'thanh-cong' ? p.status === 'paid' : p.status !== 'paid');
     return (packageFilter === 'all' || p.packageName === packageFilter)
-      && (statusFilter === 'all' || p.status === statusFilter)
+      && hopTrangThai
       && (!fromDate || ngay >= fromDate)
       && (!toDate || ngay <= toDate)
       && (p.userName.toLowerCase().includes(search.toLowerCase()) || p.transactionCode.toLowerCase().includes(search.toLowerCase()));
@@ -60,17 +70,27 @@ export default function AdminPaymentsPage() {
   // Cắt trang SAU khi đã lọc và tìm kiếm.
   const paging = usePagination(filtered, undefined, [search, packageFilter, statusFilter, fromDate, toDate]);
 
+  // Chỉ 'paid' được tô màu thành công. Ba dạng còn lại để màu trầm chứ không tô đỏ:
+  // khách bỏ dở giữa cổng thanh toán là chuyện thường ngày, không phải sự cố — tô đỏ
+  // thì trang đối soát lúc nào cũng đỏ lòm và admin thôi không nhìn màu nữa.
   const statusTone: Record<PaymentStatus, Tone> = {
-    pending: 'warning',
+    pending: 'neutral',
     rejected: 'neutral',
     paid: 'success',
     failed: 'neutral',
   };
 
+  // Nhãn nói ĐÚNG chuyện đã xảy ra. Hai nhãn cũ, 'Chờ duyệt' và 'Từ chối', được đặt
+  // từ thời admin duyệt tay từng giao dịch — khâu đó gỡ ngày 22/07/2026, nay không
+  // còn nút duyệt nào. Giữ chúng lại là hứa với admin một việc phải làm mà hệ thống
+  // không có chỗ để làm.
   const statusLabel: Record<PaymentStatus, string> = {
-    pending: 'Chờ duyệt',
-    rejected: 'Từ chối',
+    // Bản ghi cũ còn sót: đơn cổng đang chờ đã bị máy chủ lọc bỏ khỏi bảng này.
+    pending: 'Chưa hoàn tất',
+    // Cổng báo mã lỗi khác '00' — gần như luôn là khách bấm hủy giữa chừng.
+    rejected: 'Khách hủy',
     paid: 'Đã thanh toán',
+    // Đơn treo quá hạn chờ, bị dọn ở lần mua sau.
     failed: 'Thất bại',
   };
 
@@ -111,13 +131,12 @@ export default function AdminPaymentsPage() {
         <select
           className="input-funcafe !w-auto min-w-[150px]"
           value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as 'all' | PaymentStatus)}
+          onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
           aria-label="Lọc theo trạng thái giao dịch"
         >
           <option value="all">Tất cả trạng thái</option>
-          {(Object.keys(statusLabel) as PaymentStatus[]).map(s => (
-            <option key={s} value={s}>{statusLabel[s]}</option>
-          ))}
+          <option value="thanh-cong">Thành công</option>
+          <option value="that-bai">Thất bại</option>
         </select>
         <DateRangePicker from={fromDate} to={toDate} onChange={(f, t) => { setFromDate(f); setToDate(t); }} />
         {(statusFilter !== 'all' || packageFilter !== 'all' || fromDate || toDate || search) && (
@@ -229,7 +248,9 @@ export default function AdminPaymentsPage() {
               { label: 'Số tiền', value: formatCurrency(viewPayment.amount) },
               { label: 'Trạng thái', value: statusLabel[viewPayment.status] },
               { label: 'Ngày tạo', value: formatDateTime(viewPayment.createdAt) },
-              ...(viewPayment.confirmedAt ? [{ label: 'Ngày duyệt', value: formatDateTime(viewPayment.confirmedAt) }] : []),
+              // `paid_at` — thời điểm CỔNG xác nhận đã thu tiền, không phải lúc ai đó
+              // duyệt: không còn khâu duyệt tay nào để mà ghi ngày.
+              ...(viewPayment.confirmedAt ? [{ label: 'Ngày thanh toán', value: formatDateTime(viewPayment.confirmedAt) }] : []),
               ...(hasCredit(viewPayment) ? [
                 { label: 'Tiền cấn trừ', value: formatCurrency(viewPayment.creditAmount ?? 0) },
                 { label: 'Trạng thái cấn trừ', value: creditLabel[viewPayment.creditStatus ?? 'none'] },

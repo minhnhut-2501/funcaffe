@@ -395,7 +395,9 @@ export default function SubscriptionPage() {
                       <td className="px-3 py-2 text-cafe-600">{formatPaymentMethod(p.paymentMethod)}</td>
                       <td className="px-3 py-2">
                         <span className={p.status === 'paid' ? 'badge-active' : p.status === 'pending' ? 'badge-pending' : 'badge-inactive'}>
-                          {p.status === 'paid' ? 'Đã thanh toán' : p.status === 'pending' ? 'Chờ duyệt' : p.status === 'rejected' ? 'Bị từ chối' : 'Thất bại'}
+                          {/* Không còn khâu admin duyệt tay (gỡ 22/07/2026), nên không
+                              hứa với khách là có ai đang duyệt hay đã từ chối họ. */}
+                          {p.status === 'paid' ? 'Đã thanh toán' : p.status === 'pending' ? 'Chưa hoàn tất' : p.status === 'rejected' ? 'Đã hủy' : 'Thất bại'}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-cafe-400 text-xs">{formatDateTime(p.createdAt)}</td>
