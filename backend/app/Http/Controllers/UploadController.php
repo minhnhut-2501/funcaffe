@@ -49,6 +49,7 @@ class UploadController extends Controller
                         'loai_loi' => class_basename($e),
                         'ly_do' => $this->cheKhoaBiMat($e->getMessage(), $cloudinaryUrl),
                         'cau_hinh' => $this->tomTatCauHinh($cloudinaryUrl),
+                        'thu_doc' => $this->thuQuyenDoc($cloudinaryUrl),
                     ],
                 ], 502);
             }
@@ -88,6 +89,58 @@ class UploadController extends Controller
             'do_dai_api_key' => strlen($phan['user'] ?? ''),
             'do_dai_api_secret' => strlen($phan['pass'] ?? ''),
         ];
+    }
+
+    /**
+     * Khi TẢI LÊN bị từ chối: thử hai việc CHỈ ĐỌC bằng đúng cặp khóa đó.
+     *
+     * Vì sao cần. Cloudinary trả về "missing permissions (actions=[create])" cho cùng
+     * một cặp khóa mà bảng điều khiển hiện là Active và không giới hạn quyền. Nhìn từ
+     * ngoài thì hai khả năng khác hẳn nhau trông y như nhau:
+     *
+     *   - khóa vô hiệu hoàn toàn (sai, đã xóa, thuộc nơi khác) — cả đọc lẫn ghi đều hỏng;
+     *   - khóa còn sống nhưng RIÊNG quyền ghi bị chặn ở cấp tài khoản — đọc vẫn chạy.
+     *
+     * Hai nguyên nhân đó chữa bằng hai cách khác nhau, nên đoán sai là mất một buổi
+     * đi sai đường. `ping` phân biệt được chúng. `usage` đi thêm một bước: nó trả về
+     * tên gói và mức đã dùng, đủ để xác nhận hay bác bỏ giả thuyết "vượt hạn mức miễn
+     * phí nên bị khóa thao tác ghi" — thứ không nhìn thấy được từ phía máy chủ.
+     *
+     * Chỉ chạy trên nhánh đã hỏng, nên không thêm lượt gọi nào cho đường bình thường.
+     */
+    private function thuQuyenDoc(string $cloudinaryUrl): array
+    {
+        $ket = [];
+
+        try {
+            $api = (new Cloudinary($cloudinaryUrl))->adminApi();
+            $api->ping();
+            $ket['doc_duoc'] = true;
+            $ket['ket_luan'] = 'Khóa CÒN SỐNG và đọc được — chỉ quyền GHI bị chặn. '
+                . 'Xem hạn mức và cấu hình chặn ghi ở cấp tài khoản, không phải ở khóa.';
+        } catch (Throwable $e) {
+            $ket['doc_duoc'] = false;
+            $ket['loi_khi_doc'] = class_basename($e) . ': ' . $this->cheKhoaBiMat($e->getMessage(), $cloudinaryUrl);
+            $ket['ket_luan'] = 'Khóa KHÔNG làm được gì, kể cả đọc — cặp api_key/api_secret '
+                . 'trên máy chủ không khớp khóa nào đang hoạt động. Tạo khóa mới rồi đặt lại CLOUDINARY_URL.';
+
+            return $ket;
+        }
+
+        // Đọc được thì hỏi luôn hạn mức — trả lời thẳng cho câu "có phải vượt gói free không".
+        try {
+            $dung = (new Cloudinary($cloudinaryUrl))->adminApi()->usage();
+            // CHỈ lấy vài trường tóm tắt. `usage()` trả về một khối lớn, đổ hết ra
+            // phản hồi HTTP là thừa và khó đọc.
+            $ket['goi'] = $dung['plan'] ?? '(không rõ)';
+            $ket['credit_da_dung'] = $dung['credits']['usage'] ?? null;
+            $ket['credit_gioi_han'] = $dung['credits']['limit'] ?? null;
+            $ket['phan_tram_da_dung'] = $dung['credits']['used_percent'] ?? null;
+        } catch (Throwable $e) {
+            $ket['loi_khi_doc_han_muc'] = class_basename($e) . ': ' . $this->cheKhoaBiMat($e->getMessage(), $cloudinaryUrl);
+        }
+
+        return $ket;
     }
 
     /**
