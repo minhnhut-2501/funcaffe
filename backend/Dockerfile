@@ -38,10 +38,25 @@ RUN chmod -R 775 storage bootstrap/cache
 # lần và tự chịu lỗi, nên để chúng độc lập vừa an toàn vừa luôn để lại dấu vết.
 #
 # Mốc '=== ' để tìm nhanh trong log của Render.
+#
+# NHIỀU WORKER Ở BƯỚC 'serve'. Không có hai thứ đó thì máy chủ phục vụ ĐÚNG MỘT
+# request tại một thời điểm: `php artisan serve` bọc quanh `php -S`, và Laravel mặc
+# định PHP_CLI_SERVER_WORKERS=1. Hệ quả không lộ ra ở máy lập trình — nơi mỗi request
+# xong trong vài trăm mili giây — nhưng trên bản triển khai thì một lượt gọi nặng
+# chặn đứng mọi lượt gọi nhẹ xếp sau nó, và trang nào mở nhiều request cùng lúc sẽ
+# thấy những request cuối hàng hết hạn chờ trong khi bản thân chúng chỉ cần vài giây.
+#
+# Cờ `--no-reload` là BẮT BUỘC: thiếu nó Laravel bỏ qua PHP_CLI_SERVER_WORKERS và chỉ
+# in một dòng cảnh báo rồi chạy đơn luồng như cũ (xem ServeCommand::initialize).
+# Đặt biến ngay trên dòng lệnh chứ không qua env của Render, vì `config:cache` ở trên
+# làm Laravel bỏ qua tệp .env — biến đặt kiểu này là biến tiến trình thật, luôn đọc được.
+#
+# Để 3 chứ không cao hơn: gói free chỉ có 512MB, mà mỗi worker phục vụ một phản hồi
+# danh sách dài có thể ngốn hơn trăm MB.
 EXPOSE 8000
 CMD echo '=== config:cache ==='; php artisan config:cache; \
     touch database/database.sqlite; \
     echo '=== migrate ==='; php artisan migrate --force; \
     echo '=== db:indexes ==='; php artisan db:indexes; \
     echo '=== db:seed ==='; php artisan db:seed --class=ProductionSeeder --force; \
-    echo '=== serve ==='; php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+    echo '=== serve ==='; PHP_CLI_SERVER_WORKERS=3 php artisan serve --no-reload --host=0.0.0.0 --port=${PORT:-8000}
