@@ -1,0 +1,335 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Cafe;
+use App\Models\Category;
+use App\Models\Item;
+use App\Models\Order;
+use App\Models\OrderDetail;
+use App\Models\Package;
+use App\Models\Subscription;
+use App\Models\TimeSubscription;
+use App\Models\User;
+use App\Services\ConsultKnowledgeService;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Laravel\Sanctum\Sanctum;
+
+/**
+ * Trợ lý TƯ VẤN ở trang công khai.
+ *
+ * Điều thật sự cần bảo vệ ở đây KHÔNG phải "AI trả lời hay không", mà là RANH GIỚI:
+ * một hộp chat mở cho cả người chưa đăng nhập, nhưng số liệu kinh doanh của quán
+ * thì không được rời khỏi CSDL nếu gói không bật can_use_ai.
+ *
+ * Chốt chặn nằm ở chỗ nào gọi hàm nào, không nằm ở lời dặn cho AI:
+ *   · tuyến công khai  -> ConsultKnowledgeService (chỉ bảng gói, không truy vấn quán)
+ *   · tuyến trả phí    -> AiController::cafeContext (có doanh thu, bàn, thực đơn)
+ * Nên các bài dưới đây soi thẳng vào LỜI DẪN được gửi lên Gemini, chứ không soi câu
+ * trả lời — câu trả lời do mô hình sinh ra, không phải thứ kiểm thử bám vào được.
+ *
+ * Bài `..._van_nap_so_lieu_that` là cặp đối chứng: nếu bỏ nó đi thì bài chống rò rỉ
+ * vẫn xanh ngay cả khi ngữ cảnh rỗng vì một lý do vớ vẩn nào đó, tức là xanh giả.
+ */
+class AiConsultTest extends MongoTestCase
+{
+    protected array $collections = [
+        'users', 'cafes', 'packages', 'time_subscriptions', 'subscriptions',
+        'categories', 'items', 'tables', 'orders', 'order_details',
+    ];
+
+    /** Tên món cố ý dị thường để không thể trùng ngẫu nhiên với chữ trong lời dẫn. */
+    private const MON_BI_MAT = 'Trà đào cam sả ZZBIMAT';
+    private const DOANH_THU = 247_000;
+
+    private User $user;
+    private Cafe $cafe;
+    private Package $pro;
+    private Package $proMax;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['funcafe.gemini_key' => 'khoa-gia-de-kiem-thu']);
+
+        $this->pro = Package::create([
+            'name' => 'Pro', 'type' => 'pro', 'level' => 1, 'status' => 'active',
+            'is_trial' => false, 'can_use_ai' => false,
+            'max_tables' => 20, 'max_menu_items' => 40,
+            'description' => 'Đầy đủ chức năng + doanh thu',
+            'features' => ['Tối đa 20 bàn', 'Thực đơn tối đa 40 món'],
+        ]);
+
+        $this->proMax = Package::create([
+            'name' => 'Pro Max', 'type' => 'promax', 'level' => 2, 'status' => 'active',
+            'is_trial' => false, 'can_use_ai' => true,
+            'max_tables' => null, 'max_menu_items' => null,
+            'description' => 'Không giới hạn + trợ lý AI',
+            'features' => ['Không giới hạn bàn & thực đơn', 'Trợ lý AI'],
+        ]);
+
+        TimeSubscription::create([
+            'package_id' => (string) $this->pro->id, 'duration_value' => 1,
+            'duration_unit' => 'month', 'price' => 199_000, 'label' => '1 tháng', 'status' => 'active',
+        ]);
+        TimeSubscription::create([
+            'package_id' => (string) $this->proMax->id, 'duration_value' => 1,
+            'duration_unit' => 'month', 'price' => 499_000, 'label' => '1 tháng', 'status' => 'active',
+        ]);
+
+        // Chủ quán đang dùng gói Pro và ĐÃ xài hết lượt dùng thử — đúng nhóm mà lời
+        // mời phải là "nâng lên Pro Max", tuyệt đối không phải "kích hoạt Fun Free".
+        $this->user = User::create([
+            'full_name' => 'Chủ quán kiểm thử',
+            'email' => 'tuvan-' . uniqid() . '@funcafe.test',
+            'password' => Hash::make('Password@123'),
+            'role' => 'user', 'status' => 'active',
+            'has_used_free_trial' => true,
+        ]);
+
+        $this->cafe = $this->user->cafes()->create([
+            'name' => 'Quán kiểm thử', 'status' => 'open', 'has_used_free_trial' => true,
+        ]);
+
+        Subscription::create([
+            'cafe_id' => (string) $this->cafe->id,
+            'package_id' => (string) $this->pro->id,
+            'package_name_snapshot' => 'Pro',
+            'start_date' => now()->subDays(10),
+            'end_date' => now()->addDays(20),
+            'total_amount' => 199_000,
+            'status' => 'active',
+        ]);
+
+        $this->taoDuLieuBanHang();
+    }
+
+    /** Dựng dữ liệu THẬT để có cái mà rò rỉ — không có nó thì bài chống rò rỉ vô nghĩa. */
+    private function taoDuLieuBanHang(): void
+    {
+        $cafeId = (string) $this->cafe->id;
+
+        $category = Category::create(['cafe_id' => $cafeId, 'name' => 'Trà', 'is_active' => true]);
+
+        $item = Item::create([
+            'cafe_id' => $cafeId,
+            'category_id' => (string) $category->id,
+            'name' => self::MON_BI_MAT,
+            'base_price' => self::DOANH_THU,
+            'is_available' => true,
+        ]);
+
+        $this->cafe->tables()->create(['name' => 'Bàn 1', 'status' => 'available']);
+
+        $order = Order::create([
+            'cafe_id' => $cafeId,
+            'status' => 'paid',
+            'payment_status' => 'paid',
+            'total_amount' => self::DOANH_THU,
+            'paid_at' => now(),
+        ]);
+
+        OrderDetail::create([
+            'order_id' => (string) $order->id,
+            'item_id' => (string) $item->id,
+            'item_name_snapshot' => self::MON_BI_MAT,
+            'quantity' => 1,
+            'unit_price' => self::DOANH_THU,
+            'total_price' => self::DOANH_THU,
+        ]);
+    }
+
+    /** Chặn mọi lời gọi ra Gemini và trả câu giả — kiểm thử không được đốt hạn ngạch thật. */
+    private function giaLapGemini(string $traLoi = 'Dạ mình xin tư vấn ạ.'): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [['content' => ['parts' => [['text' => $traLoi]]]]],
+            ], 200),
+        ]);
+    }
+
+    /** Lời dẫn (system_instruction) THẬT SỰ được gửi lên Gemini ở lượt gọi gần nhất. */
+    private function loiDanDaGui(): string
+    {
+        $chu = '';
+        Http::assertSent(function ($request) use (&$chu) {
+            $parts = $request->data()['system_instruction']['parts'] ?? [];
+            foreach ($parts as $p) {
+                $chu .= $p['text'] ?? '';
+            }
+            return true;
+        });
+
+        return $chu;
+    }
+
+    // ---------------------------------------------------------------- mở cửa
+
+    public function test_khach_vang_lai_hoi_duoc_ma_khong_can_dang_nhap(): void
+    {
+        $this->giaLapGemini('Dạ gói Pro giới hạn 20 bàn ạ.');
+
+        $this->postJson('/api/ai/consult', [
+            'messages' => [['role' => 'user', 'content' => 'Gói Pro cho tối đa bao nhiêu bàn?']],
+        ])
+            ->assertStatus(200)
+            ->assertJsonStructure(['reply']);
+    }
+
+    // ------------------------------------------------- ranh giới dữ liệu quán
+
+    /**
+     * Chốt chặn quan trọng nhất của cả tính năng.
+     *
+     * Không kiểm câu trả lời của mô hình mà kiểm NGỮ CẢNH gửi đi: dữ liệu không có
+     * trong ngữ cảnh thì mô hình không có cách nào nói ra, kể cả khi bị dụ.
+     */
+    public function test_loi_dan_cong_khai_khong_chua_bat_ky_so_lieu_nao_cua_quan(): void
+    {
+        $this->giaLapGemini();
+
+        $this->postJson('/api/ai/consult', [
+            'messages' => [['role' => 'user', 'content' => 'Doanh thu quán tôi hôm nay bao nhiêu?']],
+        ])->assertStatus(200);
+
+        $loiDan = $this->loiDanDaGui();
+
+        $this->assertStringNotContainsString(self::MON_BI_MAT, $loiDan,
+            'Tên món trong thực đơn của quán đã lọt vào ngữ cảnh công khai.');
+        $this->assertStringNotContainsString(number_format(self::DOANH_THU, 0, ',', '.'), $loiDan,
+            'Số tiền doanh thu của quán đã lọt vào ngữ cảnh công khai.');
+        $this->assertStringNotContainsString('Doanh thu hôm nay', $loiDan);
+        $this->assertStringNotContainsString('Tình hình bán hàng', $loiDan);
+        $this->assertStringNotContainsString('Tổng số bàn', $loiDan);
+        $this->assertStringNotContainsString($this->cafe->name, $loiDan,
+            'Ngay cả TÊN quán cũng không nên có mặt — tuyến này không biết khách là quán nào.');
+    }
+
+    /**
+     * Đối chứng: tuyến TRẢ PHÍ vẫn phải nạp đủ số liệu.
+     *
+     * Không có bài này thì bài trên xanh cả khi ngữ cảnh rỗng vì lỗi khác, và ta
+     * tưởng đang được bảo vệ trong khi thật ra tính năng đã hỏng.
+     */
+    public function test_tuyen_tra_phi_van_nap_so_lieu_that_cua_quan(): void
+    {
+        Subscription::where('cafe_id', (string) $this->cafe->id)
+            ->update(['package_id' => (string) $this->proMax->id]);
+
+        $this->giaLapGemini();
+        Sanctum::actingAs($this->user);
+
+        $this->postJson("/api/cafes/{$this->cafe->id}/ai/chat", [
+            'messages' => [['role' => 'user', 'content' => 'Doanh thu hôm nay bao nhiêu?']],
+        ])->assertStatus(200);
+
+        $loiDan = $this->loiDanDaGui();
+
+        $this->assertStringContainsString('Doanh thu hôm nay', $loiDan);
+        $this->assertStringContainsString(number_format(self::DOANH_THU, 0, ',', '.'), $loiDan);
+        $this->assertStringContainsString(self::MON_BI_MAT, $loiDan);
+    }
+
+    /** Nới tay tuyến trả phí là mất luôn lý do tồn tại của gói Pro Max. */
+    public function test_tuyen_ai_tra_phi_van_chan_goi_pro(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson("/api/cafes/{$this->cafe->id}/ai/chat", [
+            'messages' => [['role' => 'user', 'content' => 'Doanh thu hôm nay bao nhiêu?']],
+        ])->assertStatus(403);
+    }
+
+    // ------------------------------------------------------------- lời mời
+
+    public function test_chu_quan_goi_pro_duoc_moi_nang_cap_chu_khong_moi_dung_thu(): void
+    {
+        $this->giaLapGemini();
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/ai/consult', [
+            'messages' => [['role' => 'user', 'content' => 'Quán tôi món nào bán chạy nhất?']],
+        ])->assertStatus(200);
+
+        $loiDan = $this->loiDanDaGui();
+
+        $this->assertStringContainsString('KHÔNG CÒN quyền dùng thử', $loiDan);
+        $this->assertStringContainsString('nâng lên gói Pro Max', $loiDan);
+    }
+
+    /**
+     * Mời một người đã hết lượt đi "kích hoạt Fun Free" là đẩy họ tới một nút bấm
+     * chắc chắn bị từ chối (SubscriptionController::store). Ba trạng thái phải tách bạch.
+     */
+    public function test_nguoi_con_quyen_dung_thu_duoc_moi_fun_free(): void
+    {
+        $moi = User::create([
+            'full_name' => 'Người mới',
+            'email' => 'moi-' . uniqid() . '@funcafe.test',
+            'password' => Hash::make('Password@123'),
+            'role' => 'user', 'status' => 'active',
+            'has_used_free_trial' => false,
+        ]);
+
+        $this->giaLapGemini();
+        Sanctum::actingAs($moi);
+
+        $this->postJson('/api/ai/consult', [
+            'messages' => [['role' => 'user', 'content' => 'Tôi muốn thử phần mềm trước khi mua']],
+        ])->assertStatus(200);
+
+        $loiDan = $this->loiDanDaGui();
+
+        $this->assertStringContainsString('VẪN CÒN quyền dùng thử', $loiDan);
+        $this->assertStringNotContainsString('KHÔNG CÒN quyền dùng thử', $loiDan);
+    }
+
+    public function test_khach_chua_dang_nhap_duoc_moi_dang_ky_chu_khong_phai_nang_goi(): void
+    {
+        $this->giaLapGemini();
+
+        $this->postJson('/api/ai/consult', [
+            'messages' => [['role' => 'user', 'content' => 'Phần mềm này dùng thế nào?']],
+        ])->assertStatus(200);
+
+        $loiDan = $this->loiDanDaGui();
+
+        $this->assertStringContainsString('CHƯA ĐĂNG NHẬP', $loiDan);
+        $this->assertStringContainsString('đăng ký tài khoản', $loiDan);
+    }
+
+    // -------------------------------------------------------- bảng gói động
+
+    /**
+     * Giá phải đọc từ CSDL. Chép cứng trong mã thì admin sửa giá xong, hộp chat vẫn
+     * đọc giá cũ cho khách nghe — sai ở đúng chỗ không được phép sai.
+     */
+    public function test_bang_goi_doc_gia_tu_csdl_khong_chep_cung(): void
+    {
+        $kienThuc = app(ConsultKnowledgeService::class);
+
+        $this->assertStringContainsString('199.000đ', $kienThuc->bangGoi());
+
+        $this->pro->update(['max_tables' => 25]);
+        TimeSubscription::where('package_id', (string) $this->pro->id)
+            ->update(['price' => 259_000]);
+        \Illuminate\Support\Facades\Cache::flush();
+
+        $sau = app(ConsultKnowledgeService::class)->bangGoi();
+        $this->assertStringContainsString('259.000đ', $sau);
+        $this->assertStringContainsString('tối đa 25', $sau);
+        $this->assertStringNotContainsString('199.000đ', $sau);
+    }
+
+    /** Hạn mức "không giới hạn" phải nói thành chữ, đừng để lọt ra chữ "null". */
+    public function test_goi_khong_gioi_han_duoc_dien_dat_ro_rang(): void
+    {
+        $bang = app(ConsultKnowledgeService::class)->bangGoi();
+
+        $this->assertStringContainsString('không giới hạn', $bang);
+        $this->assertStringNotContainsString('null', $bang);
+    }
+}

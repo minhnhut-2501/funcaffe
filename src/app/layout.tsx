@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
+import AiChatMount from '@/components/ai/AiChatMount';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
@@ -29,6 +30,9 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <AuthProvider>
           {children}
+          {/* Hộp chat tư vấn cho trang công khai. Nằm TRONG AuthProvider vì nó cần
+              biết người đang xem đã đăng nhập chưa để chọn đúng tuyến và lời mời. */}
+          <AiChatMount />
           <Toaster />
         </AuthProvider>
       </body>

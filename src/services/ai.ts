@@ -17,28 +17,50 @@ export interface AiRevenueResponse {
   cached: boolean;
 }
 
+export type AiMessage = { role: 'user' | 'assistant'; content: string };
+
+/** Đọc thân phản hồi dạng luồng và bắn từng đoạn ra ngoài (hiệu ứng gõ chữ). */
+async function docLuong(res: Response, onChunk: (text: string) => void): Promise<void> {
+  const reader = res.body?.getReader();
+  if (!reader) return;
+  const decoder = new TextDecoder();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    if (chunk) onChunk(chunk);
+  }
+}
+
 export const aiService = {
-  chat: async (messages: { role: 'user' | 'assistant'; content: string }[]) => {
+  chat: async (messages: AiMessage[]) => {
     const cafeId = await getCafeId();
     const res = await api.post<{ reply: string }>(`/cafes/${cafeId}/ai/chat`, { messages });
     return res.reply;
   },
   // Streaming: gọi onChunk(text) cho từng đoạn AI sinh ra (hiệu ứng gõ chữ).
-  chatStream: async (
-    messages: { role: 'user' | 'assistant'; content: string }[],
-    onChunk: (text: string) => void,
-  ): Promise<void> => {
+  chatStream: async (messages: AiMessage[], onChunk: (text: string) => void): Promise<void> => {
     const cafeId = await getCafeId();
     const res = await api.postStream(`/cafes/${cafeId}/ai/chat/stream`, { messages });
-    const reader = res.body?.getReader();
-    if (!reader) return;
-    const decoder = new TextDecoder();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      if (chunk) onChunk(chunk);
-    }
+    await docLuong(res, onChunk);
+  },
+
+  /**
+   * Trợ lý TƯ VẤN — tuyến CÔNG KHAI, gọi được khi chưa đăng nhập.
+   *
+   * Khác `chatStream` ở hai chỗ, và cả hai đều cố ý:
+   *  - KHÔNG đi qua getCafeId(): hàm đó gọi `/cafes` (cần đăng nhập) và ném NO_CAFE
+   *    khi tài khoản chưa có quán. Ở trang giới thiệu thì cả hai đều sai.
+   *  - Ngữ cảnh bên máy chủ chỉ có bảng gói và thông tin sản phẩm, không có số liệu
+   *    quán nào — nên hỏi doanh thu ở đây sẽ nhận lời mời nâng gói, không nhận số.
+   */
+  consultStream: async (messages: AiMessage[], onChunk: (text: string) => void): Promise<void> => {
+    const res = await api.postStream('/ai/consult/stream', { messages });
+    await docLuong(res, onChunk);
+  },
+  consult: async (messages: AiMessage[]) => {
+    const res = await api.post<{ reply: string }>('/ai/consult', { messages });
+    return res.reply;
   },
   revenueAnalysis: async (refresh = false) => {
     const cafeId = await getCafeId();

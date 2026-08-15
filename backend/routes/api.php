@@ -13,6 +13,7 @@ use App\Http\Controllers\TimeSubscriptionController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\AiConsultController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\Admin;
 
@@ -50,6 +51,21 @@ Route::post('/upload', [\App\Http\Controllers\UploadController::class, 'store'])
 // đầy hạn mức 512MB của MongoDB Atlas bậc miễn phí (ảnh hưởng dữ liệu MỌI quán)
 // và đẩy liên hệ thật của khách ra khỏi tầm nhìn của admin.
 Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:5,1');
+
+// Trợ lý TƯ VẤN (public) — hộp chat ở trang giới thiệu, hỏi được khi CHƯA đăng nhập.
+//
+// KHÔNG gắn middleware 'ai' và cũng KHÔNG mang {cafe}: đây là tuyến tư vấn bán hàng,
+// ngữ cảnh chỉ có bảng gói và thông tin sản phẩm (ConsultKnowledgeService) — không
+// một truy vấn nào chạm vào doanh thu, bàn hay thực đơn của quán nào. Hỏi số liệu
+// quán thì phải đi tuyến cafes/{cafe}/ai/* bên dưới, và tuyến đó vẫn chặn ở Pro Max.
+//
+// Trần 'ai-tu-van' (AppServiceProvider) chặt hơn hẳn trần chung: mỗi lượt gọi ở đây
+// đốt hạn ngạch Gemini bậc miễn phí, mà hạn ngạch đó dùng chung với trợ lý của chủ
+// quán đã trả tiền.
+Route::middleware('throttle:ai-tu-van')->group(function () {
+    Route::post('/ai/consult', [AiConsultController::class, 'chat']);
+    Route::post('/ai/consult/stream', [AiConsultController::class, 'chatStream']);
+});
 
 // Cafe (user's own)
 // KHÔNG có route xóa quán: xóa một quán sẽ bỏ rơi toàn bộ bàn, thực đơn, hóa đơn

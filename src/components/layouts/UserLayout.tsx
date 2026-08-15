@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { isSubscriptionExpired, expiryState, daysLeftUntil, EXPIRY_SOON_DAYS, type ExpiryState } from '@/lib/permission';
 import { invoiceService } from '@/services';
 import type { CafeInfo } from '@/types';
-import AiChatWidget from '@/components/user/AiChatWidget';
+import AiChatWidget from '@/components/ai/AiChatWidget';
 import SidebarNav, { type NavGroup } from '@/components/layouts/SidebarNav';
 
 const navGroups: NavGroup[] = [

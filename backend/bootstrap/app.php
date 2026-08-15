@@ -21,6 +21,19 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->statefulApi();
 
+        // Tin proxy đứng trước ứng dụng (Render, Vercel) để `$request->ip()` trả về
+        // IP THẬT của khách chứ không phải IP của proxy.
+        //
+        // Không có dòng này thì mọi khách CHƯA đăng nhập đều mang cùng một địa chỉ,
+        // nên họ dùng chung MỘT rổ đếm 300 lượt/phút (xem AppServiceProvider). Một
+        // người đốt hết là toàn bộ endpoint công khai — gửi liên hệ, đánh giá, bảng
+        // gói, hộp chat tư vấn — trả 429 cho tất cả mọi người trong phần còn lại của
+        // phút đó.
+        //
+        // Dùng '*' vì Render không công bố dải IP cố định cho proxy của họ. An toàn ở
+        // đây vì container chỉ nhận lưu lượng đi qua proxy đó, không mở cổng ra ngoài.
+        $middleware->trustProxies(at: '*');
+
         // Giới hạn tần suất cho TOÀN BỘ /api (giới hạn xem ở AppServiceProvider).
         // Trước đây chỉ 5 endpoint tự gắn throttle, phần còn lại — tạo order, tạo
         // giao dịch gói, mọi lượt ghi thực đơn — không có trần nào. Một script vòng

@@ -85,5 +85,38 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(300)->by($id ? 'u:' . $id : 'ip:' . $request->ip());
         });
+
+        $this->gioiHanTroLyAi();
+    }
+
+    /**
+     * Trần riêng cho trợ lý AI tư vấn — tuyến DUY NHẤT gọi được mà không cần đăng nhập.
+     *
+     * Ba lớp, mỗi lớp chặn một kiểu hỏng khác nhau:
+     *
+     *  · theo PHÚT   — chặn người bấm liên tục. Hỏi rồi đọc câu trả lời mất vài chục
+     *                  giây, nên vài lượt mỗi phút là quá đủ cho người dùng thật.
+     *  · theo NGÀY   — chặn kiểu rỉ rả: đi chậm hơn trần phút nhưng chạy suốt đêm.
+     *  · TOÀN HỆ THỐNG — thứ quan trọng nhất. Hai lớp trên đếm theo từng khách, mà
+     *                  hạn ngạch Gemini bậc miễn phí thì tính trên CẢ KHÓA. Không có
+     *                  trần chung thì mỗi khách đều trong giới hạn nhưng cộng lại vẫn
+     *                  đốt sạch quota, và người mất là chủ quán trả tiền gói Pro Max.
+     *
+     * Trần chung cố ý đặt thấp hơn hẳn hạn ngạch Gemini để luôn còn phần cho tuyến
+     * trả phí. Chỉnh qua env khi cần nới tay (ví dụ hôm demo).
+     */
+    private function gioiHanTroLyAi(): void
+    {
+        RateLimiter::for('ai-tu-van', function (Request $request) {
+            // Khách chưa đăng nhập thì chỉ có IP để bám. Phải có trustProxies
+            // (bootstrap/app.php), nếu không mọi khách dùng chung một rổ.
+            $khoa = $request->user('sanctum')?->getAuthIdentifier() ?? $request->ip();
+
+            return [
+                Limit::perMinute((int) config('funcafe.ai_moi_phut'))->by('ai-phut:' . $khoa),
+                Limit::perDay((int) config('funcafe.ai_moi_ngay'))->by('ai-ngay:' . $khoa),
+                Limit::perDay((int) config('funcafe.ai_chung_moi_ngay'))->by('ai-chung'),
+            ];
+        });
     }
 }
