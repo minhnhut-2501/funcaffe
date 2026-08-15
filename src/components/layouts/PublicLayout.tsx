@@ -33,8 +33,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
 function Logo({ light = false }: { light?: boolean }) {
   return (
-    <span className="flex items-center gap-2">
-      <span className="w-8 h-8 bg-bean rounded-lg flex items-center justify-center shrink-0">
+    <span className="group flex items-center gap-2">
+      {/* Ô logo nghiêng nhẹ khi rê chuột — dấu hiệu "bấm được về trang chủ". */}
+      <span className="w-8 h-8 bg-bean rounded-lg flex items-center justify-center shrink-0 transition-[rotate,scale] duration-300 group-hover:rotate-6 group-hover:scale-110">
         <Coffee className="w-5 h-5 text-white" />
       </span>
       <span className={`text-lg font-bold ${light ? 'text-white' : 'text-ink'}`}>FunCafe</span>

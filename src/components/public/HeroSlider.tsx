@@ -124,7 +124,10 @@ export default function HeroSlider() {
                   srcSet={`/banners/${s.img}-900w.jpg 900w, /banners/${s.img}.jpg 1600w`}
                   sizes="100vw"
                   alt={s.alt}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  // Chỉ ảnh ĐANG HIỆN mới trôi, để mỗi lượt chuyển slide là một lượt
+                  // trôi mới từ đầu. Gắn cho cả ba ảnh thì slide sau hiện ra giữa
+                  // chừng chu kỳ, lúc đậm lúc nhạt không theo quy luật nào.
+                  className={`absolute inset-0 w-full h-full object-cover ${active ? 'anh-troi' : ''}`}
                   loading={i === 0 ? 'eager' : 'lazy'}
                   fetchPriority={i === 0 ? 'high' : 'low'}
                 />

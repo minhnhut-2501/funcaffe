@@ -147,10 +147,7 @@ export default function HomePage() {
           <Reveal delay={120} className="relative">
             <div aria-hidden className="absolute -inset-6 rounded-[2.5rem] blur-3xl bg-bean/10" />
             <AppShot src="/product/cafes-multi.png" alt="Danh sách nhiều quán trên một tài khoản FunCafe" label="FunCafe · Quản lý quán" className="rotate-[1deg]" />
-            <div
-              className="absolute -bottom-6 -left-4 z-20 w-[42%] max-w-[210px] rounded-xl border border-line bg-white overflow-hidden rotate-[-5deg] hidden sm:block"
-              style={{ boxShadow: '0 22px 48px -20px rgba(15,23,42,0.45)' }}
-            >
+            <div className="anh-noi-nho absolute -bottom-6 -left-4 z-20 w-[42%] max-w-[210px] rounded-xl border border-line bg-white overflow-hidden rotate-[-5deg] hidden sm:block">
               <img src="/product/cafe-switcher.png" alt="Bộ chọn quán để chuyển nhanh giữa các chi nhánh" className="block w-full object-cover object-left-top h-full max-h-[130px]" loading="lazy" />
             </div>
           </Reveal>
@@ -216,8 +213,7 @@ export default function HomePage() {
                       height={s.imgSize?.[1]}
                     />
                     {s.float && (
-                      <div className={`absolute -bottom-6 z-20 w-[30%] max-w-[150px] rounded-xl border border-line bg-white overflow-hidden ${flip ? '-right-4 rotate-[5deg]' : '-left-4 rotate-[-5deg]'} hidden sm:block`}
-                        style={{ boxShadow: '0 22px 48px -20px rgba(15,23,42,0.45)' }}>
+                      <div className={`anh-noi-nho absolute -bottom-6 z-20 w-[30%] max-w-[150px] rounded-xl border border-line bg-white overflow-hidden ${flip ? '-right-4 rotate-[5deg]' : '-left-4 rotate-[-5deg]'} hidden sm:block`}>
                         <img src={s.float} alt="" className="block w-full" loading="lazy" />
                       </div>
                     )}
@@ -255,7 +251,7 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
-            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-bean font-semibold hover:underline text-sm">
+            <Link href="/pricing" className="link-mui-ten inline-flex items-center gap-1.5 text-bean font-semibold hover:underline text-sm">
               Xem gói Pro Max <ArrowRight className="w-4 h-4" />
             </Link>
           </Reveal>
@@ -267,8 +263,7 @@ export default function HomePage() {
               alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý ba combo đồ uống kèm giá cho buổi chiều vắng khách"
               width={768}
               height={1066}
-              className="relative w-full max-w-[340px] rounded-2xl border border-line bg-white"
-              style={{ boxShadow: '0 34px 80px -34px rgba(15,23,42,0.45)' }}
+              className="anh-noi relative w-full max-w-[340px] rounded-2xl border border-line bg-white"
               loading="lazy"
             />
           </Reveal>
@@ -401,7 +396,7 @@ export default function HomePage() {
             })}
           </div>
           <div className="text-center mt-8">
-            <Link href="/pricing" className="inline-flex items-center gap-1 text-bean font-medium hover:underline text-sm">
+            <Link href="/pricing" className="link-mui-ten inline-flex items-center gap-1 text-bean font-medium hover:underline text-sm">
               Xem chi tiết bảng giá <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

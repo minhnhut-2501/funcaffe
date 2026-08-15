@@ -137,7 +137,9 @@ export default function ReviewsCarousel() {
           <article
             key={r.key}
             data-card
-            className="snap-start shrink-0 w-[85%] sm:w-[360px] bg-white rounded-2xl border border-line p-6 flex flex-col"
+            // `lift`: băng đánh giá là phần social proof ở cuối trang chủ — thẻ nhích
+            // lên khi rê chuột báo cho người xem biết dải này kéo ngang được.
+            className="lift snap-start shrink-0 w-[85%] sm:w-[360px] bg-white rounded-2xl border border-line p-6 flex flex-col"
           >
             <Quote className="w-7 h-7 text-gold mb-3" />
             <div className="flex gap-0.5 mb-3">

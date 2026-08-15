@@ -27,9 +27,10 @@ export default function AppShot({
   height?: number;
 }) {
   return (
+    // Bóng nền nằm trong lớp `anh-noi` (globals.css) chứ không đặt inline: style
+    // inline thắng class, nên để inline là hiệu ứng bóng lúc rê chuột bị chặn đứng.
     <div
-      className={`relative z-10 rounded-2xl border border-line bg-white overflow-hidden ${className}`}
-      style={{ boxShadow: '0 34px 80px -34px rgba(15,23,42,0.45)' }}
+      className={`anh-noi relative z-10 rounded-2xl border border-line bg-white overflow-hidden ${className}`}
     >
       <div aria-hidden className="flex items-center gap-1.5 px-3.5 h-8 bg-sand border-b border-line">
         <span className="w-2.5 h-2.5 rounded-full bg-red-300" />

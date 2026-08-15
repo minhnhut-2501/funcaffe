@@ -174,10 +174,10 @@ export default function PricingPage() {
             <Reveal
               key={p.key}
               delay={i * 80}
-              className={`relative rounded-2xl border bg-white flex flex-col h-full p-6 pt-7 transition-shadow ${
+              className={`lift relative rounded-2xl border bg-white flex flex-col h-full p-6 pt-7 ${
                 p.highlight
                   ? 'border-bean ring-2 ring-bean/30 shadow-xl shadow-bean/10'
-                  : 'border-line shadow-sm hover:shadow-md'
+                  : 'border-line shadow-sm'
               }`}
             >
               {p.highlight && (

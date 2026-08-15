@@ -265,7 +265,7 @@ export default function FeaturesPage() {
                 </div>
               ))}
             </dl>
-            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-bean font-semibold hover:underline text-sm">
+            <Link href="/pricing" className="link-mui-ten inline-flex items-center gap-1.5 text-bean font-semibold hover:underline text-sm">
               Xem gói Pro Max <ArrowRight className="w-4 h-4" aria-hidden />
             </Link>
           </Reveal>
@@ -277,8 +277,7 @@ export default function FeaturesPage() {
               alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý các combo đồ uống kèm giá cho buổi chiều vắng khách"
               width={768}
               height={1066}
-              className="relative w-full max-w-[340px] rounded-2xl border border-line bg-white"
-              style={{ boxShadow: '0 34px 80px -34px rgba(15,23,42,0.45)' }}
+              className="anh-noi relative w-full max-w-[340px] rounded-2xl border border-line bg-white"
               loading="lazy"
             />
           </Reveal>

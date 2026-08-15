@@ -243,13 +243,19 @@
   .btn-cafe, .btn-cafe-outline {
     @apply active:translate-y-px;
   }
-  /* Soft tactile lift on interactive surfaces */
+  /* Soft tactile lift on interactive surfaces.
+
+     KHÔNG dùng `@apply transition-transform transition-shadow`: cả hai lớp Tailwind
+     đều ghi vào `transition-property`, nên cái sau XOÁ cái trước và chỉ còn box-shadow.
+     Cộng thêm `-translate-y-1` của Tailwind v4 ghi vào thuộc tính `translate` (không
+     phải `transform`), kết quả là phần nhấc lên KHÔNG nằm trong danh sách được chuyển
+     tiếp — thẻ nhảy giật một phát thay vì trôi lên. Viết thẳng cho khỏi bẫy. */
   .lift {
-    @apply transition-transform transition-shadow duration-300;
-    transition-timing-function: var(--ease-out-expo);
+    transition: translate 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo);
+    will-change: translate;
   }
   .lift:hover {
-    @apply -translate-y-1;
+    translate: 0 -0.25rem;
     box-shadow: var(--shadow-lift);
   }
   .no-scrollbar {
@@ -370,6 +376,77 @@
     animation: funcafe-sweep 1.5s ease-in-out infinite;
   }
 
+  /* ============ Chuyển động cho ẢNH ở trang public ============
+     Yêu cầu của GVHD: "Ảnh chưa động". Đo thật trước khi sửa: 24/26 ảnh trên năm
+     trang public hoàn toàn đứng im (scripts/do-hieu-ung-public.mjs).
+
+     Ba mức, dùng đúng chỗ — không phải ảnh nào cũng nên nhúc nhích:
+       .anh-troi   : ảnh nền hero, tự trôi rất chậm (khung hình có sự sống)
+       .khung-anh  : ảnh trong thẻ, phóng nhẹ khi rê chuột (mời người ta tương tác)
+       .anh-noi    : ảnh chụp ứng dụng, nổi lên khi rê chuột
+
+     Cả ba đều tự tắt dưới `prefers-reduced-motion` nhờ luật gộp ở cuối tệp. Đó là
+     thiết lập trợ năng của HỆ ĐIỀU HÀNH, người bật nó thường vì rối loạn tiền đình —
+     khác hẳn với "trang public nên lộng lẫy", nên giữ nguyên phần nhường này. */
+
+  /* Trôi chậm 24s rồi trôi ngược lại: một vòng đủ dài để mắt không bắt được nhịp,
+     nhưng đứng nhìn vài giây là thấy ảnh "sống". Biên độ nhỏ (1.03 -> 1.12) để chữ
+     đè lên trên không bị xê dịch theo. */
+  @keyframes funcafe-anh-troi {
+    from { transform: scale(1.03) translate3d(0, 0, 0); }
+    to   { transform: scale(1.12) translate3d(0, -1.6%, 0); }
+  }
+  .anh-troi {
+    animation: funcafe-anh-troi 24s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+
+  /* Khung bao ảnh: cắt phần ảnh phóng ra ngoài. Phóng ảnh mà quên overflow-hidden
+     là ảnh tràn ra đè lên nội dung bên cạnh. */
+  /* Dùng `scale`/`translate` RIÊNG LẺ chứ không gộp vào `transform`.
+     Trang chủ đặt `rotate-[1deg]` cho một khung ảnh; nếu hover ghi đè `transform`
+     thì ảnh giật về thẳng ngay khi rê chuột vào — hiệu ứng biến thành lỗi. Thuộc
+     tính riêng lẻ thì rotate và translate cùng tồn tại, không cái nào xoá cái nào. */
+  .khung-anh { overflow: hidden; }
+  .khung-anh img {
+    transition: scale 0.65s var(--ease-out-expo);
+    will-change: scale;
+  }
+  .group:hover .khung-anh img,
+  .khung-anh:hover img {
+    scale: 1.06;
+  }
+
+  /* Ảnh chụp ứng dụng: nâng lên + bóng sâu hơn + nội dung bên trong phóng nhẹ.
+     BÓNG NỀN ĐẶT Ở ĐÂY, không để `style={{ boxShadow }}` inline như trước: style
+     inline thắng mọi class, nên bóng lúc hover sẽ không bao giờ hiện ra được. */
+  .anh-noi, .anh-noi-nho {
+    transition: translate 0.5s var(--ease-out-expo), box-shadow 0.5s var(--ease-out-expo);
+    will-change: translate;
+  }
+  .anh-noi     { box-shadow: 0 34px 80px -34px rgba(15, 23, 42, 0.45); }
+  .anh-noi-nho { box-shadow: 0 22px 48px -20px rgba(15, 23, 42, 0.45); }
+
+  .anh-noi:hover {
+    translate: 0 -0.5rem;
+    box-shadow: 0 46px 96px -34px rgba(15, 23, 42, 0.55);
+  }
+  /* Thẻ ảnh nhỏ nổi cạnh ảnh lớn: nâng ít hơn để nó không nhảy cao hơn ảnh chính. */
+  .anh-noi-nho:hover {
+    translate: 0 -0.35rem;
+    box-shadow: 0 30px 60px -20px rgba(15, 23, 42, 0.55);
+  }
+
+  .anh-noi img, .anh-noi-nho img { transition: scale 0.7s var(--ease-out-expo); }
+  .anh-noi:hover img, .anh-noi-nho:hover img { scale: 1.035; }
+
+  /* Liên kết dạng "Xem thêm →": mũi tên trượt tới khi rê chuột.
+     Trước đây mấy liên kết này chỉ có `hover:underline` — gạch chân xuất hiện tức
+     thì, không có chuyển tiếp nào, nên rê chuột vào cảm giác như không có gì xảy ra.
+     Mũi tên nhúc nhích là tín hiệu "bấm được" rõ hơn hẳn gạch chân. */
+  .link-mui-ten svg { transition: translate 0.25s var(--ease-out-expo); }
+  .link-mui-ten:hover svg { translate: 0.28rem 0; }
+
   /* Scroll-reveal entrance, toggled by IntersectionObserver via .is-in */
   .reveal {
     opacity: 0;
@@ -380,6 +457,19 @@
   .reveal.is-in {
     opacity: 1;
     transform: none;
+  }
+
+  /* Phần tử vừa có `reveal` vừa có `lift` (thẻ liên hệ, thẻ gói dịch vụ…).
+     `transition` là thuộc tính rút gọn: luật đứng sau THAY THẾ trọn gói luật đứng
+     trước chứ không cộng dồn. `.reveal` nằm dưới `.lift` trong tệp này nên nếu không
+     có luật gộp dưới đây, mọi thẻ mang cả hai lớp sẽ mất hẳn phần nhấc lên — đúng
+     kiểu lỗi im lặng: lớp vẫn còn trên DOM, chỉ là nó không làm gì cả. */
+  .reveal.lift {
+    transition:
+      opacity 0.6s var(--ease-out-expo),
+      transform 0.6s var(--ease-out-expo),
+      translate 0.3s var(--ease-out-expo),
+      box-shadow 0.3s var(--ease-out-expo);
   }
 }
 

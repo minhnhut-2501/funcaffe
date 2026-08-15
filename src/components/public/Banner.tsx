@@ -41,7 +41,9 @@ export default function Banner({
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}
-        className="absolute inset-0 w-full h-full object-cover"
+        // `anh-troi`: trôi rất chậm để khung hero có sự sống thay vì đứng chết như
+        // ảnh dán. Biên độ nhỏ nên chữ đè lên trên không bị xê dịch theo.
+        className="anh-troi absolute inset-0 w-full h-full object-cover"
       />
       <div
         className={`relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 ${pad} ${
