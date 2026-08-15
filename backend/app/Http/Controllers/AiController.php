@@ -6,10 +6,10 @@ use App\Http\Controllers\Concerns\ChecksCafeOwnership;
 use App\Models\Cafe;
 use App\Models\Order;
 use App\Services\GeminiService;
+use App\Services\RevenueStats;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use MongoDB\BSON\UTCDateTime;
 use Throwable;
 
 /**
@@ -21,8 +21,10 @@ class AiController extends Controller
 {
     use ChecksCafeOwnership;
 
-    public function __construct(private GeminiService $gemini)
-    {
+    public function __construct(
+        private GeminiService $gemini,
+        private RevenueStats $revenueStats,
+    ) {
         $this->middleware('auth:sanctum');
     }
 
@@ -279,44 +281,15 @@ class AiController extends Controller
         // Phần chi tiết (theo tháng / theo ngày / top món) chỉ cần 12 THÁNG gần đây:
         // kết quả trả về chỉ lấy 6 tháng và 30 ngày cuối. Nạp cả lịch sử kèm dòng món
         // để rồi cắt bớt là chỗ tốn kém nhất của endpoint này.
+        //
+        // Phép cộng nằm ở RevenueStats, dùng chung với trang Doanh thu. Trước đây mỗi
+        // nơi có một bản chép tay, và chỉ cần sửa cách tính ở một bên là hai màn hình
+        // cùng nói về một quán mà ra hai con số.
         $since = Carbon::now()->subMonths(12)->startOfMonth();
-        $invoices = $this->paidOrders($cafe)
-            ->where(function ($q) use ($since) {
-                $q->where('paid_at', '>=', $since)
-                  ->orWhere(fn ($q2) => $q2->whereNull('paid_at')->where('created_at', '>=', $since));
-            })
-            ->with('orderDetails')
-            ->get();
+        $so = $this->revenueStats->forCafes([(string) $cafe->id], $since->format('Y-m-d'));
 
-        $byMonth = [];
-        $byDay = [];
-        $topItems = [];
-
-        foreach ($invoices as $inv) {
-            $amount = (int) ($inv->total_amount ?? 0);
-            $date = $this->toCarbon($inv->paid_at ?? $inv->created_at);
-            if ($date) {
-                $mKey = $date->format('Y-m');
-                $dKey = $date->format('Y-m-d');
-                $byMonth[$mKey] = ($byMonth[$mKey] ?? 0) + $amount;
-                $byDay[$dKey] = ($byDay[$dKey] ?? 0) + $amount;
-            }
-
-            foreach ($inv->orderDetails as $detail) {
-                $name = $detail->item_name_snapshot ?? 'Khác';
-                $qty = (int) ($detail->quantity ?? 0);
-                $rev = (int) ($detail->total_price ?? (($detail->unit_price ?? 0) * $qty));
-                if (!isset($topItems[$name])) {
-                    $topItems[$name] = ['name' => $name, 'count' => 0, 'revenue' => 0];
-                }
-                $topItems[$name]['count'] += $qty;
-                $topItems[$name]['revenue'] += $rev;
-            }
-        }
-
-        ksort($byMonth);
-        ksort($byDay);
-        usort($topItems, fn($a, $b) => $b['revenue'] <=> $a['revenue']);
+        $byMonth = $so['by_month'];
+        $byDay = $so['by_day'];
 
         // So sánh tháng này vs tháng trước
         $thisMonth = Carbon::now()->format('Y-m');
@@ -327,7 +300,7 @@ class AiController extends Controller
             'invoice_count'   => $invoiceCount,
             'revenue_by_month'=> array_slice($byMonth, -6, 6, true),
             'revenue_by_day'  => array_slice($byDay, -30, 30, true),
-            'top_items'       => array_slice(array_values($topItems), 0, 8),
+            'top_items'       => $so['top_items'],
             'this_month'      => $byMonth[$thisMonth] ?? 0,
             'last_month'      => $byMonth[$lastMonth] ?? 0,
         ];
@@ -360,21 +333,4 @@ class AiController extends Controller
             ->where('payment_status', 'paid');
     }
 
-    private function toCarbon($date): ?Carbon
-    {
-        if (!$date) {
-            return null;
-        }
-        if ($date instanceof Carbon) {
-            return $date;
-        }
-        if ($date instanceof UTCDateTime) {
-            return Carbon::instance($date->toDateTime());
-        }
-        try {
-            return Carbon::parse((string) $date);
-        } catch (Throwable) {
-            return null;
-        }
-    }
 }

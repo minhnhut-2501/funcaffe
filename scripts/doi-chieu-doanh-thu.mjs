@@ -6,13 +6,16 @@
  *   2. npm run build && npx next start -p 3100
  *   3. node scripts/doi-chieu-doanh-thu.mjs
  *
+ * Dang chay `npm run dev` san o cong 3000 thi khoi dung buoc 2:
+ *   BASE=http://localhost:3000 node scripts/doi-chieu-doanh-thu.mjs
+ *
  * Chi DOC — khong tao, khong sua, khong xoa gi. An toan chay tren du lieu that.
  */
 import { chromium } from 'file:///C:/FunCafe/node_modules/playwright-core/index.mjs';
 
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
-const BASE = 'http://localhost:3100';
-const API = 'http://localhost:8000/api';
+const BASE = process.env.BASE ?? 'http://localhost:3100';
+const API = process.env.API ?? 'http://localhost:8000/api';
 
 const browser = await chromium.launch({ executablePath: EDGE, headless: true });
 const page = await (await browser.newContext({ viewport: { width: 1500, height: 1300 }, locale: 'vi-VN', timezoneId: 'Asia/Ho_Chi_Minh' })).newPage();
@@ -25,6 +28,9 @@ const ngayVN = (iso) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'A
 
 await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('input[type=email]', { timeout: 30000 });
+// Cho React hydrate xong roi moi dien. O che do dev, dien truoc khi hydrate thi
+// React ve lai o input va nuot mat gia tri — may chu nhan form rong, tra 422.
+await page.waitForTimeout(3000);
 await page.fill('input[type=email]', 'nphec4007@gmail.com');
 await page.fill('input[type=password]', 'Preview@123');
 await page.click('button[type=submit]');
@@ -113,7 +119,12 @@ for (const [cid, v] of Object.entries(donTheoQuan)) {
 }
 
 // ===== 3. TRANG DOANH THU — tung pham vi =====
-console.log('\n3) TRANG DOANH THU');
+console.log('\n3) TRANG DOANH THU (mac dinh 30 ngay gan nhat)');
+const cuaSoTu = new Date(Date.now() - 29 * 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+const trongCuaSoMacDinh = (o) => {
+  const d = ngayVN(o.paid_at ?? o.created_at);
+  return d >= cuaSoTu && d <= homNayVN;
+};
 await page.goto(BASE + '/user/revenue', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => /Doanh thu hôm nay/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});
 await page.waitForTimeout(2000);
@@ -130,12 +141,19 @@ for (const nhan of cacPhamVi.map(t => t.trim())) {
   const mSoHd = chu.match(/(\d+)\s*hóa đơn/);
   const uiSoHd = mSoHd ? Number(mSoHd[1]) : null;
 
-  // Tap hoa don tuong ung voi pham vi dang chon
+  // Tap hoa don tuong ung voi pham vi dang chon, GIOI HAN trong cua so mac dinh
+  // cua trang: 30 ngay gan nhat, tinh ca hom nay.
+  //
+  // Truoc day cho nay so voi TOAN BO lich su, va no dung — hoi trang con mac dinh
+  // "toan bo thoi gian". Tu khi trang doi sang mac dinh 30 ngay thi phep so ay bao
+  // LECH o moi lan chay, trong khi ca hai ben deu dang dung. Mot bai kiem bao dong
+  // gia deu dan thi chang bao lau se khong con ai doc nua.
   const laTatCa = /Tất cả quán/.test(nhan);
   const tenQuan = nhan.replace(/\s*\(\d+\)\s*$/, '').trim();
-  const tap = laTatCa
+  const tap = (laTatCa
     ? moiDon
-    : (Object.values(donTheoQuan).find(v => v.ten === tenQuan)?.don ?? []);
+    : (Object.values(donTheoQuan).find(v => v.ten === tenQuan)?.don ?? [])
+  ).filter(trongCuaSoMacDinh);
   const that = tongCua(tap);
 
   ok(uiDoanhThu === that && uiSoHd === tap.length,

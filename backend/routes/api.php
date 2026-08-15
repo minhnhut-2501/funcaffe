@@ -139,6 +139,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Tổng doanh thu gộp tất cả quán của user (không theo quán cụ thể)
     Route::get('revenue/overview', [\App\Http\Controllers\UserRevenueController::class, 'overview']);
+    // Số liệu trang Doanh thu: đã cộng sẵn ở máy chủ, nhận khoảng ngày + phạm vi quán.
+    Route::get('revenue/summary', [\App\Http\Controllers\UserRevenueController::class, 'summary']);
 });
 
 // Admin

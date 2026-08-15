@@ -11,7 +11,7 @@ import CafeRevenueComparison from '@/components/user/CafeRevenueComparison';
 import { useAuth } from '@/context/AuthContext';
 import { invoiceService, revenueService } from '@/services';
 import { useApi } from '@/hooks/use-api';
-import { formatCurrency, formatPaymentMethod, ngayDiaPhuong } from '@/lib/format';
+import { formatCurrency, formatPaymentMethod } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { Download, TrendingUp, Receipt, DollarSign, BarChart3, AlertCircle, Store, Trophy } from 'lucide-react';
 import { downloadExcel, toExcelDate } from '@/lib/utils';
@@ -20,24 +20,25 @@ import ChartModePicker from '@/components/user/ChartModePicker';
 import type { Invoice } from '@/types';
 import { fillGaps, keyLength, axisLabel, fullLabel, suggestMode, type ChartMode } from '@/lib/chart';
 
-/** Ngày thanh toán dạng 'YYYY-MM-DD'; hóa đơn cũ thiếu paid_at thì lấy ngày tạo. */
-// Ngày ghi nhận doanh thu, theo giờ ĐỊA PHƯƠNG — xem chú thích ở ngayDiaPhuong().
-const dayOf = (i: Invoice) => ngayDiaPhuong(i.paidAt || i.createdAt);
-
-function groupBy(
-  invoices: Invoice[],
+/**
+ * Gom các mốc NGÀY do máy chủ trả về thành mốc của biểu đồ (ngày / tháng / năm).
+ *
+ * Cắt chuỗi ở đây là an toàn, khác hẳn với việc cắt một chuỗi ISO thô: khóa trong
+ * `byDay` đã là ngày ĐỊA PHƯƠNG do máy chủ dựng sẵn ('YYYY-MM-DD', giờ Việt Nam),
+ * nên `slice(0, 7)` ra đúng tháng địa phương. Cắt trên mốc UTC gốc thì hóa đơn thu
+ * lúc 00:23 sáng rơi sang cột hôm trước, và ở cuối tháng thì rơi sang cả tháng trước.
+ */
+function groupBuckets(
+  byDay: { key: string; value: number }[],
   mode: ChartMode,
   from?: string,
   to?: string,
 ): RevenuePoint[] {
   const len = keyLength(mode);
   const groups: Record<string, number> = {};
-  invoices.forEach(inv => {
-    // Cắt trên NGÀY ĐỊA PHƯƠNG chứ không trên chuỗi UTC gốc: hóa đơn thu lúc 00:23
-    // sáng nếu cắt chuỗi UTC sẽ rơi vào cột của ngày hôm trước — và ở cuối tháng thì
-    // rơi luôn sang cột tháng trước.
-    const k = dayOf(inv).slice(0, len);
-    groups[k] = (groups[k] ?? 0) + inv.totalAmount;
+  byDay.forEach(({ key, value }) => {
+    const k = key.slice(0, len);
+    groups[k] = (groups[k] ?? 0) + value;
   });
   // fillGaps: ngày nghỉ / ngày ế phải hiện cột 0 chứ không được biến mất khỏi trục.
   return fillGaps(groups, mode, 0, from, to).map(({ key, value }) => ({
@@ -45,20 +46,6 @@ function groupBy(
     full: fullLabel(key, mode),
     value,
   }));
-}
-
-function computeTopItems(invoices: Invoice[]): { name: string; count: number; revenue: number }[] {
-  const map: Record<string, { name: string; count: number; revenue: number }> = {};
-  invoices.forEach(inv => {
-    (inv.items ?? []).forEach(item => {
-      const key = item.itemNameSnapshot;
-      if (!map[key]) map[key] = { name: key, count: 0, revenue: 0 };
-      map[key].count += item.quantity;
-      // Gồm cả topping: ưu tiên totalPrice, fallback unitPrice*qty cho dữ liệu cũ
-      map[key].revenue += item.totalPrice || item.unitPrice * item.quantity;
-    });
-  });
-  return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
 }
 
 const today = new Date();
@@ -100,56 +87,33 @@ export default function RevenuePage() {
   const effectiveMode = viewMode ?? suggestMode(fromDate, toDate);
   const [exporting, setExporting] = useState(false);
 
-  /**
-   * Chỉ tải quán ĐANG XEM. Chọn "Tất cả quán" mới đi lấy hết.
-   *
-   * Bản cũ luôn tải hóa đơn của MỌI quán rồi lọc trong trình duyệt, kể cả khi màn
-   * hình chỉ hiện đúng một quán — hai phần ba lượt gọi nặng nhất ứng dụng bị vứt đi
-   * ngay sau khi tải xong.
-   */
+  /** Các quán nằm trong phạm vi đang xem — dùng cho nhãn và cho lượt xuất Excel. */
   const canTai = useMemo(
     () => (effectiveScope === 'all' ? cafes : cafes.filter(c => c.id === effectiveScope)),
     [cafes, effectiveScope],
   );
-  const taiKey = canTai.map(c => c.id).join(',');
 
-  const { data: ketQua, loading, error, refresh } = useApi(
-    async () => {
-      if (canTai.length === 0) return { hoaDon: [] as Invoice[], quanHong: [] as string[] };
-
-      const hoaDon: Invoice[] = [];
-      const quanHong: string[] = [];
-      let loiDau: unknown = null;
-
-      // TUẦN TỰ, không Promise.all/allSettled.
-      //
-      // Máy chủ ở bản triển khai phục vụ MỘT request tại một thời điểm, nên bắn song
-      // song không rút ngắn được gì — nó chỉ khiến cả ba quán cùng bấm giờ hạn chờ
-      // trong khi hai quán đang nằm xếp hàng. Quán được phục vụ sau cùng vì thế luôn
-      // hết giờ trước khi tới lượt, dù bản thân nó chỉ cần vài giây.
-      //
-      // Chạy lần lượt thì mỗi quán được trọn hạn chờ của riêng nó. Tổng thời gian chờ
-      // y hệt, nhưng dữ liệu về ĐỦ thay vì mất quán nặng nhất.
-      for (const c of canTai) {
-        try {
-          hoaDon.push(...await invoiceService.listByCafe(c.id, c.name, {
-            from: fromDate || undefined,
-            to: toDate || undefined,
-          }));
-        } catch (e) {
-          quanHong.push(c.name);
-          loiDau ??= e;
-        }
-      }
-
-      // Hỏng HẾT thì mới là lỗi thật — ném ra để useApi hiện màn hình lỗi.
-      if (quanHong.length === canTai.length) {
-        throw loiDau instanceof Error ? loiDau : new Error('Không tải được hóa đơn của quán nào.');
-      }
-
-      return { hoaDon, quanHong };
-    },
-    [taiKey, fromDate, toDate],
+  /**
+   * MỘT lượt gọi, máy chủ đã cộng sẵn.
+   *
+   * Bản trước tải toàn bộ hóa đơn của TỪNG quán — kèm dòng món và topping — rồi cộng
+   * trong trình duyệt. Với ba quán demo (gần 2.000 hóa đơn) đó là ba request nặng nối
+   * đuôi nhau, đo trên bản triển khai mất 12,3 giây, và chi phí ấy còn lớn dần theo
+   * mỗi tháng bán hàng. Tất cả chỉ để hiện vài chục con số.
+   *
+   * Giờ số liệu đi thẳng từ `/revenue/summary`: chi phí tỉ lệ với số CỘT trên biểu đồ
+   * chứ không còn tỉ lệ với số hóa đơn tích lũy.
+   *
+   * Không còn khái niệm "tải được một phần": một request thì hoặc xong hoặc hỏng, và
+   * khi hỏng thì hỏng nhanh chứ không để người dùng ngồi nhìn số liệu thiếu quán.
+   */
+  const { data: soLieu, loading, error, refresh } = useApi(
+    () => revenueService.summary({
+      from: fromDate || undefined,
+      to: toDate || undefined,
+      cafeId: effectiveScope,
+    }),
+    [effectiveScope, fromDate, toDate],
   );
 
   /**
@@ -160,45 +124,33 @@ export default function RevenuePage() {
    */
   const { data: tongQuan } = useApi(() => revenueService.overview(), []);
 
-  const all = useMemo(() => ketQua?.hoaDon ?? [], [ketQua]);
-  const quanHong = ketQua?.quanHong ?? [];
-  const scoped = useMemo(
-    () => (effectiveScope === 'all' ? all : all.filter(i => i.cafeId === effectiveScope)),
-    [all, effectiveScope],
-  );
-  const filtered = useMemo(() => {
-    let r = scoped;
-    if (fromDate) r = r.filter(i => dayOf(i) >= fromDate);
-    if (toDate) r = r.filter(i => dayOf(i) <= toDate);
-    return r;
-  }, [scoped, fromDate, toDate]);
-
-  const revenue = useMemo(() => filtered.reduce((s, i) => s + i.totalAmount, 0), [filtered]);
-  const avgPerInvoice = filtered.length > 0 ? Math.round(revenue / filtered.length) : 0;
+  // Máy chủ đã lọc theo khoảng VÀ theo quán rồi — không cắt lại lần nữa ở đây. Lọc
+  // hai lần là mở đường cho hai bên lệch nhau, mà bên thua luôn là con số trên màn hình.
+  const revenue = soLieu?.total ?? 0;
+  const soHoaDon = soLieu?.count ?? 0;
+  const avgPerInvoice = soHoaDon > 0 ? Math.round(revenue / soHoaDon) : 0;
   const todayRevenue = useMemo(() => {
     if (!tongQuan) return 0;
     if (effectiveScope === 'all') return tongQuan.today;
     return tongQuan.cafes.find(c => c.cafeId === effectiveScope)?.today ?? 0;
   }, [tongQuan, effectiveScope]);
   const chartData = useMemo(
-    () => groupBy(filtered, effectiveMode, fromDate, toDate),
-    [filtered, effectiveMode, fromDate, toDate],
+    () => groupBuckets(soLieu?.byDay ?? [], effectiveMode, fromDate, toDate),
+    [soLieu, effectiveMode, fromDate, toDate],
   );
-  const topItems = useMemo(() => computeTopItems(filtered), [filtered]);
+  // Máy chủ trả 8 món xếp sẵn theo doanh thu; màn hình chỉ hiện 5.
+  const topItems = useMemo(() => (soLieu?.topItems ?? []).slice(0, 5), [soLieu]);
 
   // Xếp hạng doanh thu từng quán trong khoảng đang lọc.
   const cafeRanking = useMemo(() => {
-    const rows = cafes.map(c => {
-      const list = filtered.filter(i => i.cafeId === c.id);
-      return {
-        id: c.id,
-        name: c.name,
-        revenue: list.reduce((s, i) => s + i.totalAmount, 0),
-        count: list.length,
-      };
-    });
+    const rows = (soLieu?.cafes ?? []).map(c => ({
+      id: c.cafeId,
+      name: c.cafeName,
+      revenue: c.total,
+      count: c.count,
+    }));
     return rows.sort((a, b) => b.revenue - a.revenue);
-  }, [cafes, filtered]);
+  }, [soLieu]);
   const showComparison = effectiveScope === 'all' && cafes.length > 1;
 
   const rangeLabel = fromDate || toDate
@@ -207,12 +159,50 @@ export default function RevenuePage() {
   const scopeLabel = effectiveScope === 'all' ? 'tất cả quán' : cafes.find(c => c.id === effectiveScope)?.name ?? '';
 
   const handleExport = async () => {
-    if (filtered.length === 0) {
+    if (soHoaDon === 0) {
       toast({ description: 'Không có hóa đơn nào trong khoảng đã lọc.' });
       return;
     }
     setExporting(true);
     try {
+      /**
+       * Chi tiết từng hóa đơn CHỈ tải lúc bấm nút này.
+       *
+       * Màn hình không cần chúng — `/revenue/summary` đã cộng sẵn mọi con số hiện ra.
+       * Nhưng tệp Excel thì cần từng dòng, nên lượt gọi nặng ngày xưa vẫn còn đây,
+       * chỉ là đã dời khỏi đường mở trang sang một thao tác hiếm mà người dùng chủ
+       * động chọn và sẵn sàng chờ.
+       *
+       * TUẦN TỰ chứ không `Promise.all`, và lần này lý do KHÔNG phải "máy chủ chạy
+       * một request một lúc" (từ 14/08 nó chạy 3 worker). Lý do là bộ nhớ: gói Render
+       * miễn phí có 512MB, mỗi phản hồi danh sách dài chiếm hàng trăm MB ở phía máy
+       * chủ, nên bắn ba lượt cùng lúc là cách chắc chắn nhất để tiến trình bị giết.
+       */
+      const hoaDon: Invoice[] = [];
+      const quanHong: string[] = [];
+      for (const c of canTai) {
+        try {
+          hoaDon.push(...await invoiceService.listByCafe(c.id, c.name, {
+            from: fromDate || undefined,
+            to: toDate || undefined,
+          }));
+        } catch {
+          quanHong.push(c.name);
+        }
+      }
+
+      if (hoaDon.length === 0) {
+        throw new Error('Không tải được hóa đơn nào để xuất.');
+      }
+      // Xuất thiếu quán mà không nói là đưa cho người nhận một tệp trông đầy đủ
+      // nhưng thiếu tiền. Nói trước, rồi vẫn xuất phần lấy được.
+      if (quanHong.length > 0) {
+        toast({
+          description: `Thiếu hóa đơn của ${quanHong.join(' · ')} — tệp chỉ gồm các quán còn lại.`,
+          variant: 'destructive',
+        });
+      }
+
       // Cột "Quán" chỉ có nghĩa khi file gộp nhiều quán; đang xem riêng một quán mà
       // vẫn xuất thì cả cột lặp lại đúng một cái tên.
       const multi = effectiveScope === 'all' && cafes.length > 1;
@@ -230,7 +220,7 @@ export default function RevenuePage() {
           { header: 'Số tiền', width: 16, numFmt: '#,##0 "₫"' },
           { header: 'Ngày thanh toán', width: 20, numFmt: 'dd/mm/yyyy hh:mm' },
         ],
-        filtered.map(inv => [
+        hoaDon.map(inv => [
           ...(multi ? [inv.cafeName ?? ''] : []),
           inv.invoiceCode,
           inv.tableName,
@@ -306,23 +296,9 @@ export default function RevenuePage() {
         }
       />
 
-      {/* Tải được một phần. Số dưới đây là THẬT nhưng THIẾU — nói rõ thiếu của quán
-          nào, thay vì để chủ quán đọc một con số nhỏ hơn thực tế mà không hay biết. */}
-      {quanHong.length > 0 && (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold">
-              Số liệu đang thiếu {quanHong.length === 1 ? 'quán' : `${quanHong.length} quán`}: {quanHong.join(' · ')}
-            </p>
-            <p className="mt-0.5">
-              Các quán còn lại đã tải xong và số bên dưới là của những quán đó.
-              Quán nhiều hóa đơn có thể tải quá lâu — thử lại thường là được.
-            </p>
-            <button onClick={refresh} className="btn-secondary mt-3">Tải lại</button>
-          </div>
-        </div>
-      )}
+      {/* Không còn dải cảnh báo "thiếu N quán": số liệu nay về trong MỘT lượt gọi đã
+          cộng sẵn, nên không tồn tại trạng thái nửa vời "vài quán xong, vài quán rớt".
+          Hỏng thì rơi vào nhánh `error` ở trên, kèm nút Thử lại. */}
 
       <FilterBar>
         {cafes.length > 1 && (
@@ -350,11 +326,11 @@ export default function RevenuePage() {
       </FilterBar>
 
       <p className="text-sm text-cafe-500 mb-4">
-        Đang xem <span className="font-semibold text-ink">{scopeLabel}</span> · {rangeLabel} · {filtered.length} hóa đơn
+        Đang xem <span className="font-semibold text-ink">{scopeLabel}</span> · {rangeLabel} · {soHoaDon} hóa đơn
       </p>
 
       <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Doanh thu" value={formatCurrency(revenue)} icon={DollarSign} featured hint={`${filtered.length} hóa đơn`} />
+        <StatCard label="Doanh thu" value={formatCurrency(revenue)} icon={DollarSign} featured hint={`${soHoaDon} hóa đơn`} />
         <StatCard label="Doanh thu hôm nay" value={formatCurrency(todayRevenue)} icon={TrendingUp} color="green" />
         <StatCard label="Trung bình/hóa đơn" value={formatCurrency(avgPerInvoice)} icon={BarChart3} color="blue" />
         {showComparison && cafeRanking[0]?.revenue > 0 ? (
@@ -366,7 +342,7 @@ export default function RevenuePage() {
             hint={formatCurrency(cafeRanking[0].revenue)}
           />
         ) : (
-          <StatCard label="Tổng hóa đơn" value={filtered.length} icon={Receipt} color="yellow" />
+          <StatCard label="Tổng hóa đơn" value={soHoaDon} icon={Receipt} color="yellow" />
         )}
       </div>
 

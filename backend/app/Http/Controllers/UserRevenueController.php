@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cafe;
 use App\Models\Order;
 use App\Models\Subscription;
+use App\Services\RevenueStats;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use MongoDB\BSON\UTCDateTime;
@@ -133,6 +134,67 @@ class UserRevenueController extends Controller
             'count' => $grandCount,
             'revenue_by_month' => array_slice($byMonth, -12, 12, true),
             'cafes' => $cafeRows,
+        ]);
+    }
+
+    /**
+     * Số liệu cho TRANG DOANH THU: tổng, theo ngày, theo tháng, top món, tách quán —
+     * tất cả trong một lượt gọi, đã cộng sẵn ở máy chủ.
+     *
+     * Khác `overview()` ở trên: overview là bức ảnh cố định (toàn thời gian, hôm nay,
+     * tháng này) cho thẻ tóm tắt và tên gói; còn đây nhận khoảng ngày và phạm vi quán
+     * do người dùng chọn, và trả thêm phần dựng biểu đồ.
+     *
+     * Thay cho việc trình duyệt tải toàn bộ hóa đơn của từng quán rồi tự cộng: cùng
+     * một kết quả, nhưng vài chục kilobyte thay vì vài megabyte, và một request thay
+     * vì một request cho mỗi quán.
+     *
+     * KHÔNG trả về từng hóa đơn. Nút Xuất Excel cần chi tiết thì đi lấy riêng lúc bấm
+     * — đó là thao tác hiếm, không đáng bắt mọi lượt mở trang trả giá.
+     */
+    public function summary(Request $request, RevenueStats $stats)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'from'    => 'nullable|date_format:Y-m-d',
+            'to'      => 'nullable|date_format:Y-m-d',
+            // Vắng mặt = gộp mọi quán của chủ tài khoản.
+            'cafe_id' => 'nullable|string',
+        ]);
+
+        $cafes = Cafe::where('user_id', (string) $user->id)->get();
+
+        if (!empty($validated['cafe_id'])) {
+            $chon = $cafes->first(fn ($c) => (string) $c->id === $validated['cafe_id']);
+            // Quán không thuộc tài khoản này thì báo không tìm thấy, đừng lặng lẽ trả
+            // về toàn số 0 — người đọc sẽ tưởng quán mình chưa bán được gì.
+            if (!$chon) {
+                return response()->json(['message' => 'Không tìm thấy quán.'], 404);
+            }
+            $cafes = collect([$chon]);
+        }
+
+        $tenQuan = $cafes->mapWithKeys(fn ($c) => [(string) $c->id => $c->name]);
+
+        $so = $stats->forCafes(
+            $tenQuan->keys()->all(),
+            $validated['from'] ?? null,
+            $validated['to'] ?? null,
+        );
+
+        return response()->json([
+            'total'     => $so['total'],
+            'count'     => $so['count'],
+            'by_day'    => (object) $so['by_day'],
+            'by_month'  => (object) $so['by_month'],
+            'top_items' => $so['top_items'],
+            'cafes'     => collect($so['by_cafe'])->map(fn ($row, $cid) => [
+                'cafe_id'   => $cid,
+                'cafe_name' => $tenQuan[$cid] ?? '',
+                'total'     => $row['total'],
+                'count'     => $row['count'],
+            ])->values(),
         ]);
     }
 

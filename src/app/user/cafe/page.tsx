@@ -4,10 +4,10 @@ import PageHeader from '@/components/ui/PageHeader';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import MediaUploader from '@/components/ui/MediaUploader';
 import { useAuth } from '@/context/AuthContext';
-import { cafeService, createCafe, invoiceService, revenueService, type RevenueOverview } from '@/services';
+import { cafeService, createCafe, revenueService, type RevenueOverview, type RevenueSummary } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/format';
-import type { CafeInfo, Invoice } from '@/types';
+import type { CafeInfo } from '@/types';
 import { VN_BANKS } from '@/lib/banks';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import DateRangePicker from '@/components/ui/DateRangePicker';
@@ -51,9 +51,9 @@ export default function CafePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [rangeStats, setRangeStats] = useState<RevenueSummary | null>(null);
   const [rangeLoading, setRangeLoading] = useState(false);
-  const [quanHong, setQuanHong] = useState<string[]>([]);
+  const [rangeError, setRangeError] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
@@ -95,69 +95,42 @@ export default function CafePage() {
   const hasRange = !!(fromDate || toDate);
 
   /**
-   * Hóa đơn CHỈ tải khi người dùng thực sự chọn một khoảng ngày.
+   * Số liệu theo khoảng CHỈ hỏi khi người dùng thực sự chọn một khoảng ngày.
    *
-   * Đường đi mặc định — cái mở ra 95% số lần — không cần đến chúng: /revenue/overview
-   * đã trả sẵn tổng tiền, hôm nay, tháng này VÀ số hóa đơn cho từng quán, tất cả
-   * trong một request duy nhất chỉ đọc bốn trường. Trước đây trang này gọi nó rồi
-   * chỉ lấy mỗi tên gói, xong đi tải lại toàn bộ hóa đơn của MỌI quán kèm dòng món
-   * và topping để cộng ra đúng những con số đó — vài megabyte để thay cho vài chục
-   * kilobyte, trên một máy chủ phục vụ một request tại một thời điểm.
+   * Đường đi mặc định — cái mở ra 95% số lần — không cần lượt gọi nào thêm:
+   * /revenue/overview đã trả sẵn tổng tiền, hôm nay, tháng này VÀ số hóa đơn cho từng
+   * quán, tất cả trong một request chỉ đọc bốn trường.
    *
-   * Hai điểm nữa của lượt gọi này, khác hẳn bản cũ:
-   *
-   *  · TUẦN TỰ, không `Promise.all`. Máy chủ ở bản triển khai chỉ chạy được một
-   *    request một lúc, nên bắn song song không nhanh hơn được chút nào — chỉ khiến
-   *    cả ba cùng bấm giờ trong khi hai cái phải nằm chờ. Chạy lần lượt thì mỗi quán
-   *    được trọn hạn chờ của riêng nó.
-   *  · Hỏng quán nào chỉ mất quán đó. `Promise.all` cũ reject ngay khi MỘT quán hỏng
-   *    và nhánh catch xoá sạch mảng, nên chỉ cần quán nặng nhất quá hạn là cả trang
-   *    hiện 0 ₫ — kể cả khi những quán khác đã tải xong và có doanh thu thật.
+   * Khi có chọn khoảng thì hỏi /revenue/summary — máy chủ cộng sẵn và trả về vài
+   * kilobyte. Bản trước đi vòng qua danh sách hóa đơn: duyệt TỪNG quán, mỗi quán một
+   * request kéo về mọi hóa đơn kèm dòng món và topping, rồi cộng lại trong trình
+   * duyệt để ra đúng mấy con số này. Đo trên dữ liệu demo: 282 KB xuống 1,7 KB cho
+   * một quán 127 hóa đơn, và phần tiết kiệm còn lớn thêm theo mỗi tháng bán hàng.
    */
   const cafeKey = cafes.map(c => c.id).join(',');
   useEffect(() => {
     if (!hasRange || cafes.length === 0) {
-      setInvoices([]);
-      setQuanHong([]);
+      setRangeStats(null);
+      setRangeError(false);
       setRangeLoading(false);
       return;
     }
     let cancelled = false;
     setRangeLoading(true);
-    (async () => {
-      const gom: Invoice[] = [];
-      const hong: string[] = [];
-      for (const c of cafes) {
-        if (cancelled) return;
-        try {
-          // Lọc NGAY TRÊN MÁY CHỦ: kéo cả đời rồi cắt trong trình duyệt là trả tiền
-          // băng thông cho phần dữ liệu chắc chắn bị vứt đi.
-          gom.push(...await invoiceService.listByCafe(c.id, c.name, {
-            from: fromDate || undefined,
-            to: toDate || undefined,
-          }));
-        } catch {
-          hong.push(c.name);
-        }
-      }
-      if (cancelled) return;
-      setInvoices(gom);
-      setQuanHong(hong);
-      setRangeLoading(false);
-    })();
+    setRangeError(false);
+    revenueService.summary({ from: fromDate || undefined, to: toDate || undefined })
+      .then((d) => { if (!cancelled) setRangeStats(d); })
+      // KHÔNG nuốt lỗi thành số 0: "chưa bán được gì" và "không tải được" trông y hệt
+      // nhau trên màn hình, mà hai thứ đó cần hai phản ứng khác hẳn.
+      .catch(() => { if (!cancelled) { setRangeStats(null); setRangeError(true); } })
+      .finally(() => { if (!cancelled) setRangeLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cafeKey, fromDate, toDate, hasRange]);
 
-  // Máy chủ đã lọc theo khoảng rồi nên không cắt lại ở đây nữa.
-  const ranged = invoices;
-
-  // Chưa lọc -> lấy thẳng số máy chủ đã cộng sẵn. Có lọc -> cộng từ hóa đơn vừa tải.
-  const rangeRevenue = useMemo(
-    () => (hasRange ? ranged.reduce((s, i) => s + i.totalAmount, 0) : overview?.total ?? 0),
-    [hasRange, ranged, overview],
-  );
-  const rangeCount = hasRange ? ranged.length : overview?.count ?? 0;
+  // Chưa lọc -> lấy số toàn thời gian từ overview. Có lọc -> lấy số của khoảng đó.
+  const rangeRevenue = hasRange ? rangeStats?.total ?? 0 : overview?.total ?? 0;
+  const rangeCount = hasRange ? rangeStats?.count ?? 0 : overview?.count ?? 0;
   const todayRevenue = overview?.today ?? 0;
   const monthRevenue = overview?.thisMonth ?? 0;
   const avgPerInvoice = rangeCount > 0 ? Math.round(rangeRevenue / rangeCount) : 0;
@@ -172,21 +145,15 @@ export default function CafePage() {
         count: m.get(c.id)?.count ?? 0,
       }));
     }
-    const stat: Record<string, { total: number; count: number }> = {};
-    cafes.forEach(c => { stat[c.id] = { total: 0, count: 0 }; });
-    ranged.forEach(i => {
-      const e = stat[i.cafeId ?? ''];
-      if (!e) return;
-      e.total += i.totalAmount;
-      e.count += 1;
-    });
+    // Máy chủ đã tách sẵn theo quán, kể cả quán không bán được gì trong khoảng.
+    const m = new Map((rangeStats?.cafes ?? []).map(c => [c.cafeId, c]));
     return cafes.map(c => ({
       id: c.id,
       name: c.name,
-      revenue: stat[c.id]?.total ?? 0,
-      count: stat[c.id]?.count ?? 0,
+      revenue: m.get(c.id)?.total ?? 0,
+      count: m.get(c.id)?.count ?? 0,
     }));
-  }, [cafes, hasRange, pkgList, ranged]);
+  }, [cafes, hasRange, pkgList, rangeStats]);
 
   const rangeLabel = hasRange
     ? `${fromDate ? fromDate.split('-').reverse().join('/') : 'đầu kỳ'} → ${toDate ? toDate.split('-').reverse().join('/') : 'nay'}`
@@ -402,16 +369,18 @@ export default function CafePage() {
         </div>
       )}
 
-      {/* Tải được một phần: số bên dưới là THẬT nhưng THIẾU quán nào thì nói rõ quán đó. */}
-      {quanHong.length > 0 && (
+      {/* Số theo khoảng về trong MỘT lượt gọi đã cộng sẵn, nên không còn trạng thái
+          nửa vời "vài quán xong, vài quán rớt" — chỉ còn xong hoặc hỏng. Hỏng thì
+          phải nói ra: để nguyên số 0 trên màn hình là nói dối rằng quán không bán
+          được gì trong khoảng đó. */}
+      {rangeError && (
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold">
-              Số liệu trong khoảng đang thiếu {quanHong.length === 1 ? 'quán' : `${quanHong.length} quán`}: {quanHong.join(' · ')}
-            </p>
+            <p className="font-semibold">Không tải được số liệu của khoảng đã chọn.</p>
             <p className="mt-0.5">
-              Các quán còn lại đã tải xong. Thu hẹp khoảng ngày sẽ tải nhanh hơn hẳn.
+              Các con số bên dưới đang để trống, không phải bằng 0. Thử lại, hoặc bỏ
+              bộ lọc ngày để xem số toàn thời gian.
             </p>
           </div>
         </div>
