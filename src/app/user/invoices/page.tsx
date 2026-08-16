@@ -4,6 +4,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
 import LockedButton from '@/components/ui/LockedButton';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { invoiceService } from '@/services';
 import { useApi } from '@/hooks/use-api';
 import { canPrint } from '@/lib/permission';
@@ -30,6 +31,36 @@ export default function InvoicesPage() {
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
   /** Đã bấm in từ bảng, đang chờ hộp thoại vẽ xong. */
   const [choIn, setChoIn] = useState(false);
+  /**
+   * Đang đi lấy dòng món cho tờ đang mở.
+   *
+   * Danh sách nạp về ở dạng gọn — không kèm dòng món (xem `invoiceService.list`), nên
+   * mở một tờ ra là phải hỏi máy chủ lần nữa. Phần đầu phiếu (mã, bàn, giờ, tổng tiền)
+   * đã có sẵn nên vẽ được ngay; chỉ khúc bảng món là phải chờ.
+   */
+  const [dangTaiChiTiet, setDangTaiChiTiet] = useState(false);
+  const { toast } = useToast();
+
+  /**
+   * Mở một hóa đơn, và chỉ IN sau khi đã có đủ dòng món.
+   *
+   * `roiIn` không được bật trước lúc chi tiết về: bản in dựng từ chính khối .print-area
+   * trong hộp thoại này, nên in lúc bảng món còn rỗng là đưa khách một tờ phiếu KHÔNG
+   * CÓ MÓN NÀO mà vẫn ghi đủ tổng tiền — sai nguy hiểm hơn hẳn một tờ giấy trắng, vì
+   * nó trông như một hóa đơn thật.
+   */
+  const moHoaDon = async (inv: Invoice, roiIn = false) => {
+    setViewInvoice(inv);
+    setDangTaiChiTiet(true);
+    try {
+      setViewInvoice(await invoiceService.getById(inv.id));
+      if (roiIn) setChoIn(true);
+    } catch {
+      toast({ description: 'Không tải được chi tiết hóa đơn, vui lòng thử lại.', variant: 'destructive' });
+    } finally {
+      setDangTaiChiTiet(false);
+    }
+  };
 
   // Bán hàng chỉ có 2 phương thức: tiền mặt và chuyển khoản. Chuyển khoản được lưu là
   // 'vietqr', nhưng đơn cũ trong DB còn giá trị 'transfer' — gom cả hai vào một nhóm.
@@ -86,9 +117,15 @@ export default function InvoicesPage() {
     if (!cauHoi) return;
 
     const canIn = invoices.find(inv => inv.id === cauHoi || inv.invoiceCode === cauHoi);
-    if (canIn) setViewInvoice(canIn);
+    // Qua moHoaDon chứ không setViewInvoice thẳng: bản trong danh sách là bản GỌN,
+    // không có dòng món nào. Đây là đường thu ngân đi ngay sau khi thu tiền.
+    if (canIn) void moHoaDon(canIn);
     // Xóa tham số khỏi thanh địa chỉ: tải lại trang không nên mở lại hộp thoại cũ.
     window.history.replaceState(null, '', window.location.pathname);
+    // `moHoaDon` cố ý KHÔNG nằm trong danh sách phụ thuộc: nó được dựng lại ở mỗi lượt
+    // vẽ, mà chính nó gọi setState — đưa vào là hiệu ứng tự kích lại vòng vòng. Hiệu
+    // ứng này chỉ được chạy khi danh sách vừa về, đúng một lần.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices]);
 
   if (loading) return <div><PageHeader title="Hóa đơn" description="Xem, lọc và in hóa đơn thanh toán." /><LoadingSkeleton variant="table" rows={6} cols={7} /></div>;
@@ -141,11 +178,11 @@ export default function InvoicesPage() {
                 <td className="px-4 py-3 text-cafe-500 text-xs">{formatDateTime(inv.createdAt)}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => setViewInvoice(inv)} title="Xem chi tiết" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors">
+                    <button onClick={() => moHoaDon(inv)} title="Xem chi tiết" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors">
                       <Eye className="w-4 h-4" />
                     </button>
                     {canPrint(pkg) ? (
-                      <button onClick={() => { setViewInvoice(inv); setChoIn(true); }} title="In hóa đơn" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors">
+                      <button onClick={() => moHoaDon(inv, true)} title="In hóa đơn" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors">
                         <Printer className="w-4 h-4" />
                       </button>
                     ) : (
@@ -179,8 +216,10 @@ export default function InvoicesPage() {
           // giữ class để nó không chiếm chỗ trên bản in.
           <div className="flex gap-2 no-print">
             {canPrint(pkg) ? (
-              <button onClick={() => window.print()} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
-                <Printer className="w-4 h-4" />In hóa đơn
+              // Khóa trong lúc chờ dòng món: in sớm là ra một tờ phiếu không có món
+              // nào mà vẫn ghi đủ tổng tiền.
+              <button onClick={() => window.print()} disabled={dangTaiChiTiet} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
+                <Printer className="w-4 h-4" />{dangTaiChiTiet ? 'Đang tải...' : 'In hóa đơn'}
               </button>
             ) : (
               <LockedButton variant="secondary" className="flex-1 flex items-center justify-center gap-2 text-sm">
@@ -220,6 +259,11 @@ export default function InvoicesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cafe-50">
+                  {/* no-print: dòng chờ này không bao giờ được lên giấy. Nút In cũng
+                      đã khóa trong lúc chờ, nên đây chỉ là lớp phòng thứ hai. */}
+                  {dangTaiChiTiet && viewInvoice.items.length === 0 && (
+                    <tr className="no-print"><td colSpan={4} className="py-3 text-center text-cafe-400">Đang tải chi tiết món...</td></tr>
+                  )}
                   {viewInvoice.items.map((item, idx) => (
                     <Fragment key={idx}>
                       <tr className="text-cafe-800">

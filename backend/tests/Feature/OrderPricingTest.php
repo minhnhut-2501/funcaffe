@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Cafe;
 use App\Models\Category;
 use App\Models\Item;
+use App\Models\Order;
 use App\Models\Package;
 use App\Models\Subscription;
 use App\Models\Topping;
@@ -184,6 +185,35 @@ class OrderPricingTest extends MongoTestCase
         ])->assertStatus(422);
     }
 
+    /**
+     * BỎ TRỐNG ô tiền khách đưa cũng phải bị chặn, không chỉ đưa thiếu.
+     *
+     * Đây từng là lỗ thật: `cash_received` là `nullable`, mà cái chốt "đưa thiếu thì
+     * không cho thanh toán" lại nằm bên trong `isset()`. Không gửi trường đó là đi
+     * lọt — đơn chốt bình thường với `cash_received` và `change_amount` cùng null,
+     * biên lai in ra không có tiền thối để đối chiếu cuối ca.
+     */
+    public function test_tien_mat_ma_khong_ghi_so_khach_dua_thi_bi_tu_choi(): void
+    {
+        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+            'payment_method' => 'cash',
+        ])->assertStatus(422)->assertJsonValidationErrors('cash_received');
+
+        $this->assertSame('active', Order::find($orderId)->status, 'Đơn bị chốt dù lệnh đã bị từ chối.');
+    }
+
+    /** ĐỐI CHỨNG: chuyển khoản thì không có tiền khách đưa, và đó là bình thường. */
+    public function test_chuyen_khoan_khong_can_so_tien_khach_dua(): void
+    {
+        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+            'payment_method' => 'vietqr',
+        ])->assertStatus(200);
+    }
+
     public function test_thanh_toan_tra_ve_tien_thoi_dung(): void
     {
         $orderId = $this->createOrder([$this->oneItem()])->json('id');
@@ -199,12 +229,60 @@ class OrderPricingTest extends MongoTestCase
         $this->assertSame('empty', $this->table->fresh()->status);
     }
 
+    /**
+     * `slim=1` bỏ dòng món khỏi danh sách, nhưng KHÔNG được bỏ thứ bảng Hóa đơn cần.
+     *
+     * Bảng đó hiện mã phiếu, mã order, tên bàn, tổng tiền, phương thức, giờ — mất bất
+     * kỳ trường nào trong số đó là cả cột trắng bóc. Riêng `table` phải giữ eager-load
+     * vì tên bàn nằm ở quan hệ, không nằm trên chính đơn.
+     */
+    public function test_danh_sach_gon_bo_dong_mon_nhung_giu_du_thu_bang_can(): void
+    {
+        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+            'payment_method' => 'cash', 'cash_received' => 100_000,
+        ])->assertStatus(200);
+
+        $gon = $this->getJson("/api/cafes/{$this->cafe->id}/orders?status=paid&slim=1")
+            ->assertStatus(200)->json();
+
+        $this->assertCount(1, $gon);
+        $this->assertEmpty($gon[0]['order_details'] ?? [], 'Bản gọn vẫn kèm dòng món.');
+        foreach (['invoice_code', 'code', 'total_amount', 'payment_method', 'paid_at'] as $truong) {
+            $this->assertNotNull($gon[0][$truong] ?? null, "Bản gọn thiếu trường `{$truong}` mà bảng Hóa đơn đang hiện.");
+        }
+        $this->assertSame($this->table->name, $gon[0]['table']['name'] ?? null, 'Bản gọn mất tên bàn.');
+    }
+
+    /**
+     * ĐỐI CHỨNG. Không có bài này thì bài trên vẫn xanh ngay cả khi dòng món biến mất
+     * khỏi MỌI phản hồi — lúc đó hộp thoại chi tiết và bản in đều rỗng mà không ai hay.
+     */
+    public function test_khong_co_co_gon_thi_van_tra_du_dong_mon(): void
+    {
+        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+            'payment_method' => 'cash', 'cash_received' => 100_000,
+        ])->assertStatus(200);
+
+        $day = $this->getJson("/api/cafes/{$this->cafe->id}/orders?status=paid")
+            ->assertStatus(200)->json();
+
+        $this->assertNotEmpty($day[0]['order_details'] ?? [], 'Danh sách đầy đủ lại không có dòng món.');
+
+        // Và đường `show` — nơi hộp thoại chi tiết đi lấy món — luôn phải đủ.
+        $this->assertNotEmpty(
+            $this->getJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}")->assertStatus(200)->json('order_details'),
+            'Xem một hóa đơn mà không có dòng món thì bản in ra tờ phiếu trống.',
+        );
+    }
+
     public function test_don_da_thanh_toan_khong_thanh_toan_lai_duoc(): void
     {
         $orderId = $this->createOrder([$this->oneItem()])->json('id');
         $url = "/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay";
 
-        $this->postJson($url, ['payment_method' => 'cash'])->assertStatus(200);
-        $this->postJson($url, ['payment_method' => 'cash'])->assertStatus(400);
+        $this->postJson($url, ['payment_method' => 'cash', 'cash_received' => 100_000])->assertStatus(200);
+        $this->postJson($url, ['payment_method' => 'cash', 'cash_received' => 100_000])->assertStatus(400);
     }
 }

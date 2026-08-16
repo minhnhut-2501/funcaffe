@@ -518,8 +518,12 @@ export default function SalesPage() {
     if (!selectedTable || cart.length === 0) return;
 
     const cashReceived = paymentMethod === 'cash' ? Number(cashGiven.replace(/\D/g, '')) : 0;
-    // Khách đưa thiếu tiền -> không cho xác nhận (backend cũng chặn 422)
-    if (paymentMethod === 'cash' && cashReceived > 0 && cashReceived < cartTotal) {
+    // Trả tiền mặt thì phải khai số khách đưa, và số đó phải đủ (backend cũng chặn 422).
+    if (paymentMethod === 'cash' && chuaNhapTien) {
+      showToast('Nhập số tiền khách đưa trước khi xác nhận.');
+      return;
+    }
+    if (paymentMethod === 'cash' && cashReceived < cartTotal) {
       showToast(`Tiền khách đưa chưa đủ, còn thiếu ${formatCurrency(cartTotal - cashReceived)}.`);
       return;
     }
@@ -534,7 +538,9 @@ export default function SalesPage() {
         payResult = await orderService.pay(orderId, {
           payment_method: paymentMethod,
           discount_amount: discount,
-          ...(paymentMethod === 'cash' && cashReceived > 0 ? { cash_received: cashReceived } : {}),
+          // Tiền mặt thì LUÔN gửi. Bỏ qua khi bằng 0 — như trước — là để máy chủ mất
+          // hẳn cơ hội kiểm tra, vì trường không tới nơi thì không có gì để kiểm.
+          ...(paymentMethod === 'cash' ? { cash_received: cashReceived } : {}),
         });
       } catch (err) {
         // MẤT MẠNG GIỮA LÚC THANH TOÁN, RỒI BẤM LẠI (4.6.15).
@@ -607,8 +613,14 @@ export default function SalesPage() {
   // phải hỏi bằng một cờ riêng chứ không dò dấu âm của tiền thối.
   const cashGivenNumber = Number(cashGiven.replace(/\D/g, '')) || 0;
   const cashChange = calcChange(cashGivenNumber, cartTotal);
-  const thieuTien = cashGivenNumber > 0 && cashGivenNumber < cartTotal;
+  // BỎ TRỐNG và ĐƯA THIẾU là hai chuyện khác nhau, phải nói khác nhau: ô trống mà báo
+  // "chưa đủ 130.000" thì thu ngân tưởng mình gõ sai số, chứ không hiểu là chưa gõ gì.
+  const chuaNhapTien = cashGiven.trim() === '';
+  const thieuTien = !chuaNhapTien && cashGivenNumber < cartTotal;
   const conThieu = Math.max(0, cartTotal - cashGivenNumber);
+  // Trước đây bỏ trống là đi lọt: chốt `cashReceived > 0` coi ô trống như "không khai
+  // báo" rồi bỏ qua mọi kiểm tra, và máy chủ cũng bỏ qua vì không nhận được trường đó.
+  const chuaTraDuoc = paymentMethod === 'cash' && (chuaNhapTien || thieuTien);
 
   return (
     <div className="flex flex-col md:h-[calc(100vh-9rem)]">
@@ -783,8 +795,18 @@ export default function SalesPage() {
               <div className="space-y-1 text-xs text-cafe-600">
                 <div className="flex justify-between"><span>Tạm tính</span><span>{formatCurrency(baseSubtotal)}</span></div>
                 {toppingSubtotal > 0 && <div className="flex justify-between"><span>Topping</span><span>{formatCurrency(toppingSubtotal)}</span></div>}
-                <div className="flex justify-between"><span>Giảm giá</span><span>—</span></div>
-                <div className="flex justify-between"><span>Thuế</span><span>—</span></div>
+                {/* Chỉ vẽ khi có số thật. Một dòng vĩnh viễn "—" dạy người dùng rằng
+                    chỗ đó hỏng, trong khi giảm giá vẫn chạy đúng — nó chỉ được nhập ở
+                    bước thanh toán, đúng lúc khách mở lời xin giảm. */}
+                {discount > 0 && (
+                  <div className="flex justify-between"><span>Giảm giá</span><span className="text-pine">-{formatCurrency(discount)}</span></div>
+                )}
+                {/* KHÔNG có dòng "Thuế" ở đây, và đó là chủ ý.
+                    VAT trong hệ thống nằm ở tầng khác hẳn: `package_payments` lưu
+                    `vat_rate`/`vat_amount` cho lượt CHỦ QUÁN MUA GÓI của FunCafe (xem
+                    doc/ERD.md). Còn hóa đơn quán bán nước cho khách thì không có trường
+                    thuế nào trong `orders` — quán tự quyết. Một dòng "Thuế —" nằm đây
+                    chỉ trộn lẫn hai thứ đó vào nhau. */}
               </div>
               <div className="flex justify-between text-sm font-bold text-ink pt-2 border-t border-line">
                 <span>Tổng thanh toán</span>
@@ -831,9 +853,18 @@ export default function SalesPage() {
         title={optionModal?.item.name ?? ''}
         size="md"
         footer={optionModal && (
+          /* Số tiền nằm TRÊN NÚT, không nằm trong thân hộp thoại.
+             Thân hộp thoại cuộn được, còn cụm nút này dính đáy — nên đây là chỗ duy
+             nhất số tiền chắc chắn nhìn thấy được mà không phải cuộn. Trước đây dòng
+             "Tạm tính" nằm dưới ô Ghi chú, tức dưới nếp gấp: thu ngân phải cuộn xuống
+             xem bao nhiêu rồi cuộn tiếp để bấm, trong khi khách đang đứng chờ.
+             "Hủy" bỏ flex-1: hai nút bằng nhau là sai thứ bậc, và nút chính cần chỗ. */
           <div className="flex gap-2">
-            <button onClick={() => { setOptionModal(null); setEditCartItemId(null); }} className="btn-secondary flex-1">Hủy</button>
-            <button onClick={handleSaveCartItem} disabled={savingItem} className="btn-primary flex-1">{savingItem ? 'Đang lưu...' : editCartItemId ? 'Cập nhật' : 'Thêm vào order'}</button>
+            <button onClick={() => { setOptionModal(null); setEditCartItemId(null); }} className="btn-secondary px-5">Hủy</button>
+            <button onClick={handleSaveCartItem} disabled={savingItem} className="btn-primary flex-1 justify-between">
+              <span>{savingItem ? 'Đang lưu...' : editCartItemId ? 'Cập nhật' : 'Thêm vào order'}</span>
+              <span className="tabular-nums">{formatCurrency(optTotal)}</span>
+            </button>
           </div>
         )}
       >
@@ -948,9 +979,6 @@ export default function SalesPage() {
               <input className="input-funcafe" placeholder="Ít đường, không đá..." value={optForm.note} onChange={e => setOptForm(f => ({ ...f, note: e.target.value }))} />
             </div>
 
-            <div className="pt-3 border-t border-line text-right text-sm text-cafe-600">
-              Tạm tính: <span className="font-bold text-bean text-base">{formatCurrency(optTotal)}</span>
-            </div>
           </div>
         )}
       </Modal>
@@ -965,7 +993,7 @@ export default function SalesPage() {
           <div className="flex gap-2">
             <button onClick={() => setPaymentModal(false)} className="btn-secondary flex-1">Hủy</button>
             <button onClick={handlePayment}
-              disabled={processing || (paymentMethod === 'cash' && thieuTien)}
+              disabled={processing || chuaTraDuoc}
               className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed">
               <CreditCard className="w-4 h-4" />{processing ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</button>
           </div>
@@ -1031,10 +1059,24 @@ export default function SalesPage() {
 
           {paymentMethod === 'cash' && (
             <div>
-              <label className="label-funcafe">Tiền khách đưa (đ)</label>
-              <input type="text" className="input-funcafe" placeholder="0" value={cashGiven} onChange={e => setCashGiven(e.target.value)} />
-              {cashGivenNumber > 0 && !thieuTien && <p className="text-sm text-pine font-semibold mt-1.5">Tiền thối: {formatCurrency(cashChange)}</p>}
+              <label className="label-funcafe">Tiền khách đưa (đ) <span className="text-red-500">*</span></label>
+              {/* Nút "Vừa đủ" là cái làm cho việc bắt buộc không phiền: khách trả đúng
+                  tiền là trường hợp thường gặp nhất, một cú bấm xong. Không có nó thì
+                  ràng buộc mới chỉ tổ bắt thu ngân gõ lại con số đang hiện trên màn hình. */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="input-funcafe flex-1"
+                  placeholder="0"
+                  value={cashGiven === '' ? '' : formatThousands(cashGivenNumber)}
+                  onChange={e => setCashGiven(e.target.value.replace(/\D/g, ''))}
+                />
+                <button type="button" onClick={() => setCashGiven(String(cartTotal))} className="btn-secondary shrink-0 px-3">Vừa đủ</button>
+              </div>
+              {chuaNhapTien && <p className="text-sm text-cafe-500 mt-1.5">Nhập số tiền khách đưa, hoặc bấm <strong>Vừa đủ</strong>.</p>}
               {thieuTien && <p className="text-sm text-red-500 mt-1.5">Chưa đủ {formatCurrency(conThieu)}</p>}
+              {!chuaNhapTien && !thieuTien && <p className="text-sm text-pine font-semibold mt-1.5">Tiền thối: {formatCurrency(cashChange)}</p>}
             </div>
           )}
 

@@ -8,7 +8,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const BASE = 'http://localhost:3000';
+// Đọc từ môi trường như mọi script kiểm khác: bản dev chạy 3000, nhưng muốn soi đúng
+// thứ sắp đưa lên mạng thì phải chạy trên bản đã dựng (`next start -p 3100`).
+const BASE = process.env.BASE ?? 'http://localhost:3000';
 const DEST = 'design-shots/public-audit';
 // Ghi thẳng vào project sẽ làm Next dev rebuild giữa chừng -> Fast Refresh remount
 // component -> state (menu đang mở) bị reset và phép kiểm báo sai.

@@ -204,6 +204,8 @@ class CafeIsolationTest extends MongoTestCase
         Sanctum::actingAs($this->chuA);
         $this->postJson("/api/cafes/{$this->quanA->id}/orders/{$this->donA->id}/pay", [
             'payment_method' => 'cash',
+            // Bắt buộc từ khi tiền mặt phải ghi số khách đưa; bài này soi ranh giới hai quán.
+            'cash_received' => 1_000_000,
         ])->assertStatus(200);
 
         Sanctum::actingAs($this->chuB);

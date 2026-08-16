@@ -4,6 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import AiChatMount from '@/components/ai/AiChatMount';
+import ApiProgressBar from '@/components/ui/ApiProgressBar';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
@@ -29,6 +30,10 @@ export default function RootLayout({
     <html lang="vi" className={beVietnamPro.variable} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <AuthProvider>
+          {/* Đặt ở layout gốc để phủ CẢ BA khu — công khai, quản lý quán, quản trị.
+              Nó không đọc gì từ React, chỉ nghe bộ đếm trong api-client, nên nằm đâu
+              trong cây cũng được; ở đây là để chắc chắn không khu nào bị bỏ sót. */}
+          <ApiProgressBar />
           {children}
           {/* Hộp chat tư vấn cho trang công khai. Nằm TRONG AuthProvider vì nó cần
               biết người đang xem đã đăng nhập chưa để chọn đúng tuyến và lời mời. */}

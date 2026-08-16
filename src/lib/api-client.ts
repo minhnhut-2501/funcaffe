@@ -1,3 +1,5 @@
+import { batDauMotLuot, ketThucMotLuot } from './api-progress';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 const STORAGE_URL = process.env.NEXT_PUBLIC_STORAGE_URL || 'http://localhost:8000';
 
@@ -156,6 +158,18 @@ function shouldBounceToLogin(endpoint: string): boolean {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  // Mọi lượt gọi thường đều đi qua đây (get/getList/post/put/delete), nên đây là điểm
+  // duy nhất cần đếm — không phải đi gắn cờ tải ở từng trang. `finally` chứ không phải
+  // đặt ở cuối thân hàm: ném lỗi giữa chừng mà quên trừ thì thanh chạy mãi không tắt.
+  batDauMotLuot();
+  try {
+    return await guiRequest<T>(endpoint, options);
+  } finally {
+    ketThucMotLuot();
+  }
+}
+
+async function guiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -256,34 +270,47 @@ export const api = {
     }
     return res;
   },
+  // Đếm luôn lượt tải ảnh: nó đi qua Cloudinary nên là lượt chờ LÂU NHẤT mà người
+  // dùng gặp (hạn chờ tới 60 giây), đúng chỗ cần một dấu hiệu "máy vẫn đang làm".
+  // Riêng `postStream` thì KHÔNG đếm — phản hồi của nó là dòng chữ chảy dần, sống cả
+  // chục giây, để thanh chạy suốt lúc trợ lý đang trả lời là báo động giả.
   upload: async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const token = getToken();
-    let response: Response;
+    batDauMotLuot();
     try {
-      response = await fetch(`${API_BASE}/upload`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-      });
-    } catch (err) {
-      throw toApiError(err);
+      return await guiAnh(file);
+    } finally {
+      ketThucMotLuot();
     }
-    if (!response.ok) {
-      // Đọc lời giải thích của máy chủ thay vì nuốt đi. Upload hỏng vì đủ thứ lý do
-      // khác nhau — ảnh quá 2MB, sai định dạng, kho ảnh Cloudinary từ chối — mà chỉ
-      // báo "Upload thất bại" thì người dùng không biết phải sửa gì.
-      const body = await response.json().catch(() => ({}));
-      throw new ApiError(messageFor(response.status, body.message), response.status, body.errors);
-    }
-    const data = await response.json();
-    // Cloudinary trả URL tuyệt đối (https://res.cloudinary.com/...) -> dùng thẳng.
-    // Ảnh cũ lưu local trả path tương đối (/storage/...) -> ghép STORAGE_URL.
-    return /^https?:\/\//i.test(data.url) ? data.url : `${STORAGE_URL}${data.url}`;
   },
 };
+
+async function guiAnh(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = getToken();
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw toApiError(err);
+  }
+  if (!response.ok) {
+    // Đọc lời giải thích của máy chủ thay vì nuốt đi. Upload hỏng vì đủ thứ lý do
+    // khác nhau — ảnh quá 2MB, sai định dạng, kho ảnh Cloudinary từ chối — mà chỉ
+    // báo "Upload thất bại" thì người dùng không biết phải sửa gì.
+    const body = await response.json().catch(() => ({}));
+    throw new ApiError(messageFor(response.status, body.message), response.status, body.errors);
+  }
+  const data = await response.json();
+  // Cloudinary trả URL tuyệt đối (https://res.cloudinary.com/...) -> dùng thẳng.
+  // Ảnh cũ lưu local trả path tương đối (/storage/...) -> ghép STORAGE_URL.
+  return /^https?:\/\//i.test(data.url) ? data.url : `${STORAGE_URL}${data.url}`;
+}
 
 export interface AuthUser {
   /**

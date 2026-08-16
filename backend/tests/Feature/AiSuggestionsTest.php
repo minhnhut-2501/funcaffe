@@ -151,6 +151,8 @@ class AiSuggestionsTest extends MongoTestCase
         $orderId = Order::where('cafe_id', (string) $this->cafe->id)->first()->id;
         $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
             'payment_method' => 'cash',
+            // Bắt buộc từ khi tiền mặt phải ghi số khách đưa; bài này không soi tiền thối.
+            'cash_received' => 1_000_000,
         ])->assertStatus(200);
 
         $this->assertStringContainsString(

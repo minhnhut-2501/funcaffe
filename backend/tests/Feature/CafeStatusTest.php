@@ -110,7 +110,7 @@ class CafeStatusTest extends MongoTestCase
         $donId = $this->moDon()->json('id');
         $this->cafe->update(['status' => 'closed']);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$donId}/pay", ['payment_method' => 'cash'])
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$donId}/pay", ['payment_method' => 'cash', 'cash_received' => 1_000_000])
             ->assertStatus(200);
     }
 
@@ -164,7 +164,7 @@ class CafeStatusTest extends MongoTestCase
     public function test_quan_ngung_hoat_dong_van_xem_duoc_so_lieu_cu(): void
     {
         $donId = $this->moDon()->json('id');
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$donId}/pay", ['payment_method' => 'cash']);
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$donId}/pay", ['payment_method' => 'cash', 'cash_received' => 1_000_000]);
         $this->cafe->update(['status' => 'inactive']);
 
         $this->getJson("/api/cafes/{$this->cafe->id}/orders?status=paid")->assertStatus(200)->assertJsonCount(1);

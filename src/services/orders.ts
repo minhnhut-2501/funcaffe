@@ -92,6 +92,8 @@ export interface OrderQuery {
   from?: string;  // 'YYYY-MM-DD'
   to?: string;    // 'YYYY-MM-DD'
   limit?: number;
+  /** Bỏ dòng món và topping khỏi phản hồi. Chỉ dùng khi nơi gọi thật sự không cần chúng. */
+  slim?: boolean;
 }
 
 function orderQueryString(q: OrderQuery): string {
@@ -100,6 +102,7 @@ function orderQueryString(q: OrderQuery): string {
   if (q.from) params.set('from', q.from);
   if (q.to) params.set('to', q.to);
   if (q.limit) params.set('limit', String(q.limit));
+  if (q.slim) params.set('slim', '1');
   const s = params.toString();
   return s ? `?${s}` : '';
 }
@@ -181,9 +184,20 @@ export const orderService = {
 export const invoiceService = {
   // status=paid lọc ở CSDL. Trước đây tải mọi đơn (kể cả đang phục vụ và đã hủy)
   // rồi mới `.filter(o => o.status === 'paid')` trong trình duyệt.
+  /**
+   * Danh sách cho BẢNG hóa đơn — không kèm dòng món.
+   *
+   * Bảng đó chỉ hiện mã, bàn, tổng tiền, phương thức, giờ. Kéo về chi tiết của hàng
+   * trăm hóa đơn để vẽ một cái bảng không dùng tới chi tiết là phần nặng nhất của
+   * lượt gọi nặng nhất ứng dụng. `items` trả về rỗng — nơi nào cần chi tiết thì gọi
+   * `getById`, và trang Hóa đơn làm đúng vậy lúc mở một tờ ra xem hoặc in.
+   *
+   * Nhờ vậy vẫn giữ được tính chất đáng giá nhất của trang: tìm kiếm và lọc chạy trên
+   * TOÀN BỘ lịch sử ngay tại trình duyệt, không phải hỏi lại máy chủ mỗi lần gõ phím.
+   */
   list: async (query: Omit<OrderQuery, 'status'> = {}) => {
     const cafeId = await getCafeId();
-    const orders = await api.get<RawOrder[]>(`/cafes/${cafeId}/orders${orderQueryString({ ...query, status: 'paid' })}`);
+    const orders = await api.get<RawOrder[]>(`/cafes/${cafeId}/orders${orderQueryString({ ...query, status: 'paid', slim: true })}`);
     return orders.map(mapInvoice);
   },
   /**

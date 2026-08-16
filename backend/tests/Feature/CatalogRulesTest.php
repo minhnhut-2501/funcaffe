@@ -329,7 +329,7 @@ class CatalogRulesTest extends MongoTestCase
             'table_id' => (string) $ban->id,
             'items' => [['item_id' => (string) $monId, 'item_name_snapshot' => 'Cà phê mùa hè', 'quantity' => 1]],
         ])->json('id');
-        $this->postJson($this->url("orders/{$donId}/pay"), ['payment_method' => 'cash'])->assertStatus(200);
+        $this->postJson($this->url("orders/{$donId}/pay"), ['payment_method' => 'cash', 'cash_received' => 1_000_000])->assertStatus(200);
 
         // Hết mùa, chủ quán ẩn món.
         $this->putJson($this->url("items/{$monId}"), ['is_available' => false])->assertStatus(200);

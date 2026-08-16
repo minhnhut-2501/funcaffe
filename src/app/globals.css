@@ -525,7 +525,14 @@
     0%        { transform: translateX(-110%); }
     70%, 100% { transform: translateX(280%); }
   }
-  .duong-noi { position: relative; overflow: hidden; }
+  /* KHÔNG đặt `position` ở đây. Lớp này luôn đi kèm một lớp định vị của Tailwind
+     (`absolute` ở trang chủ), mà hai lớp cùng độ ưu tiên thì lớp khai báo SAU thắng —
+     tức `.duong-noi` sẽ ghi đè `absolute` thành `relative`. Mất `absolute` thì thẻ
+     thôi làm lớp phủ và quay về làm một Ô LƯỚI bình thường: nó chiếm mất ô số 1 của
+     `lg:grid-cols-4`, đẩy bước 4 xuống hàng dưới và để lại một vạch kẻ lửng bên trái.
+     Chỉ lộ ra từ 1024px trở lên vì dưới đó thẻ đang `hidden`.
+     `::after` bên dưới vẫn có gốc để bám: chính lớp `absolute` kia đã định vị thẻ. */
+  .duong-noi { overflow: hidden; }
   .duong-noi::after {
     content: '';
     position: absolute;

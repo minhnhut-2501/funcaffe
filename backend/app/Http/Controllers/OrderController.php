@@ -47,9 +47,26 @@ class OrderController extends Controller
             'from'   => 'nullable|date_format:Y-m-d',
             'to'     => 'nullable|date_format:Y-m-d',
             'limit'  => 'nullable|integer|min:1|max:1000',
+            'slim'   => 'nullable|boolean',
         ]);
 
-        $query = $cafe->orders()->with(['orderDetails.orderDetailToppings.topping', 'table']);
+        // `slim=1` — bỏ dòng món và topping ra khỏi phản hồi.
+        //
+        // Bảng Hóa đơn chỉ hiện mã phiếu, mã order, bàn, tổng tiền, phương thức và
+        // giờ; không cột nào chạm tới chi tiết dòng. Vậy mà lượt gọi này kéo về đủ
+        // dòng món + topping cho TOÀN BỘ lịch sử bán hàng của quán — đó là phần nặng
+        // nhất của lượt gọi vốn đã nặng nhất ứng dụng (xem LIST_TIMEOUT_MS ở
+        // api-client). Ai mở một hóa đơn ra xem hay in thì `show` trả đủ chi tiết.
+        //
+        // Vẫn giữ `table`: cột "Bàn" cần nó, và đó chỉ là một lượt tra thêm chứ không
+        // phải ba tầng lồng nhau như phía dòng món.
+        //
+        // KHÔNG bật cờ này cho trang Doanh thu: nó cần chi tiết để tính top món.
+        $query = $cafe->orders()->with(
+            $request->boolean('slim')
+                ? ['table']
+                : ['orderDetails.orderDetailToppings.topping', 'table'],
+        );
 
         if (!empty($validated['status'])) {
             $statuses = array_values(array_intersect(
@@ -297,10 +314,19 @@ class OrderController extends Controller
             return response()->json(['message' => 'Đơn chưa có món nào, không thể thanh toán.'], 422);
         }
 
+        // `cash_received` BẮT BUỘC khi trả tiền mặt.
+        //
+        // Trước đây nó `nullable`, và cái chốt "đưa thiếu thì không cho thanh toán" ở
+        // dưới lại nằm TRONG một điều kiện `isset()`. Nghĩa là bỏ trống ô tiền khách
+        // đưa là thoát được chốt: đơn chốt bình thường, `cash_received` và
+        // `change_amount` cùng null, biên lai in ra không có tiền thối để đối chiếu.
+        // Ràng buộc chỉ sống ở trình duyệt thì không phải ràng buộc.
         $validated = $request->validate([
             'payment_method'  => 'required|string|in:cash,vietqr',
             'discount_amount' => 'nullable|numeric|min:0',
-            'cash_received'   => 'nullable|numeric|min:0',
+            'cash_received'   => 'required_if:payment_method,cash|numeric|min:0',
+        ], [
+            'cash_received.required_if' => 'Trả tiền mặt thì phải ghi số tiền khách đưa.',
         ]);
 
         // Giảm giá: ưu tiên số gửi kèm lệnh thanh toán, nếu không có thì DÙNG LẠI số đã
@@ -316,7 +342,7 @@ class OrderController extends Controller
         // Tiền khách đưa + tiền thối (chỉ áp dụng cho tiền mặt) — lưu để đối chứng.
         $cashReceived = null;
         $changeAmount = null;
-        if ($validated['payment_method'] === 'cash' && isset($validated['cash_received'])) {
+        if ($validated['payment_method'] === 'cash') {
             $cashReceived = (int) round((float) $validated['cash_received']);
             // BUG-FIX (B2): khách đưa thiếu tiền thì không được xác nhận thanh toán
             if ($cashReceived < (int) round($total)) {

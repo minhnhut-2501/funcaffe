@@ -87,6 +87,16 @@ class OrderLifecycleTest extends MongoTestCase
         ])->json('id');
     }
 
+    /**
+     * Trả tiền mặt, đưa dư sức. Từ khi `cash_received` thành bắt buộc cho tiền mặt,
+     * mọi lệnh thanh toán đều phải mang con số này — nhưng các bài dưới đây soi mã
+     * phiếu và vòng đời đơn, không soi tiền thối, nên số cụ thể không quan trọng.
+     */
+    private function traTienMat(): array
+    {
+        return ['payment_method' => 'cash', 'cash_received' => 1_000_000];
+    }
+
     // --- 4.6.10 Thanh toán hai lần ---------------------------------------------
 
     /**
@@ -99,7 +109,7 @@ class OrderLifecycleTest extends MongoTestCase
         $orderId = $this->taoDon();
         $url = "/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay";
 
-        $maPhieu = $this->postJson($url, ['payment_method' => 'cash'])
+        $maPhieu = $this->postJson($url, $this->traTienMat())
             ->assertStatus(200)
             ->json('invoice_code');
 
@@ -116,9 +126,9 @@ class OrderLifecycleTest extends MongoTestCase
         $orderId = $this->taoDon();
         $url = "/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay";
 
-        $this->postJson($url, ['payment_method' => 'cash']);
-        $this->postJson($url, ['payment_method' => 'cash']);
-        $this->postJson($url, ['payment_method' => 'cash']);
+        $this->postJson($url, $this->traTienMat());
+        $this->postJson($url, $this->traTienMat());
+        $this->postJson($url, $this->traTienMat());
 
         $soPhieu = $this->cafe->orders()->whereNotNull('invoice_code')->count();
         $this->assertSame(1, $soPhieu);
@@ -139,7 +149,7 @@ class OrderLifecycleTest extends MongoTestCase
         $this->putJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}", ['items' => []])
             ->assertStatus(200);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", ['payment_method' => 'cash'])
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", $this->traTienMat())
             ->assertStatus(422)
             ->assertJsonPath('message', 'Đơn chưa có món nào, không thể thanh toán.');
     }
@@ -161,7 +171,7 @@ class OrderLifecycleTest extends MongoTestCase
     public function test_don_da_thanh_toan_thi_khong_huy_duoc(): void
     {
         $orderId = $this->taoDon();
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", ['payment_method' => 'cash']);
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", $this->traTienMat());
 
         $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/cancel")
             ->assertStatus(400)
@@ -185,7 +195,7 @@ class OrderLifecycleTest extends MongoTestCase
         $orderId = $this->taoDon();
         $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/cancel");
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", ['payment_method' => 'cash'])
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", $this->traTienMat())
             ->assertStatus(400);
 
         $this->assertNull(Order::find($orderId)->invoice_code, 'Đơn đã hủy vẫn sinh ra mã phiếu.');
@@ -263,7 +273,7 @@ class OrderLifecycleTest extends MongoTestCase
         // Kéo ngày tạo về hôm qua, giữ nguyên trạng thái đang phục vụ.
         Order::where('_id', $orderId)->update(['created_at' => now()->subDay()]);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", ['payment_method' => 'cash'])
+        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", $this->traTienMat())
             ->assertStatus(200);
 
         $homNay  = now()->format('Y-m-d');
