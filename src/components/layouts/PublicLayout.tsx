@@ -14,6 +14,11 @@ const navLinks = [
 ];
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  // Đổi trang là đổi key -> animation chạy lại, nên bấm từ Trang chủ sang Tính năng
+  // có một nhịp vào ngắn thay vì thay nội dung đột ngột. Khu quản trị đã làm vậy từ
+  // lâu (.anim-page); trang public thì chưa, và đó là một phần của cảm giác "thô".
+  const pathname = usePathname();
+
   return (
     <div className="min-h-screen flex flex-col bg-paper text-ink">
       <a
@@ -25,7 +30,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <PublicHeader />
       {/* min-w-0: chặn sẵn kiểu lỗi "flex item bị nội dung rộng kéo giãn" khiến
           cả trang cuộn ngang trên điện thoại (bảng rộng, ảnh, khối pre...). */}
-      <main id="main" className="flex-1 min-w-0">{children}</main>
+      <main id="main" className="flex-1 min-w-0">
+        <div key={pathname} className="vao-trang">{children}</div>
+      </main>
       <PublicFooter />
     </div>
   );
@@ -196,7 +203,15 @@ function PublicFooter() {
     <footer className="bg-ink-deep text-white/70">
       <div className="h-1 bg-gradient-to-r from-bean via-gold to-pine" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+        {/* `[&>*]:min-w-0` — vá bẫy `min-width: auto` của CSS Grid.
+            Mặc định một ô lưới KHÔNG được co nhỏ hơn nội dung không xuống dòng được
+            của nó. Địa chỉ email trong cột "Liên hệ" là một chuỗi liền không có chỗ
+            ngắt, nên từ 768px (lúc md:grid-cols-4 kích hoạt, cột còn 156px) nó chống
+            cả lưới rộng ra và kéo TOÀN TRANG cuộn ngang 9px — ở mọi trang public,
+            kể cả /login, vì footer dùng chung.
+            Con số khớp chính xác: cột 156px trừ icon và khoảng cách còn 132px cho một
+            chuỗi cần ~141px. Lên 800px cột rộng 164px thì phần tràn còn đúng 1px. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8 [&>*]:min-w-0">
           <div>
             <Logo light />
             <p className="text-sm leading-relaxed mt-3 text-white/65 max-w-xs">
@@ -227,8 +242,12 @@ function PublicFooter() {
             <h2 className="text-white font-semibold mb-3 text-sm">Liên hệ</h2>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="mailto:nphec4007@gmail.com" className="flex items-center gap-2 hover:text-white transition-colors">
-                  <Mail className="w-4 h-4 shrink-0" aria-hidden /> nphec4007@gmail.com
+                {/* `break-words` để chuỗi email liền một mạch có chỗ ngắt khi cột hẹp
+                    — cho ô lưới co được (min-w-0) mà không có chỗ ngắt thì chữ vẫn
+                    tràn ra ngoài ô. */}
+                <a href="mailto:nphec4007@gmail.com" className="flex items-start gap-2 hover:text-white transition-colors">
+                  <Mail className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                  <span className="min-w-0 break-words">nphec4007@gmail.com</span>
                 </a>
               </li>
               <li>

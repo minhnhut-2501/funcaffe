@@ -288,6 +288,39 @@
     background-size: 22px 22px;
   }
 
+  /* Ô icon vuông bo tròn — mô-típ lặp khắp trang public (danh sách vấn đề, các bước,
+     thẻ liên hệ, nhóm tính năng). Trước đây chúng đứng im tuyệt đối, nên cả dòng
+     nhìn như chữ in ra giấy. Nghiêng và nảy nhẹ khi rê vào CẢ DÒNG (`group`), đủ để
+     mắt biết dòng đó sống, không đủ để thành trò hề. */
+  .o-icon {
+    transition: scale 0.32s var(--ease-out-expo), rotate 0.32s var(--ease-out-expo),
+      background-color 0.32s ease, color 0.32s ease;
+  }
+  .group:hover .o-icon { scale: 1.12; rotate: -5deg; }
+
+  /* Chấm nền cho mảng TỐI — cùng một hoạ tiết với .bg-paper-textured, chỉ đảo màu.
+     Dùng lại đúng motif của hệ thống để khối CTA nhìn thuộc về trang, thay vì như
+     một hộp màu dán vào cuối. */
+  .bg-cham-toi {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.075) 1px, transparent 1.4px);
+    background-size: 22px 22px;
+  }
+
+  /* Vệt sáng quét ngang nút chính khi rê chuột.
+     Nút "Dùng thử miễn phí" là điểm đến của cả trang public; trước đây nó chỉ đổi
+     màu nền khi rê vào nên nhìn ngang hàng với mọi nút khác. */
+  .nut-sang { position: relative; overflow: hidden; }
+  .nut-sang::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-130%) skewX(-18deg);
+    background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.22), transparent);
+    transition: transform 0.75s var(--ease-out-expo);
+    pointer-events: none;
+  }
+  .nut-sang:hover::after { transform: translateX(130%) skewX(-18deg); }
+
   /* Modal entrance */
   @keyframes funcafe-fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes funcafe-pop {
@@ -392,12 +425,16 @@
   /* Trôi chậm 24s rồi trôi ngược lại: một vòng đủ dài để mắt không bắt được nhịp,
      nhưng đứng nhìn vài giây là thấy ảnh "sống". Biên độ nhỏ (1.03 -> 1.12) để chữ
      đè lên trên không bị xê dịch theo. */
+  /* Trôi CHÉO chứ không chỉ phóng to: chuyển động ngang mắt bắt được rõ hơn hẳn
+     chuyển động theo trục nhìn. Bản đầu (24s, chỉ scale + đẩy dọc 1.6%) chậm và
+     phẳng tới mức người xem báo là "đứng im lìm" — đúng, vì về mặt cảm nhận thì nó
+     đứng im thật. 18s và biên rộng gấp đôi thì nhìn vài giây là thấy. */
   @keyframes funcafe-anh-troi {
-    from { transform: scale(1.03) translate3d(0, 0, 0); }
-    to   { transform: scale(1.12) translate3d(0, -1.6%, 0); }
+    from { transform: scale(1.04) translate3d(1.2%, 0.8%, 0); }
+    to   { transform: scale(1.15) translate3d(-1.6%, -1.8%, 0); }
   }
   .anh-troi {
-    animation: funcafe-anh-troi 24s ease-in-out infinite alternate;
+    animation: funcafe-anh-troi 18s ease-in-out infinite alternate;
     will-change: transform;
   }
 
@@ -446,6 +483,72 @@
      Mũi tên nhúc nhích là tín hiệu "bấm được" rõ hơn hẳn gạch chân. */
   .link-mui-ten svg { transition: translate 0.25s var(--ease-out-expo); }
   .link-mui-ten:hover svg { translate: 0.28rem 0; }
+
+  /* ============ Nhịp VÀO TRANG cho khu public ============
+     Khu quản trị đã có `.anim-page` (240ms) và `.stagger` — cố ý ngắn vì đó là màn
+     hình làm việc. Trang public là trang thuyết phục nên được thong thả hơn một chút.
+
+     VÌ SAO KHÔNG DÙNG `Reveal` CHO PHẦN ĐẦU TRANG: Reveal chỉ hoạt hình những gì
+     đang nằm DƯỚI màn hình; thứ đã hiện sẵn thì nó cố ý bỏ qua để bot và trình duyệt
+     không chạy JS vẫn thấy nội dung. Hệ quả là toàn bộ phần trên nếp gấp — banner,
+     hero — chưa bao giờ có lấy một chuyển động nào lúc mở trang. Đó chính là cảm giác
+     "trang hiện ra đột ngột" thay vì "bước vào".
+
+     Đây là animation CSS thuần, KHÔNG chặn gì cả: trang vẽ và bấm được ngay từ mili
+     giây đầu, chuyển động chỉ chồng lên trên. Khác hẳn màn chờ (splash) — thứ bắt
+     người ta ngồi đợi rồi mới cho vào. */
+  @keyframes funcafe-vao-trang {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* `backwards` chứ không `both` — xem ghi chú dài ở .anim-page: `both` ghim
+     transform vĩnh viễn, và một transform dù là đơn vị cũng tạo containing block
+     làm mọi `position: fixed` bên trong bám nhầm chỗ. */
+  .vao-trang { animation: funcafe-vao-trang 0.5s var(--ease-out-expo) backwards; }
+
+  /* Dàn cảnh: các phần tử con vào so le. Tổng ~0.5s nên người đọc không phải chờ
+     dòng cuối; chỉ so le 6 phần tử đầu rồi dùng chung độ trễ. */
+  .dan-canh > * { animation: funcafe-vao-trang 0.55s var(--ease-out-expo) backwards; }
+  .dan-canh > *:nth-child(1) { animation-delay: 80ms; }
+  .dan-canh > *:nth-child(2) { animation-delay: 170ms; }
+  .dan-canh > *:nth-child(3) { animation-delay: 250ms; }
+  .dan-canh > *:nth-child(4) { animation-delay: 320ms; }
+  .dan-canh > *:nth-child(5) { animation-delay: 380ms; }
+  .dan-canh > *:nth-child(n + 6) { animation-delay: 430ms; }
+
+  /* Đường nối 4 bước ở trang chủ: một vệt sáng chạy dọc theo đường kẻ.
+     Đường kẻ vốn đã có (h-px bg-line) nhưng đứng chết, nên khu "Bắt đầu trong 4
+     bước" đọc như một hàng icon tĩnh. Vệt chạy biến đường kẻ từ vật trang trí thành
+     thứ NÓI RA trình tự — mắt đi theo nó đúng theo thứ tự các bước. */
+  @keyframes funcafe-chay-duong {
+    0%        { transform: translateX(-110%); }
+    70%, 100% { transform: translateX(280%); }
+  }
+  .duong-noi { position: relative; overflow: hidden; }
+  .duong-noi::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 38%;
+    background: linear-gradient(90deg, transparent, var(--color-bean), transparent);
+    animation: funcafe-chay-duong 4.5s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  /* Vệt sáng chậm quét ngang banner — tín hiệu "khối này đang sống".
+     Chu kỳ dài (9s) và chỉ sáng 10%: đủ để mắt bắt được nếu nhìn vài giây, không đủ
+     để làm phiền người đang đọc tiêu đề. */
+  @keyframes funcafe-quet-cham {
+    0%,  62% { transform: translateX(-140%) skewX(-14deg); }
+    100%     { transform: translateX(140%) skewX(-14deg); }
+  }
+  .quet-cham {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+    animation: funcafe-quet-cham 9s ease-in-out infinite;
+    will-change: transform;
+  }
 
   /* Scroll-reveal entrance, toggled by IntersectionObserver via .is-in */
   .reveal {

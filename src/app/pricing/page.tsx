@@ -23,6 +23,22 @@ function limitLabel(v: number | null | undefined, unit: string): string {
   return v == null || !Number.isFinite(v) ? 'Không giới hạn' : `${v} ${unit}`;
 }
 
+/**
+ * Quy giá gói ra tiền mỗi ngày — xoá rào cản "199.000 nghe hơi nhiều".
+ *
+ * TÍNH TỪ GIÁ THẬT trong CSDL, không chép cứng con số marketing. Đây là chỗ rất dễ
+ * sai theo hướng có lợi cho mình: gói Pro 12 tháng ra 5.452đ/ngày mà làm tròn thành
+ * "chỉ từ 5.000đ" là nói quá — hội đồng bấm máy tính là thấy ngay.
+ *
+ * Quy ước 30 ngày/tháng: hơi thiệt cho mình (một năm thành 360 ngày nên đơn giá nhích
+ * lên) nhưng dễ giải thích và không bao giờ hứa hơn thực tế.
+ */
+function giaMoiNgay(tongTien: number, soThang: number): string | null {
+  if (tongTien <= 0 || soThang <= 0) return null;
+  const moiNgay = Math.round(tongTien / (soThang * 30));
+  return `≈ ${moiNgay.toLocaleString('vi-VN')}đ/ngày`;
+}
+
 function getPrice(pkg: Package, timeSubs: TimeSubscription[], dur: DurationMonths): number {
   if (pkg.isTrial) return 0;
   const found = timeSubs.find(t => t.durationValue === dur && t.durationUnit === 'month');
@@ -95,6 +111,7 @@ export default function PricingPage() {
       badge: 'Dùng thử',
       desc: 'Trải nghiệm trước khi quyết định.',
       features: freePkg?.features ?? ['Trải nghiệm TOÀN BỘ tính năng Pro Max trong 7 ngày', 'Không giới hạn bàn & món', 'Có thống kê doanh thu', 'Chỉ dùng thử 1 lần / tài khoản'],
+      moiNgay: null,
       highlight: false,
     },
     {
@@ -105,6 +122,7 @@ export default function PricingPage() {
       badge: 'Phù hợp quán nhỏ',
       desc: 'Đủ dùng cho vận hành hằng ngày.',
       features: proPkg?.features ?? ['Tối đa 20 bàn, 40 món', 'Size và topping', 'Bán hàng theo bàn', 'In hóa đơn', 'Có thống kê doanh thu'],
+      moiNgay: proPkg ? giaMoiNgay(getPrice(proPkg, timeSubsMap[proPkg.id] ?? [], dur), dur) : null,
       highlight: false,
     },
     {
@@ -115,6 +133,7 @@ export default function PricingPage() {
       badge: 'Đầy đủ báo cáo',
       desc: 'Quản lý sâu bằng số liệu.',
       features: promaxPkg?.features ?? ['Tất cả chức năng của gói Pro', 'Thống kê doanh thu', 'Biểu đồ doanh thu', 'Top món bán chạy', 'Báo cáo chi tiết'],
+      moiNgay: promaxPkg ? giaMoiNgay(getPrice(promaxPkg, timeSubsMap[promaxPkg.id] ?? [], dur), dur) : null,
       highlight: true,
     },
   ];
@@ -199,6 +218,14 @@ export default function PricingPage() {
                   <span className={`text-4xl font-extrabold tracking-tight ${p.highlight ? 'text-white' : 'text-bean'}`}>{p.price}</span>
                   <span className={`text-sm font-medium ${p.highlight ? 'text-white/90' : 'text-ink/70'}`}>{p.period}</span>
                 </div>
+                {/* Quy ra tiền mỗi ngày: "199.000đ/tháng" nghe nặng hơn hẳn
+                    "≈ 6.633đ/ngày" cho cùng một số tiền. Đổi theo thời hạn đang chọn,
+                    tính từ giá thật nên chọn 12 tháng là thấy đơn giá tụt xuống. */}
+                {p.moiNgay && (
+                  <p className={`mt-1.5 text-sm font-medium ${p.highlight ? 'text-white/90' : 'text-pine'}`}>
+                    {p.moiNgay}
+                  </p>
+                )}
               </div>
 
               <ul className="space-y-2.5 mb-6 flex-1">
@@ -255,6 +282,7 @@ export default function PricingPage() {
       <CtaPanel
         title="Vẫn phân vân chọn gói nào?"
         subtitle="Cứ bắt đầu với bản dùng thử miễn phí 7 ngày, nâng cấp bất cứ lúc nào."
+        note="Không cần thẻ tín dụng · Huỷ bất cứ lúc nào"
         secondaryLabel="Hỏi tư vấn"
         secondaryHref="/contact"
       />

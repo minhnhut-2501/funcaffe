@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { packageService, timeSubscriptionService } from '@/services';
 import type { Package, TimeSubscription } from '@/types';
 import { formatCurrency } from '@/lib/format';
+import { moHopChat } from '@/lib/ai-chat-bus';
 
 const planIcons: Record<string, typeof Gift> = { free: Gift, pro: Zap, promax: Crown };
 
@@ -128,9 +129,9 @@ export default function HomePage() {
             </p>
             <ul className="space-y-4 mb-8">
               {branchPoints.map((p, i) => (
-                <Reveal as="li" key={p.title} delay={i * 80} className="flex gap-3.5 items-start">
-                  <span className="w-10 h-10 rounded-xl bg-bean/10 border border-bean/15 flex items-center justify-center shrink-0">
-                    <p.icon className="w-5 h-5 text-bean" aria-hidden />
+                <Reveal as="li" key={p.title} delay={i * 80} className="group flex gap-3.5 items-start">
+                  <span className="o-icon w-10 h-10 rounded-xl bg-bean/10 border border-bean/15 flex items-center justify-center shrink-0 group-hover:bg-bean group-hover:text-white">
+                    <p.icon className="w-5 h-5 text-bean transition-colors duration-300 group-hover:text-white" aria-hidden />
                   </span>
                   <div>
                     <p className="font-semibold text-ink leading-snug">{p.title}</p>
@@ -163,8 +164,8 @@ export default function HomePage() {
           </Reveal>
           <div className="divide-y divide-line border-y border-line">
             {problems.map((p, i) => (
-              <Reveal key={p.text} delay={i * 70} className="flex gap-4 items-start py-5">
-                <span className="w-10 h-10 rounded-xl bg-paper border border-line flex items-center justify-center shrink-0">
+              <Reveal key={p.text} delay={i * 70} className="group flex gap-4 items-start py-5">
+                <span className="o-icon w-10 h-10 rounded-xl bg-paper border border-line flex items-center justify-center shrink-0 group-hover:bg-bean-tint group-hover:border-bean/25">
                   <p.icon className="w-5 h-5 text-bean" />
                 </span>
                 <p className="text-ink/80 leading-relaxed pt-2">{p.text}</p>
@@ -251,9 +252,23 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
-            <Link href="/pricing" className="link-mui-ten inline-flex items-center gap-1.5 text-bean font-semibold hover:underline text-sm">
-              Xem gói Pro Max <ArrowRight className="w-4 h-4" />
-            </Link>
+            {/* Trợ lý THẬT đang chạy ngay trên trang này — nên mời người ta hỏi thử
+                luôn, thay vì chỉ cho xem một tấm ảnh chụp hội thoại. Đây cũng là chỗ
+                khoe được tính năng mà không cần đăng ký gì. */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+              <button
+                type="button"
+                onClick={() => moHopChat('Trợ lý AI của FunCafe làm được những gì cho quán tôi?')}
+                className="nut-sang inline-flex min-h-11 items-center gap-2 rounded-xl bg-bean px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(37,99,235,0.8)] transition-[translate,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_-12px_rgba(37,99,235,0.9)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-bean/30"
+              >
+                <span className="relative z-10 inline-flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" aria-hidden /> Hỏi thử ngay
+                </span>
+              </button>
+              <Link href="/pricing" className="link-mui-ten inline-flex items-center gap-1.5 text-bean font-semibold hover:underline text-sm">
+                Xem gói Pro Max <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </Reveal>
 
           <Reveal delay={120} className="relative flex justify-center lg:justify-end">
@@ -278,10 +293,12 @@ export default function HomePage() {
             <p className="text-ink/70">Không cần kiến thức kỹ thuật, làm theo từng bước là dùng được.</p>
           </Reveal>
           <div className="relative grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            <div aria-hidden className="hidden lg:block absolute top-5 left-[12.5%] right-[12.5%] h-px bg-line" />
+            <div aria-hidden className="duong-noi hidden lg:block absolute top-5 left-[12.5%] right-[12.5%] h-px bg-line" />
             {steps.map((s, i) => (
-              <Reveal key={s.title} delay={i * 90} className="relative">
-                <div className="w-10 h-10 rounded-full bg-bean text-white flex items-center justify-center text-sm font-semibold relative z-10 ring-4 ring-white">
+              <Reveal key={s.title} delay={i * 90} className="group relative">
+                {/* Số bước phóng to và bóng đậm lên khi rê vào cả cột — bốn bước này
+                    là thứ người xem lướt mắt qua nhiều nhất ở khúc giữa trang. */}
+                <div className="o-icon w-10 h-10 rounded-full bg-bean text-white flex items-center justify-center text-sm font-semibold relative z-10 ring-4 ring-white group-hover:bg-bean-dark group-hover:shadow-lg group-hover:shadow-bean/35">
                   {i + 1}
                 </div>
                 <div className="flex items-center gap-2 mt-4 mb-1.5">

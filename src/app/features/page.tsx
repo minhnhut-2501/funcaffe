@@ -293,9 +293,11 @@ export default function FeaturesPage() {
           </Reveal>
           <div className="grid gap-8 md:grid-cols-3 md:gap-12">
             {extras.map((g, i) => (
-              <Reveal key={g.title} delay={i * 80}>
+              <Reveal key={g.title} delay={i * 80} className="group">
                 <div className="flex items-center gap-2.5 mb-4">
-                  <g.icon className="w-5 h-5 text-bean" aria-hidden />
+                  <span className="o-icon grid h-9 w-9 place-items-center rounded-xl bg-bean/10 text-bean shrink-0 group-hover:bg-bean group-hover:text-white">
+                    <g.icon className="w-[18px] h-[18px]" aria-hidden />
+                  </span>
                   <h3 className="font-bold text-ink">{g.title}</h3>
                 </div>
                 <ul className="space-y-3">

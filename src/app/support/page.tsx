@@ -196,6 +196,7 @@ export default function SupportPage() {
       <CtaPanel
         title="Sẵn sàng bắt đầu?"
         subtitle="Tạo tài khoản và làm theo hướng dẫn — chỉ vài phút là quán bạn bán được hàng."
+        note="7 ngày miễn phí · Không cần thẻ tín dụng"
       />
     </PublicLayout>
   );

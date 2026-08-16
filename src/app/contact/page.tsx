@@ -67,8 +67,8 @@ export default function ContactPage() {
             </Reveal>
             <div className="space-y-3">
               {info.map((c, i) => (
-                <Reveal key={c.label} delay={i * 70} className="flex items-start gap-3 bg-white rounded-2xl border border-line p-4 lift">
-                  <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-bean/10 text-bean">
+                <Reveal key={c.label} delay={i * 70} className="group flex items-start gap-3 bg-white rounded-2xl border border-line p-4 lift">
+                  <span className="o-icon w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-bean/10 text-bean group-hover:bg-bean group-hover:text-white">
                     <c.icon className="w-5 h-5" />
                   </span>
                   <div>
@@ -194,6 +194,7 @@ export default function ContactPage() {
       <CtaPanel
         title="Hay là thử luôn cho nhanh?"
         subtitle="Bạn có thể tạo tài khoản và dùng thử miễn phí ngay, không cần chờ tư vấn."
+        note="7 ngày miễn phí · Không cần thẻ tín dụng"
       />
     </PublicLayout>
   );

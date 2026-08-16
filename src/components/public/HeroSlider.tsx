@@ -50,7 +50,9 @@ const SLIDES: Slide[] = [
   },
 ];
 
-const AUTOPLAY_MS = 6000;
+// 6000ms từng là quá thong thả: người xem đọc xong tiêu đề rồi ngồi chờ, hero trông
+// như đứng im. 4200ms vẫn đủ đọc hết một tiêu đề hai dòng mà nhịp trang sống hẳn.
+const AUTOPLAY_MS = 4200;
 
 export default function HeroSlider() {
   // Người dùng bật "giảm chuyển động" thì không tự chạy slide.
@@ -67,7 +69,8 @@ export default function HeroSlider() {
   // luôn nằm trên nó, bật lên là slider đứng yên gần như mãi mãi.
   // stopOnInteraction: false để sau khi người dùng bấm mũi tên/dot thì vẫn chạy tiếp.
   const [emblaRef, embla] = useEmblaCarousel(
-    { loop: true, duration: 28 },
+    // duration 28 -> 20: cú trượt dứt khoát hơn, hết cảm giác slide bò sang.
+    { loop: true, duration: 20 },
     [Autoplay({ delay: AUTOPLAY_MS, stopOnInteraction: false })],
   );
   const [selected, setSelected] = useState(0);
