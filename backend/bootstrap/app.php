@@ -21,6 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->statefulApi();
 
+        // PREPEND, không phải append: phản hồi đi từ trong ra, nên chỉ lớp ngoài cùng
+        // mới ghi đè được `Vary: Origin` mà HandleCors vừa gắn. Đó là header khiến
+        // Cloudflare từ chối đệm mọi đường công khai. Chi tiết trong chính lớp đó.
+        $middleware->prepend(\App\Http\Middleware\PublicEdgeCache::class);
+
         // Tin proxy đứng trước ứng dụng (Render, Vercel) để `$request->ip()` trả về
         // IP THẬT của khách chứ không phải IP của proxy.
         //
