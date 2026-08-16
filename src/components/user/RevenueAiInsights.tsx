@@ -1,11 +1,12 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, Lock, Loader2, TrendingUp, AlertTriangle, Lightbulb, RefreshCw } from 'lucide-react';
+import { Sparkles, Lock, Loader2, TrendingUp, AlertTriangle, Lightbulb, RefreshCw, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { canUseAI } from '@/lib/permission';
 import { aiService, type AiRevenueAnalysis } from '@/services';
 import { ApiError } from '@/lib/api-client';
+import { moHopChat } from '@/lib/ai-chat-bus';
 
 export default function RevenueAiInsights() {
   const { user } = useAuth();
@@ -27,10 +28,22 @@ export default function RevenueAiInsights() {
     }
   }
 
-  // Gói không có AI: thẻ mời nâng cấp
+  // Gói không có AI.
+  //
+  // Bản trước là một NGÕ CỤT: thẻ khoá, một nút "Nâng cấp" duy nhất, và câu mời
+  // luôn luôn là "Nâng cấp Pro Max" — sai với người chưa từng dùng thử, vì họ còn
+  // được 7 ngày Fun Free miễn phí và đó mới là lời mời đúng cho họ.
+  //
+  // Không rẽ nhánh ở đây vì phía giao diện KHÔNG biết `has_used_free_trial`
+  // (AuthContext không nạp trường đó, và cờ này nằm trên CẢ tài khoản lẫn quán —
+  // xem SubscriptionController::store). Nhân bản luật phân quyền ra client là tạo
+  // nguồn sự thật thứ hai, đúng thứ dự án này đã dập nhiều lần.
+  //
+  // Thay vào đó: mở hộp chat tư vấn. Máy chủ đã biết chính xác người này đang ở
+  // trạng thái nào (ConsultKnowledgeService::trangThai) nên nó mời đúng câu.
   if (!allowed) {
     return (
-      <div className="mb-6 rounded-2xl border border-line bg-white shadow-soft p-5 flex items-center gap-4">
+      <div className="mb-6 rounded-2xl border border-line bg-white shadow-soft p-5 flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="w-11 h-11 rounded-xl bg-bean-tint grid place-items-center shrink-0">
           <Lock className="w-5 h-5 text-bean" />
         </div>
@@ -38,9 +51,21 @@ export default function RevenueAiInsights() {
           <p className="font-semibold text-ink flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-bean" /> Phân tích doanh thu bằng AI
           </p>
-          <p className="text-sm text-cafe-500">Nâng cấp Pro Max để AI tự đọc số liệu và gợi ý cách tăng doanh thu.</p>
+          <p className="text-sm text-cafe-500">
+            AI đọc thẳng số liệu bán hàng của quán rồi chỉ ra điểm nổi bật, cảnh báo bất
+            thường và gợi ý hành động cụ thể.
+          </p>
         </div>
-        <Link href="/user/subscription" className="btn-primary text-sm shrink-0">Nâng cấp</Link>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => moHopChat('Quán tôi cần làm gì để dùng được phân tích doanh thu bằng AI?')}
+            className="btn-secondary text-sm inline-flex items-center gap-1.5"
+          >
+            <MessageCircle className="w-4 h-4" aria-hidden /> Hỏi trợ lý
+          </button>
+          <Link href="/user/subscription" className="btn-primary text-sm">Xem gói</Link>
+        </div>
       </div>
     );
   }

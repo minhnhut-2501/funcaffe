@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { canUseAI } from '@/lib/permission';
 import { aiService } from '@/services';
 import { ApiError } from '@/lib/api-client';
+import { SU_KIEN_MO_CHAT, type ChiTietMoChat } from '@/lib/ai-chat-bus';
 
 interface ChatMsg { role: 'user' | 'assistant'; content: string }
 
@@ -76,10 +77,24 @@ export default function AiChatWidget() {
   );
   const suggestionsLoaded = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Câu hỏi do nơi khác trong trang gửi tới (nút "Hỏi thử ngay"), chờ panel mở xong
+  // mới gửi đi.
+  const [cauHoiChoGui, setCauHoiChoGui] = useState<string | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Nghe lời mời mở hộp chat từ chỗ khác (xem lib/ai-chat-bus).
+  useEffect(() => {
+    const xuLy = (e: Event) => {
+      const chiTiet = (e as CustomEvent<ChiTietMoChat>).detail;
+      setOpen(true);
+      if (chiTiet?.cauHoi) setCauHoiChoGui(chiTiet.cauHoi);
+    };
+    window.addEventListener(SU_KIEN_MO_CHAT, xuLy);
+    return () => window.removeEventListener(SU_KIEN_MO_CHAT, xuLy);
+  }, []);
 
   // Gợi ý theo tình trạng THẬT của quán chỉ có nghĩa khi ngữ cảnh cũng có số liệu
   // quán — chế độ tư vấn thì dùng bộ câu bán hàng, không gọi máy chủ làm gì.
@@ -138,6 +153,18 @@ export default function AiChatWidget() {
       setLoading(false);
     }
   }
+
+  // Gửi câu hỏi đặt sẵn SAU khi panel đã mở, không gửi ngay lúc nhận sự kiện: gửi
+  // sớm thì câu trả lời chảy vào một khung chưa hiện ra, người bấm nút không thấy gì.
+  // Xoá `cauHoiChoGui` TRƯỚC khi gọi để effect không bắn lại lần hai.
+  useEffect(() => {
+    if (!open || !cauHoiChoGui || loading) return;
+    const cau = cauHoiChoGui;
+    setCauHoiChoGui(null);
+    send(cau);
+    // `send` đổi mỗi lần render nên cố ý không đưa vào danh sách phụ thuộc.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cauHoiChoGui, loading]);
 
   // Người chưa đăng nhập thì đường nâng gói là trang đăng ký; đã đăng nhập thì vào
   // thẳng trang gói. Gửi khách lạ tới /user/subscription là đá họ ra màn hình login.
