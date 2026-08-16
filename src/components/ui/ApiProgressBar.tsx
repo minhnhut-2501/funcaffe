@@ -72,12 +72,15 @@ export default function ApiProgressBar() {
       className="fixed inset-x-0 top-0 z-[100] h-0.5 pointer-events-none"
       style={{ opacity: hien ? 1 : 0, transition: 'opacity 200ms ease-out' }}
     >
+      {/* Co giãn bằng `scale` chứ không bằng `width`: đổi width là ép trình duyệt tính
+          lại bố cục ở MỖI khung hình, mà thanh này chạy trong lúc trang đang bận nạp
+          dữ liệu — đúng lúc không nên giành thêm việc. `scale` chỉ chạm khâu vẽ.
+          Thanh đặc một màu nên co giãn ngang không méo gì. */}
       <div
-        className="h-full bg-bean"
+        className="h-full w-full bg-bean origin-left"
         style={{
-          width: `${phanTram}%`,
-          transition: 'width 220ms ease-out',
-          boxShadow: '0 0 8px var(--color-bean)',
+          scale: `${phanTram / 100} 1`,
+          transition: 'scale 220ms ease-out',
         }}
       />
     </div>
