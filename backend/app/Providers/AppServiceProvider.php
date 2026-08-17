@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
+use App\Support\CauHinhMail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -47,7 +48,7 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Kêu to khi bản đã triển khai đang chạy với cấu hình chỉ hợp cho máy phát triển.
      *
-     * Ba thứ dưới đây đều KHÔNG làm hỏng gì ngay — ứng dụng chạy bình thường, không
+     * Bốn thứ dưới đây đều KHÔNG làm hỏng gì ngay — ứng dụng chạy bình thường, không
      * báo lỗi nào — nên rất dễ lên mạng rồi vẫn còn nguyên. Mỗi cái là một cửa mở:
      *
      *  · `APP_DEBUG=true` in ra đường dẫn tệp, đoạn mã và **toàn bộ biến môi trường**
@@ -56,6 +57,8 @@ class AppServiceProvider extends ServiceProvider
      *  · CORS `*` cho phép **mọi trang web** gọi API này bằng token của người dùng
      *    đang đăng nhập.
      *  · `APP_KEY` rỗng thì mọi thứ Laravel mã hóa đều không đáng tin.
+     *  · Cấu hình thư thiếu thì thư đặt lại mật khẩu và thư trả lời khách chui vào
+     *    tệp log, còn giao diện vẫn báo "đã gửi".
      *
      * Chỉ ghi log, không chặn khởi động: dựng được nhưng không vào được thì còn tệ
      * hơn, nhất là trong buổi bảo vệ.
@@ -76,6 +79,14 @@ class AppServiceProvider extends ServiceProvider
 
         if (empty(config('app.key'))) {
             Log::warning('[TRIỂN KHAI] APP_KEY đang rỗng — chạy `php artisan key:generate`.');
+        }
+
+        // Kêu NGAY LÚC KHỞI ĐỘNG, không đợi ai bấm "Quên mật khẩu" rồi mới biết. Bản
+        // triển khai từng chạy nhiều tuần với mailer `log` mà không ai hay: thư ghi vào
+        // tệp, giao diện báo gửi xong, không một dòng lỗi nào. Chốt chặn ở
+        // Admin\ContactController chỉ nói khi admin bấm trả lời — quá muộn và quá hẹp.
+        if ($lyDo = CauHinhMail::lyDoChuaSanSang()) {
+            Log::warning("[TRIỂN KHAI] Máy chủ KHÔNG gửi được thư ra ngoài: {$lyDo}");
         }
     }
 
