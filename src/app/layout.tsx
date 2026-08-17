@@ -16,9 +16,20 @@ const beVietnamPro = Be_Vietnam_Pro({
 export const metadata: Metadata = {
   title: 'FunCafe - Nền tảng quản lý quán cafe',
   description: 'Hệ thống quản lý quán cafe thông minh dành cho chủ quán tại Việt Nam',
-  // public/favicon.svg vốn có sẵn nhưng không được khai báo, nên trình duyệt tự
-  // đòi /favicon.ico và ăn 404 ở mọi lượt tải trang.
-  icons: { icon: '/favicon.svg' },
+  // Khai báo SVG thôi là chưa đủ. Cốc Cốc, Zalo, lối tắt trên Desktop và nhiều trình
+  // đọc liên kết KHÔNG đọc thẻ <link> — chúng đòi thẳng /favicon.ico ở gốc tên miền.
+  // Thiếu tệp đó thì chúng ăn 404 rồi rơi về quả địa cầu mặc định, dù trang vẫn khai
+  // báo icon đàng hoàng. Nên phải có CẢ HAI: .ico để tương thích, .svg để nét ở mọi cỡ.
+  //
+  // Cả hai sinh ra từ cùng public/favicon.svg bằng `node scripts/dung-icon.mjs` —
+  // sửa logo thì sửa .svg rồi chạy lại, đừng vẽ tay tệp .ico kẻo hai bên trôi khỏi nhau.
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({
