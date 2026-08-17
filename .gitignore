@@ -54,6 +54,10 @@ tsconfig.base.json
 # Ảnh chụp phục vụ rà soát giao diện (tự sinh lại bằng scripts/audit-pages.mjs)
 design-shots/
 
+# Ảnh trọn trang để dựng lại giao diện trong Figma — 37 MB và tự sinh lại được
+# bằng scripts/chup-figma.mjs, nên giữ ở máy chứ không đẩy lên kho.
+figma/
+
 # Backup .docx tam thoi cua bao cao (giu local, khong can dong bo)
 doc/_BACKUP_*.docx
 
