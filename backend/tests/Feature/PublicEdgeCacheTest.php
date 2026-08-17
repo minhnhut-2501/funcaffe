@@ -13,9 +13,9 @@ use Laravel\Sanctum\Sanctum;
  * Ranh giới của PublicEdgeCache: đường nào được biên đệm chung, đường nào tuyệt đối không.
  *
  * Đây là bài kiểm thử về BẢO MẬT nhiều hơn về tốc độ. Bộ đệm của Cloudflare dùng chung
- * cho mọi khách: một phản hồi lọt vào đó là mọi người sẽ nhận đúng nội dung ấy trong 5
- * phút, bất kể họ là ai. Nên thứ phải khoá chặt là DANH SÁCH đường được đệm — thêm nhầm
- * một đường có dữ liệu riêng của quán là quán này thấy số liệu của quán kia.
+ * cho mọi khách: một phản hồi lọt vào đó là mọi người sẽ nhận đúng nội dung ấy cho tới
+ * khi hết hạn, bất kể họ là ai. Nên thứ phải khoá chặt là DANH SÁCH đường được đệm —
+ * thêm nhầm một đường có dữ liệu riêng của quán là quán này thấy số liệu của quán kia.
  *
  * Bài `..._van_giu_cors_chat` là cặp đối chứng: không có nó thì các bài trên vẫn xanh
  * ngay cả khi middleware lỡ nới cho TOÀN BỘ /api, tức là xanh giả.
@@ -43,7 +43,7 @@ class PublicEdgeCacheTest extends MongoTestCase
         $res = $this->getJson('/api/packages');
 
         $res->assertOk();
-        $res->assertHeader('Cache-Control', 'max-age=300, public');
+        $res->assertHeader('Cache-Control', 'max-age=0, public, s-maxage=60');
         $res->assertHeader('Access-Control-Allow-Origin', '*');
 
         // Đây mới là điều thật sự đang sửa: Cloudflare bỏ qua mọi phản hồi có `Vary`
@@ -65,7 +65,7 @@ class PublicEdgeCacheTest extends MongoTestCase
 
         $res->assertOk();
         $res->assertHeader('Access-Control-Allow-Origin', '*');
-        $this->assertStringContainsString('max-age=300', $res->headers->get('Cache-Control'));
+        $this->assertStringContainsString('s-maxage=60', $res->headers->get('Cache-Control'));
     }
 
     public function test_danh_gia_cong_khai_duoc_dem(): void
@@ -75,6 +75,26 @@ class PublicEdgeCacheTest extends MongoTestCase
         $res->assertOk();
         $res->assertHeader('Access-Control-Allow-Origin', '*');
         $this->assertSame('Accept-Encoding', $res->headers->get('Vary'));
+    }
+
+    /**
+     * Đệm chung được, đệm riêng thì KHÔNG.
+     *
+     * Đây là bài giữ chỗ cho một lỗi đã xảy ra thật: header từng là `max-age=300` nên
+     * trình duyệt của chính chủ quán giữ bản cũ 5 phút, sửa đánh giá xong mở trang chủ
+     * vẫn thấy nguyên văn cũ và tưởng phần mềm không lưu. `s-maxage` nói riêng với biên,
+     * `max-age=0` bắt trình duyệt hỏi lại — đổi ngược lại là lỗi ấy quay về y nguyên.
+     */
+    public function test_trinh_duyet_khong_duoc_tu_giu_ban_cu(): void
+    {
+        $res = $this->getJson('/api/reviews');
+
+        $cacheControl = (string) $res->headers->get('Cache-Control');
+
+        $this->assertStringContainsString('max-age=0', $cacheControl,
+            'Trình duyệt được phép tự giữ bản cũ — người vừa sửa đánh giá sẽ không thấy thay đổi.');
+        $this->assertStringContainsString('s-maxage=60', $cacheControl,
+            'Mất chỉ thị dành riêng cho biên thì Cloudflare thôi đệm, mỗi lượt xem lại bay sang Virginia.');
     }
 
     /**

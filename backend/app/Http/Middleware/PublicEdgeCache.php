@@ -20,9 +20,17 @@ use Symfony\Component\HttpFoundation\Response;
  * Origin: *` và hạ `Vary` xuống `Accept-Encoding` — KHÔNG nới CORS cho phần còn lại
  * của API, nơi mỗi quán chỉ được thấy dữ liệu của mình.
  *
- * `max-age=300` do máy chủ tự khai còn có tác dụng thứ hai: gói Cloudflare Free không
- * cho chọn Edge TTL dưới 2 giờ ở giao diện, nhưng nó TÔN TRỌNG max-age của máy chủ.
- * Đặt luật Cache Rules ở chế độ "Use cache-control header if present" là ăn đúng 5 phút.
+ * ĐỆM Ở BIÊN, KHÔNG ĐỆM Ở TRÌNH DUYỆT. Trước đây header là `max-age=300` chung cho cả
+ * hai, và cái giá phải trả nằm ở chỗ không ai ngờ: chủ quán sửa đánh giá xong, mở trang
+ * chủ thì suốt 5 phút vẫn thấy nguyên văn bản cũ — trình duyệt trả thẳng từ đĩa, request
+ * còn không rời khỏi máy. Người dùng không có cách nào biết đó là bản đệm, nên kết luận
+ * duy nhất họ rút ra là "phần mềm không lưu".
+ *
+ * Nay `max-age=0` bắt trình duyệt luôn hỏi lại, còn `s-maxage` chỉ nói với ĐỆM CHUNG
+ * (Cloudflare) — lượt hỏi đó dừng ở biên gần nhất chứ không bay sang Virginia, nên vẫn
+ * nhanh. Gói Cloudflare Free không cho chọn Edge TTL dưới 2 giờ ở giao diện, nhưng nó
+ * TÔN TRỌNG chỉ thị của máy chủ và ưu tiên `s-maxage` hơn `max-age`; đặt luật Cache
+ * Rules ở chế độ "Use cache-control header if present" là ăn đúng số giây dưới đây.
  *
  * PHẢI PREPEND (xem bootstrap/app.php) để nằm NGOÀI HandleCors: phản hồi đi từ trong
  * ra ngoài, nên chỉ lớp ngoài cùng mới ghi đè được header mà HandleCors vừa gắn.
@@ -36,8 +44,13 @@ class PublicEdgeCache
         'api/reviews',
     ];
 
-    /** 5 phút: bảng gói đổi vài tháng một lần, đánh giá mới thì chờ chừng đó là chấp nhận được. */
-    private const SO_GIAY = 300;
+    /**
+     * Biên được giữ bản đệm bao lâu. 60 giây là mức chịu đựng của người vừa bấm lưu:
+     * họ sửa đánh giá rồi mở trang chủ xem, chờ tới 5 phút thì tưởng là hỏng, còn một
+     * phút thì lần tải lại đầu tiên đã thấy. Đổi lại, mỗi phút chỉ một lượt gọi thật
+     * chạm tới máy chủ — phần tiết kiệm lớn nhất vẫn còn nguyên.
+     */
+    private const SO_GIAY = 60;
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -48,7 +61,7 @@ class PublicEdgeCache
         }
 
         $response->headers->set('Access-Control-Allow-Origin', '*');
-        $response->headers->set('Cache-Control', 'public, max-age='.self::SO_GIAY);
+        $response->headers->set('Cache-Control', 'public, max-age=0, s-maxage='.self::SO_GIAY);
 
         // Giữ lại Accept-Encoding chứ không xoá trắng Vary: Cloudflare được phép đệm
         // theo nó, mà bỏ hẳn thì bản đã nén có thể bị trả cho máy không nhận nén.

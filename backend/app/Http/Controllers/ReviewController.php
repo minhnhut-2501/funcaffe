@@ -18,9 +18,13 @@ class ReviewController extends Controller
 
     public function publicReviews()
     {
+        // Xếp theo LẦN SỬA gần nhất, không theo ngày viết. Gửi lại là ghi đè bản cũ nên
+        // `created_at` đứng yên: xếp theo nó thì chủ quán sửa đánh giá xong vẫn thấy nó
+        // nằm nguyên chỗ cũ, và khi đã quá 12 đánh giá thì bản vừa sửa còn không lọt vào
+        // danh sách — đúng cái cảm giác "sửa xong mà không thấy gì đổi".
         $reviews = Review::where('status', 'visible')
             ->with('user', 'cafe', 'package')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->limit(12)
             ->get()
             ->map(function ($review) {
@@ -95,10 +99,23 @@ class ReviewController extends Controller
     {
         $this->authorizeCafe($cafe);
 
+        // Tiêu đề và nội dung BẮT BUỘC. Đánh giá chỉ có số sao trần trụi không nói được
+        // gì với người đang cân nhắc dùng FunCafe, mà băng đánh giá ở trang chủ lại chỉ
+        // dựng thẻ từ những cái có nội dung — nên bản thiếu nội dung vừa vô nghĩa với
+        // người đọc, vừa im lặng biến mất với người viết.
         $validated = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
-            'title' => 'nullable|string|max:255',
-            'comment' => 'nullable|string|max:2000',
+            'title' => 'required|string|max:255',
+            'comment' => 'required|string|max:2000',
+        ], [
+            // Không có thư mục lang/vi trong dự án, để mặc định là người dùng nhận câu
+            // tiếng Anh của Laravel ngay giữa một màn hình tiếng Việt.
+            'rating.required'  => 'Vui lòng chọn số sao.',
+            'rating.min'       => 'Vui lòng chọn số sao.',
+            'title.required'   => 'Vui lòng nhập tiêu đề cho đánh giá.',
+            'title.max'        => 'Tiêu đề không được dài quá 255 ký tự.',
+            'comment.required' => 'Vui lòng nhập nội dung đánh giá.',
+            'comment.max'      => 'Nội dung không được dài quá 2000 ký tự.',
         ]);
 
         $user = $request->user();

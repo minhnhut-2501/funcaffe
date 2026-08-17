@@ -105,7 +105,60 @@ class ReviewRulesTest extends MongoTestCase
         $this->assertSame(1, Review::where('user_id', (string) $this->user->id)->count());
     }
 
-    // === 5.7.3 Không lộ thông tin cá nhân ==========================================
+    // === 5.7.2 Đánh giá phải có nội dung ===========================================
+
+    /**
+     * Sao trần trụi không nói được gì với người đang cân nhắc dùng FunCafe, mà băng
+     * đánh giá ở trang chủ cũng chỉ dựng thẻ từ bản CÓ nội dung — nên bản thiếu nội
+     * dung im lặng biến mất, người viết tưởng hệ thống nuốt mất đánh giá của mình.
+     */
+    public function test_thieu_tieu_de_hoac_noi_dung_thi_khong_gui_duoc(): void
+    {
+        $this->gui(['title' => ''])->assertStatus(422)->assertJsonValidationErrors('title');
+        // Toàn dấu cách cũng là rỗng: `required` của Laravel cắt khoảng trắng trước khi xét.
+        $this->gui(['comment' => '   '])->assertStatus(422)->assertJsonValidationErrors('comment');
+
+        $this->assertSame(0, Review::count(), 'Đánh giá rỗng vẫn lọt xuống CSDL.');
+    }
+
+    // === 5.7.3 Thứ tự trên trang chủ ===============================================
+
+    /**
+     * Gửi lại là GHI ĐÈ nên `created_at` đứng yên. Xếp trang chủ theo ngày viết thì
+     * người vừa sửa xong không thấy gì đổi chỗ, và khi đã quá 12 đánh giá thì bản vừa
+     * sửa còn rơi hẳn khỏi danh sách — trông y như "sửa xong mà không lưu".
+     */
+    public function test_danh_gia_vua_sua_nhay_len_dau_trang_chu(): void
+    {
+        $this->travelTo(now()->subHours(2));
+        $this->gui();
+
+        // Đánh giá của người khác, viết SAU của mình một tiếng và không ai đụng vào nữa.
+        $this->travelTo(now()->addHour());
+        $nguoiKhac = User::create([
+            'full_name' => 'Người viết sau',
+            'email' => 'sau-' . uniqid() . '@funcafe.test',
+            'phone' => '0900333444',
+            'password' => Hash::make('Password@123'),
+            'role' => 'user', 'status' => 'active',
+        ]);
+        Review::create([
+            'user_id' => (string) $nguoiKhac->id,
+            'cafe_id' => (string) $this->cafe->id,
+            'rating' => 4, 'title' => 'Viết sau', 'comment' => 'Dùng ổn.',
+            'status' => 'visible',
+        ]);
+
+        $this->travelBack();
+        $this->gui(['rating' => 5, 'title' => 'Sửa lại lúc nãy', 'comment' => 'Càng dùng càng quen.']);
+
+        $than = $this->getJson('/api/reviews')->assertStatus(200)->json();
+
+        $this->assertSame('Sửa lại lúc nãy', $than[0]['title'],
+            'Đánh giá vừa sửa không lên đầu — trang chủ đang xếp theo ngày viết chứ không theo lần sửa.');
+    }
+
+    // === 5.7.4 Không lộ thông tin cá nhân ==========================================
 
     /**
      * Trang chủ ai cũng xem được, kể cả người không đăng nhập. Nhúng nguyên đối tượng
@@ -144,7 +197,7 @@ class ReviewRulesTest extends MongoTestCase
         );
     }
 
-    // === 5.7.4 Đánh giá bị ẩn ======================================================
+    // === 5.7.5 Đánh giá bị ẩn ======================================================
 
     public function test_danh_gia_bi_an_khong_lot_ra_trang_chu(): void
     {

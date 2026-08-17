@@ -51,14 +51,20 @@ export default function FunCafeReviewSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, cafes.length]);
 
+  // Chặn ngay ở đây thay vì để máy chủ trả 422: người dùng biết còn thiếu gì TRƯỚC khi
+  // bấm, chứ không phải sau một vòng đi về mạng.
+  const title = reviewForm.title.trim();
+  const comment = reviewForm.comment.trim();
+  const dayDu = reviewForm.rating >= 1 && title !== '' && comment !== '';
+
   const handleSubmit = async () => {
-    if (reviewForm.rating < 1) return;
+    if (!dayDu) return;
     setSubmitting(true);
     try {
       await reviewService.create({
         rating: reviewForm.rating,
-        title: reviewForm.title.trim() || undefined,
-        comment: reviewForm.comment.trim() || undefined,
+        title,
+        comment,
       });
       toast({ description: myReview ? 'Đã cập nhật đánh giá của bạn. Cảm ơn bạn!' : 'Đã gửi đánh giá. Cảm ơn bạn!' });
       applyMine(await reviewService.mine().catch(() => null));
@@ -98,20 +104,26 @@ export default function FunCafeReviewSection() {
           </div>
         </div>
         <div>
-          <label className="label-funcafe">Tiêu đề (tuỳ chọn)</label>
+          <label className="label-funcafe">Tiêu đề</label>
           <input className="input-funcafe" placeholder="VD: Quản lý quán nhàn hơn hẳn"
             value={reviewForm.title} maxLength={255}
             onChange={e => setReviewForm(f => ({ ...f, title: e.target.value }))} />
         </div>
         <div>
-          <label className="label-funcafe">Nội dung (tuỳ chọn)</label>
+          <label className="label-funcafe">Nội dung</label>
           <textarea className="input-funcafe min-h-[80px]" placeholder="Bạn thích/chưa thích điều gì ở FunCafe?"
             value={reviewForm.comment} maxLength={2000}
             onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))} />
         </div>
-        <button onClick={handleSubmit} disabled={submitting} className="btn-primary">
-          {submitting ? 'Đang gửi...' : myReview ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={handleSubmit} disabled={submitting || !dayDu} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+            {submitting ? 'Đang gửi...' : myReview ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
+          </button>
+          {/* Nút mờ đi mà không nói vì sao là một câu đố. Chỉ hiện khi thật sự còn thiếu. */}
+          {!dayDu && (
+            <span className="text-sm text-ink/60">Nhập cả tiêu đề và nội dung để gửi được đánh giá.</span>
+          )}
+        </div>
       </div>
     );
   };

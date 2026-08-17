@@ -90,7 +90,10 @@ class CreateMongoIndexes extends Command
         'item_toppings' => [['keys' => ['item_id' => 1]]],
         'reviews' => [
             ['keys' => ['user_id' => 1]],
-            ['keys' => ['status' => 1, 'created_at' => -1]],
+            // Băng đánh giá trang chủ lọc status rồi xếp theo LẦN SỬA gần nhất
+            // (xem ReviewController@publicReviews) — index phải đi theo nó, không
+            // thì mọi lượt vào trang chủ là một lượt quét cả collection rồi sắp xếp.
+            ['keys' => ['status' => 1, 'updated_at' => -1]],
         ],
         'users' => [
             ['keys' => ['email' => 1], 'options' => ['unique' => true, 'name' => 'uniq_email']],

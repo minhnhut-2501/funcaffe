@@ -5,11 +5,12 @@ import { getCafeId } from './cafe-id';
 
 // Reviews
 export const reviewService = {
-  // Gửi đánh giá FunCafe của chủ quán (backend upsert: gửi lại = cập nhật đánh giá cũ)
+  // Gửi đánh giá FunCafe của chủ quán (backend upsert: gửi lại = cập nhật đánh giá cũ).
+  // title và comment bắt buộc — khớp ràng buộc của ReviewController@store.
   create: async (data: {
     rating: number;
-    title?: string;
-    comment?: string;
+    title: string;
+    comment: string;
   }) => {
     const cafeId = await getCafeId();
     return api.post(`/cafes/${cafeId}/reviews`, data);
