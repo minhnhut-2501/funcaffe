@@ -73,6 +73,19 @@ class ContactController extends Controller
             'reply' => 'required|string|min:10|max:5000',
         ]);
 
+        // CHẶN TRƯỚC KHI GỬI. Mailer `log` (giá trị mặc định khi thiếu MAIL_MAILER) nhận
+        // thư, ghi vào tệp log rồi trả về êm ru — không ném lỗi nào để `catch` bên dưới
+        // bắt được. Hậu quả đúng như đã xảy ra trên bản triển khai: admin thấy "Đã gửi
+        // email trả lời", tin nhắn chuyển sang "Đã trả lời", còn khách không nhận được
+        // gì và không ai biết. Thà từ chối thẳng còn hơn ghi nhận một việc chưa xảy ra.
+        if (($lyDo = \App\Support\CauHinhMail::lyDoChuaSanSang()) !== null) {
+            \Illuminate\Support\Facades\Log::error("[MAIL] Không gửi được thư trả lời liên hệ: {$lyDo}");
+
+            return response()->json([
+                'message' => "Máy chủ chưa gửi thư ra ngoài được nên chưa trả lời khách. {$lyDo}",
+            ], 503);
+        }
+
         try {
             Mail::to($contact->email)->send(new ContactReplyMail($contact, $validated['reply']));
         } catch (\Throwable $e) {

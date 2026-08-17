@@ -6,6 +6,7 @@ use App\Models\PersonalAccessToken;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -23,6 +24,24 @@ class AppServiceProvider extends ServiceProvider
 
         $this->dinhNghiaGioiHanTanSuat();
         $this->canhBaoCauHinhTrienKhai();
+        $this->dinhTuyenThuTraLoi();
+    }
+
+    /**
+     * Mọi thư đi ra đều mang Reply-To trỏ về hòm thư có người đọc.
+     *
+     * Thư gửi từ tên miền đã xác thực ở Resend (`no-reply@funcafe.pro`) — hòm đó không
+     * ai mở. Đặt ở đây thay vì đi sửa từng Mailable vì cái bẫy nằm ở chỗ ngược lại:
+     * thêm một nơi gửi thư mới mà quên gắn Reply-To thì không có gì báo, chỉ có thư
+     * của khách lặng lẽ đi vào hư không.
+     */
+    private function dinhTuyenThuTraLoi(): void
+    {
+        $diaChi = config('mail.reply_to.address');
+
+        if (!empty($diaChi)) {
+            Mail::alwaysReplyTo($diaChi, (string) config('mail.reply_to.name'));
+        }
     }
 
     /**

@@ -14,6 +14,14 @@ import StatusBadge, { type Tone } from '@/components/user/StatusBadge';
 
 type Stage = 'unread' | 'read' | 'replied';
 
+/**
+ * Khớp đúng ràng buộc của Admin\ContactController@reply. Để frontend không biết hai
+ * con số này thì người viết chỉ phát hiện ra giới hạn khi bị máy chủ từ chối — sau
+ * khi đã gõ xong cả đoạn.
+ */
+const TRA_LOI_TOI_THIEU = 10;
+const TRA_LOI_TOI_DA = 5000;
+
 const stageOf = (m: ContactMessage): Stage => (m.reply ? 'replied' : m.isRead ? 'read' : 'unread');
 const stageLabel: Record<Stage, string> = { unread: 'Chưa đọc', read: 'Đã đọc', replied: 'Đã trả lời' };
 const stageTone: Record<Stage, Tone> = { unread: 'warning', read: 'neutral', replied: 'success' };
@@ -62,8 +70,11 @@ export default function AdminContactsPage() {
     }
   };
 
+  const doDaiTraLoi = replyText.trim().length;
+  const traLoiHopLe = doDaiTraLoi >= TRA_LOI_TOI_THIEU && doDaiTraLoi <= TRA_LOI_TOI_DA;
+
   const handleSendReply = async () => {
-    if (!detail || replyText.trim().length < 10) return;
+    if (!detail || !traLoiHopLe) return;
     setSending(true);
     try {
       const updated = await contactService.reply(detail.id, replyText.trim());
@@ -191,8 +202,8 @@ export default function AdminContactsPage() {
             <button onClick={() => setDetail(null)} className="btn-secondary">Đóng</button>
             <button
               onClick={handleSendReply}
-              disabled={sending || replyText.trim().length < 10}
-              className="btn-primary"
+              disabled={sending || !traLoiHopLe}
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-4 h-4" />
               {sending ? 'Đang gửi...' : 'Gửi trả lời'}
@@ -242,16 +253,27 @@ export default function AdminContactsPage() {
               </label>
               <textarea
                 id="contact-reply"
-                rows={5}
+                rows={9}
+                maxLength={TRA_LOI_TOI_DA}
                 className="input-funcafe resize-y"
                 placeholder="Nội dung này sẽ được gửi tới email của khách, kèm trích lại tin nhắn gốc..."
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
               />
-              <p className="text-xs text-cafe-500 mt-1.5">
-                Gửi tới <span className="font-medium text-ink">{detail.email}</span>. Khách bấm Trả lời trong hộp thư
-                sẽ về hòm mail của FunCafe.
-              </p>
+              {/* Bộ đếm và lời nhắc còn thiếu bao nhiêu ký tự nằm cùng một dòng: trước
+                  đây nút "Gửi trả lời" cứ mờ đi mà không nói vì sao, người viết chỉ
+                  đoán được sau khi gõ thêm vài chữ thấy nó sáng lên. */}
+              <div className="flex items-baseline justify-between gap-3 mt-1.5">
+                <p className="text-xs text-cafe-500">
+                  Gửi tới <span className="font-medium text-ink">{detail.email}</span>. Khách bấm Trả lời trong hộp thư
+                  sẽ về hòm mail của FunCafe.
+                </p>
+                <p className={`text-xs shrink-0 tabular-nums ${doDaiTraLoi > TRA_LOI_TOI_DA * 0.9 ? 'text-gold' : 'text-cafe-500'}`}>
+                  {doDaiTraLoi < TRA_LOI_TOI_THIEU
+                    ? `Cần thêm ${TRA_LOI_TOI_THIEU - doDaiTraLoi} ký tự`
+                    : `${doDaiTraLoi.toLocaleString('vi-VN')} / ${TRA_LOI_TOI_DA.toLocaleString('vi-VN')}`}
+                </p>
+              </div>
             </div>
           </div>
         )}

@@ -115,4 +115,22 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Địa chỉ nhận thư trả lời
+    |--------------------------------------------------------------------------
+    |
+    | Thư đi từ một tên miền đã xác thực ở Resend (no-reply@funcafe.pro) — không ai
+    | đọc hòm đó. Nhưng màn hình quản trị có hứa với admin rằng "khách bấm Trả lời
+    | trong hộp thư sẽ về hòm mail của FunCafe", và khách trả lời thư đặt lại mật
+    | khẩu cũng là chuyện thường tình. Không đặt Reply-To thì những lời ấy rơi vào
+    | hư không. Xem AppServiceProvider::dinhTuyenThuTraLoi().
+    |
+    */
+
+    'reply_to' => [
+        'address' => env('MAIL_REPLY_TO_ADDRESS'),
+        'name' => env('MAIL_REPLY_TO_NAME', env('MAIL_FROM_NAME', env('APP_NAME', 'FunCafe'))),
+    ],
+
 ];

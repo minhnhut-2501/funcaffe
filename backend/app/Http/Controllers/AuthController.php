@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Rules\SoDienThoaiVN;
+use App\Support\CauHinhMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -169,12 +170,9 @@ class AuthController extends Controller
 
         // Gửi email thật nếu SMTP đã được cấu hình (MAIL_MAILER=smtp + có App Password).
         // Nếu chưa, ghi link vào log để vẫn test được luồng (không làm hỏng request).
-        $smtpPass = config('mail.mailers.smtp.password');
-        $mailReady = config('mail.default') === 'smtp'
-            && !empty($smtpPass)
-            && $smtpPass !== 'your-gmail-app-password';
+        $lyDo = CauHinhMail::lyDoChuaSanSang();
 
-        if ($mailReady) {
+        if ($lyDo === null) {
             try {
                 $body = "Xin chào,\n\n"
                     . "Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản FunCafe ({$user->email}).\n"
@@ -184,11 +182,23 @@ class AuthController extends Controller
                 Mail::raw($body, function ($m) use ($user) {
                     $m->to($user->email)->subject('Đặt lại mật khẩu FunCafe');
                 });
+
+                // Gửi xong vẫn ghi liên kết ra log KHI ĐANG Ở MÁY LẬP TRÌNH: ở đó thư đi
+                // vào mailer giả (`array`) chứ không tới hộp thư nào, nên đây là đường
+                // duy nhất để người lập trình và bộ kiểm thử đi tiếp bước đặt lại mật
+                // khẩu. Hàm dưới tự chặn việc ghi token ở production.
+                if (app()->environment('local', 'testing')) {
+                    $this->logResetUrlForDevelopment($user->email, $resetUrl);
+                }
             } catch (\Throwable $e) {
                 Log::warning("Gửi email reset thất bại ({$user->email}): " . $e->getMessage());
                 $this->logResetUrlForDevelopment($user->email, $resetUrl);
             }
         } else {
+            // Người dùng vẫn nhận câu trả lời mơ hồ (không được để lộ email nào có tài
+            // khoản), nên đây là DẤU VẾT DUY NHẤT cho biết vì sao thư không tới nơi.
+            // Nói thẳng biến môi trường còn thiếu, thay vì "MAIL chưa cấu hình SMTP".
+            Log::error("[MAIL] Không gửi được thư đặt lại mật khẩu: {$lyDo}");
             $this->logResetUrlForDevelopment($user->email, $resetUrl, '[MAIL chưa cấu hình SMTP] ');
         }
 

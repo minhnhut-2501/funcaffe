@@ -5,6 +5,7 @@ import Reveal from '@/components/public/Reveal';
 import CtaPanel from '@/components/public/CtaPanel';
 import { useState } from 'react';
 import { contactService } from '@/services';
+import { ApiError } from '@/lib/api-client';
 import { Mail, Phone, MapPin, Clock, CheckCircle2 } from 'lucide-react';
 
 // Bốn ô cùng một loại thông tin nên cùng một màu. Trước đây tô xanh dương / xanh
@@ -18,8 +19,10 @@ const info = [
   { icon: MapPin, label: 'Địa chỉ', value: 'Tòa nhà QTSC9 (toà T), đường Tô Ký, Phường Trung Mỹ Tây, TP. Hồ Chí Minh' },
 ];
 
+const FORM_RONG = { fullName: '', email: '', phone: '', cafeName: '', content: '' };
+
 export default function ContactPage() {
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', cafeName: '', content: '' });
+  const [form, setForm] = useState(FORM_RONG);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -37,8 +40,15 @@ export default function ContactPage() {
         content: form.content,
       });
       setSent(true);
-    } catch {
-      setError('Gửi tin nhắn thất bại. Vui lòng thử lại sau.');
+      // Dọn form NGAY khi gửi xong. Trước đây chỉ đổi cờ `sent`, nên bấm "Gửi tin khác"
+      // là toàn bộ họ tên, email và nội dung vừa gửi hiện lại y nguyên trong ô — trông
+      // hệt như lần gửi vừa rồi không ăn thua, và người dùng gửi lại lần nữa.
+      setForm(FORM_RONG);
+    } catch (err) {
+      // Nói đúng lý do máy chủ từ chối (nội dung quá 2000 ký tự, email sai định dạng,
+      // gửi quá 5 lần một phút). Câu chung "thử lại sau" biến một lỗi sửa được trong
+      // mười giây thành một vòng lặp bấm gửi mãi không hiểu vì sao.
+      setError(err instanceof ApiError ? err.detail : 'Gửi tin nhắn thất bại. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
@@ -171,6 +181,9 @@ export default function ContactPage() {
                       id="contact-content"
                       name="content"
                       rows={4}
+                      // Khớp ràng buộc của ContactController@store: chặn tại chỗ còn hơn
+                      // để người gõ xong cả đoạn dài rồi mới bị máy chủ trả 422.
+                      maxLength={2000}
                       className="input-funcafe resize-y"
                       placeholder="Mô tả nhu cầu của quán bạn..."
                       value={form.content}

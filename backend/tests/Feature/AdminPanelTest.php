@@ -534,6 +534,86 @@ class AdminPanelTest extends MongoTestCase
     }
 
     /**
+     * Máy chủ chưa cấu hình SMTP thì PHẢI từ chối, không được báo "đã gửi".
+     *
+     * Đây là bẫy đã sập trên bản triển khai thật: `config/mail.php` khai
+     * `env('MAIL_MAILER', 'log')`, mà biến đó không được đặt trên Render. Mailer `log`
+     * nhận thư, ghi vào tệp rồi trả về êm ru — KHÔNG ném lỗi nào cho `catch` bắt. Kết
+     * quả: admin thấy "Đã gửi email trả lời", tin nhắn chuyển sang "Đã trả lời", khách
+     * không nhận được gì, và không có một dòng lỗi nào để lần ra.
+     */
+    public function test_chua_cau_hinh_smtp_thi_tu_choi_thay_vi_bao_da_gui(): void
+    {
+        config(['mail.default' => 'log']);
+
+        $tin = ContactMessage::create([
+            'full_name' => 'Khách', 'email' => 'khach@funcafe.test',
+            'content' => 'Tư vấn giúp tôi gói Pro', 'is_read' => false,
+        ]);
+
+        $this->laAdmin();
+        $res = $this->postJson("/api/admin/contacts/{$tin->id}/reply", [
+            'reply' => 'Chào bạn, gói Pro hiện có giá 600.000đ cho 6 tháng.',
+        ]);
+
+        $res->assertStatus(503);
+        $this->assertStringContainsString('MAIL_MAILER', $res->json('message'),
+            'Thông báo phải chỉ thẳng biến môi trường còn thiếu, không thì lại đi mò.');
+
+        $sau = ContactMessage::find($tin->id);
+        $this->assertNull($sau->reply, 'Ghi "đã trả lời" trong khi thư chỉ chui vào tệp log.');
+        $this->assertNull($sau->replied_at);
+    }
+
+    /**
+     * Đặt `MAIL_MAILER=resend` mà quên khóa API cũng là chưa gửi được — và phải nói ra.
+     *
+     * Bản triển khai buộc phải dùng Resend (Render chặn cổng SMTP trên gói miễn phí),
+     * nên đây là kiểu cấu hình thiếu dễ xảy ra nhất từ nay về sau.
+     */
+    public function test_dung_resend_ma_thieu_khoa_api_thi_tu_choi(): void
+    {
+        config(['mail.default' => 'resend', 'services.resend.key' => null]);
+
+        $tin = ContactMessage::create([
+            'full_name' => 'Khách', 'email' => 'khach@funcafe.test',
+            'content' => 'Tư vấn giúp tôi gói Pro', 'is_read' => false,
+        ]);
+
+        $this->laAdmin();
+        $res = $this->postJson("/api/admin/contacts/{$tin->id}/reply", [
+            'reply' => 'Chào bạn, gói Pro hiện có giá 600.000đ cho 6 tháng.',
+        ]);
+
+        $res->assertStatus(503);
+        $this->assertStringContainsString('RESEND_API_KEY', $res->json('message'));
+        $this->assertNull(ContactMessage::find($tin->id)->reply);
+    }
+
+    /** Có khóa API rồi thì `resend` là cấu hình HỢP LỆ — chốt chặn không được cản. */
+    public function test_resend_du_cau_hinh_thi_gui_binh_thuong(): void
+    {
+        Mail::fake();
+        config([
+            'mail.default' => 'resend',
+            'services.resend.key' => 're_khoa_gia_de_kiem_thu',
+            'mail.from.address' => 'no-reply@funcafe.pro',
+        ]);
+
+        $tin = ContactMessage::create([
+            'full_name' => 'Khách', 'email' => 'khach@funcafe.test',
+            'content' => 'Tư vấn giúp tôi gói Pro', 'is_read' => false,
+        ]);
+
+        $this->laAdmin();
+        $this->postJson("/api/admin/contacts/{$tin->id}/reply", [
+            'reply' => 'Chào bạn, gói Pro hiện có giá 600.000đ cho 6 tháng.',
+        ])->assertStatus(200);
+
+        $this->assertNotNull(ContactMessage::find($tin->id)->replied_at);
+    }
+
+    /**
      * Việc 7.7.4 — phân trang THẬT.
      *
      * Trước đây là `limit(200)` không kèm đường đi tiếp: tin thứ 201 nằm trong CSDL mà

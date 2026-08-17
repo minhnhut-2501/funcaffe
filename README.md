@@ -172,9 +172,9 @@ Frontend đưa lên Vercel, backend đóng gói Docker đưa lên Render, cơ s�
 2. Đĩa của máy chủ bị xoá sạch sau mỗi lần triển khai lại, nên ảnh phải đẩy sang Cloudinary thay vì ghi vào thư mục ứng dụng.
 3. Frontend và backend nằm ở hai tên miền khác nhau — khai báo `CORS_ALLOWED_ORIGINS` và `FRONTEND_URL` cho đúng.
 
-### Bốn thứ phải kiểm trước khi coi là xong
+### Năm thứ phải kiểm trước khi coi là xong
 
-Ba cái đầu **không làm hỏng gì ngay** — ứng dụng chạy bình thường, không báo lỗi nào — nên
+Phần lớn **không làm hỏng gì ngay** — ứng dụng chạy bình thường, không báo lỗi nào — nên
 rất dễ lên mạng rồi vẫn còn nguyên. Ứng dụng tự ghi cảnh báo vào log khi phát hiện, nhưng
 đừng đợi tới đó:
 
@@ -184,6 +184,29 @@ rất dễ lên mạng rồi vẫn còn nguyên. Ứng dụng tự ghi cảnh b�
 | `CORS_ALLOWED_ORIGINS` | tên miền frontend thật | Mọi trang web gọi được API này bằng token của người dùng đang đăng nhập |
 | `APP_KEY` | đã sinh | Mọi thứ Laravel mã hóa đều không đáng tin |
 | `APP_TIMEZONE` | `Asia/Ho_Chi_Minh` | Doanh thu bán từ 0h–7h sáng bị tính sang ngày hôm trước |
+| `MAIL_MAILER` + `RESEND_API_KEY` + `MAIL_FROM_ADDRESS` | `resend`, khóa API, địa chỉ thuộc tên miền đã xác thực | Thiếu `MAIL_MAILER` thì Laravel lặng lẽ dùng mailer `log`: thư đặt lại mật khẩu và thư admin trả lời khách được ghi vào tệp log, **giao diện vẫn báo gửi thành công**, hộp thư người nhận trống trơn |
+
+`FRONTEND_URL` cũng phải là tên miền frontend thật, không phải `localhost:3000` — liên kết
+trong thư đặt lại mật khẩu được dựng từ chính biến này, đặt sai thì thư gửi đi đúng nhưng
+người nhận bấm vào không mở được gì.
+
+### Vì sao bản triển khai gửi thư qua Resend chứ không phải Gmail
+
+Render **chặn mọi kết nối ra cổng SMTP (25/465/587)** trên dịch vụ web gói miễn phí, hiệu
+lực từ 26/09/2025. Nó không từ chối thẳng mà nuốt gói tin, nên triệu chứng rất dễ đọc
+nhầm — đo trên bản đang chạy:
+
+| Lượt gọi | Thời gian |
+|---|---|
+| `forgot-password`, email **có** tài khoản (phải gửi thư) | **61s** rồi hết giờ |
+| `forgot-password`, email **không** tồn tại (không gửi gì) | 0,9s |
+| `/up` (chỉ đường truyền) | 0,55s |
+
+Resend đi qua HTTPS cổng 443 nên không dính lệnh chặn. Máy phát triển vẫn dùng Gmail SMTP
+bình thường — cổng 587 ở nhà không ai chặn — nên `CauHinhMail` chấp nhận cả hai đường.
+`MAIL_FROM_ADDRESS` bắt buộc thuộc tên miền đã xác thực ở Resend (`funcafe.pro`); để một
+địa chỉ `@gmail.com` là bị từ chối. Đặt thêm `MAIL_REPLY_TO_ADDRESS` trỏ về hòm thư có
+người đọc, nếu không thư khách bấm "Trả lời" sẽ đi vào hòm `no-reply` không ai mở.
 
 Máy chủ ở gói miễn phí của Render **ngủ sau một thời gian không dùng**; lượt gọi đầu tiên
 sau đó mất vài chục giây. Trước buổi trình bày nên mở trước một lượt cho nó dậy.
