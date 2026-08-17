@@ -22,7 +22,30 @@ WORKDIR /app
 COPY . .
 
 # Cài dependencies production (ext-mongodb 2.x đã có ở trên nên qua được platform check)
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+#
+# Thử lại ba lần rồi mới lùi về nguồn, chứ không gọi thẳng --prefer-source ngay.
+#
+# Lượt dựng 17/08/2026 chết ở đúng dòng này: codeload.github.com trả 429 khi tải
+# guzzle — một gói gần cuối, sau khi mấy chục gói trước đã tải xong. Composer in
+# "Source fallback is disabled. Not trying alternative sources." rồi bỏ cuộc. Nghĩa là
+# mặc định nó KHÔNG tự chuyển sang git khi zip hỏng, nên MỘT gói vấp là hỏng cả lượt
+# dựng. Mà 429 thì không phải lỗi của mã mình và cũng chẳng sửa được bằng cách sửa mã.
+#
+# 429 là lỗi nhất thời, chờ vài chục giây thường là qua — nên thử lại trước, rẻ hơn
+# nhiều so với clone lại toàn bộ. Chỉ khi cả ba lần đều hỏng mới dùng --prefer-source:
+# nó lấy bằng git qua github.com, một đường KHÁC codeload, nên sống được ngay cả lúc
+# codeload đang chặn. Đổi lại thì chậm và để lại .git trong vendor, nên để làm đường
+# lui chứ không phải đường chính.
+#
+# Composer giữ đệm giữa các lần thử, nên lần sau chỉ tải lại đúng gói còn thiếu.
+RUN set -eu; \
+    for i in 1 2 3; do \
+      if composer install --no-dev --optimize-autoloader --no-interaction; then exit 0; fi; \
+      echo "=== composer install hong lan $i — cho $((i*20))s roi thu lai ==="; \
+      sleep $((i*20)); \
+    done; \
+    echo '=== Ba lan deu hong — lui ve cai tu ma nguon (git) ==='; \
+    composer install --no-dev --optimize-autoloader --no-interaction --prefer-source
 
 # Quyền ghi cho Laravel
 RUN chmod -R 775 storage bootstrap/cache
