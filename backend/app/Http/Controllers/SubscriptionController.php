@@ -364,17 +364,27 @@ class SubscriptionController extends Controller
         }
 
         // Kiểm tra quyền dùng thử. HAI cổng, cả hai đều cần:
-        //  - theo QUÁN: một quán không xin dùng thử hai lần.
         //  - theo TÀI KHOẢN: số quán mỗi tài khoản tạo được không bị giới hạn, nên chỉ
         //    chặn theo quán là mở đường dùng Pro Max miễn phí vĩnh viễn — hết 7 ngày
         //    thì tạo quán mới, lại được 7 ngày nữa.
+        //  - theo QUÁN: lớp phòng thứ hai, phòng khi dữ liệu lệch (quán mang dấu đã
+        //    dùng mà chủ thì chưa).
+        //
+        // HỎI TÀI KHOẢN TRƯỚC, và đây là chủ ý chứ không phải thứ tự ngẫu nhiên. Lúc
+        // kích hoạt gói dùng thử, cả hai dấu được đánh CÙNG LÚC (xem đoạn dưới), nên
+        // quán nào đã dùng thì chủ của nó chắc chắn cũng đã dùng. Hỏi quán trước thì
+        // người dùng luôn đọc được câu "quán này đã dùng" — câu đó ngụ ý "thử quán
+        // khác đi", mà tạo quán mới xong họ vẫn đâm vào cổng tài khoản và vẫn bị chặn.
+        // Nói thẳng ràng buộc rộng hơn và vĩnh viễn thì họ khỏi mất công.
         if ($package->is_trial) {
-            if ($cafe->has_used_free_trial) {
-                return response()->json(['message' => 'Quán này đã sử dụng gói dùng thử trước đó.'], 400);
-            }
             if ($user->has_used_free_trial) {
                 return response()->json([
                     'message' => 'Tài khoản của bạn đã dùng gói dùng thử miễn phí rồi. Mỗi tài khoản chỉ được dùng thử một lần — vui lòng chọn gói trả phí cho quán này.',
+                ], 400);
+            }
+            if ($cafe->has_used_free_trial) {
+                return response()->json([
+                    'message' => 'Quán này đã dùng gói dùng thử trước đó. Mỗi quán chỉ được dùng thử một lần — vui lòng chọn gói trả phí.',
                 ], 400);
             }
         }

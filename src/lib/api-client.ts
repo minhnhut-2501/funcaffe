@@ -28,6 +28,15 @@ const UPLOAD_TIMEOUT_MS = 60_000;
  * ngay sau đó.
  */
 const LIST_TIMEOUT_MS = 45_000;
+/**
+ * Hạn chờ cho lượt gọi đi qua nhà cung cấp AI.
+ *
+ * Đặt RỘNG HƠN hạn chờ của máy chủ (`funcafe.gemini_timeout`, mặc định 45 giây) là
+ * cố ý: phải để máy chủ luôn là bên trả lời trước, kể cả khi nó phải đổi sang mô hình
+ * dự phòng. Đặt bằng hoặc hẹp hơn thì hai bên chạy đua, và bên thua là người dùng —
+ * họ nhận "Máy chủ phản hồi quá lâu" trong khi câu trả lời đã sắp về tới nơi.
+ */
+const AI_TIMEOUT_MS = 60_000;
 
 /** `status = 0` nghĩa là request KHÔNG tới được máy chủ (mất mạng, sai địa chỉ, CORS). */
 export const NETWORK_ERROR_STATUS = 0;
@@ -233,6 +242,23 @@ export const api = {
     request<T>(endpoint, { signal: AbortSignal.timeout(LIST_TIMEOUT_MS) }),
   post: <T>(endpoint: string, data?: unknown) =>
     request<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
+  /**
+   * POST cho lượt gọi CHẬM CÓ LÝ DO — hiện chỉ dùng cho phân tích doanh thu bằng AI.
+   *
+   * Trước đây nó dùng `api.post` thường, tức bị cắt ở 15 giây, trong khi máy chủ cho
+   * Gemini tới 45 giây rồi còn đổi sang mô hình dự phòng nếu bên kia quá tải. Kết quả:
+   * trình duyệt bỏ cuộc trong lúc máy chủ VẪN ĐANG LÀM và sắp trả lời tới nơi, người
+   * dùng đọc được "Máy chủ phản hồi quá lâu" cho một lượt gọi hoàn toàn bình thường.
+   *
+   * Huỷ ở trình duyệt KHÔNG dừng được việc phía máy chủ: nó vẫn cày nốt để trả một
+   * phản hồi không ai đọc. Nên cắt sớm còn làm chậm chính lượt bấm "Thử lại" ngay sau.
+   */
+  postSlow: <T>(endpoint: string, data?: unknown) =>
+    request<T>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    }),
   put: <T>(endpoint: string, data?: unknown) =>
     request<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
   delete: <T>(endpoint: string) =>

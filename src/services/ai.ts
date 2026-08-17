@@ -35,7 +35,7 @@ async function docLuong(res: Response, onChunk: (text: string) => void): Promise
 export const aiService = {
   chat: async (messages: AiMessage[]) => {
     const cafeId = await getCafeId();
-    const res = await api.post<{ reply: string }>(`/cafes/${cafeId}/ai/chat`, { messages });
+    const res = await api.postSlow<{ reply: string }>(`/cafes/${cafeId}/ai/chat`, { messages });
     return res.reply;
   },
   // Streaming: gọi onChunk(text) cho từng đoạn AI sinh ra (hiệu ứng gõ chữ).
@@ -59,12 +59,20 @@ export const aiService = {
     await docLuong(res, onChunk);
   },
   consult: async (messages: AiMessage[]) => {
-    const res = await api.post<{ reply: string }>('/ai/consult', { messages });
+    const res = await api.postSlow<{ reply: string }>('/ai/consult', { messages });
     return res.reply;
   },
+  /**
+   * Phân tích doanh thu — lượt gọi AI NẶNG NHẤT: máy chủ phải tổng hợp doanh thu,
+   * thực đơn và thống kê bán hàng rồi mới hỏi mô hình.
+   *
+   * Dùng `postSlow` chứ không `post`: hạn chờ mặc định 15 giây hẹp hơn hạn 45 giây
+   * mà máy chủ dành cho Gemini, nên trình duyệt cắt ngang trong lúc máy chủ vẫn đang
+   * làm — người dùng đọc được "Máy chủ phản hồi quá lâu" cho một lượt gọi bình thường.
+   */
   revenueAnalysis: async (refresh = false) => {
     const cafeId = await getCafeId();
-    return api.post<AiRevenueResponse>(`/cafes/${cafeId}/ai/revenue-analysis`, { refresh });
+    return api.postSlow<AiRevenueResponse>(`/cafes/${cafeId}/ai/revenue-analysis`, { refresh });
   },
   /**
    * Câu gợi ý mở đầu, chọn theo tình trạng thật của quán.

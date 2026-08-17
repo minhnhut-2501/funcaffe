@@ -6,6 +6,7 @@ use App\Services\ConsultKnowledgeService;
 use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -79,21 +80,45 @@ class AiConsultController extends Controller
         ]);
     }
 
+    /** Trần cho tin NGƯỜI DÙNG gõ — đây mới là thứ cần chặn. */
+    private const KY_TU_NGUOI_HOI = 1000;
+
+    /** Trần cho tin của TRỢ LÝ — chỉ để chặn thân request phình vô hạn. */
+    private const KY_TU_TRO_LY = 8000;
+
     /**
      * Đọc và kiểm tin nhắn.
      *
-     * Giới hạn chặt hơn tuyến trong portal (10 lượt thay vì 30, 1000 ký tự thay vì
-     * 4000): tuyến này không cần đăng nhập, nên mỗi ký tự gửi lên đều là token trả
-     * phí mà bất kỳ ai trên mạng cũng bơm được. Hội thoại tư vấn bán hàng thật thì
-     * vài lượt là đủ.
+     * Giới hạn chặt hơn tuyến trong portal (10 lượt thay vì 30): tuyến này không cần
+     * đăng nhập, nên mỗi ký tự gửi lên đều là token trả phí mà bất kỳ ai trên mạng
+     * cũng bơm được. Hội thoại tư vấn bán hàng thật thì vài lượt là đủ.
+     *
+     * TRẦN KÝ TỰ TÁCH THEO VAI TRÒ, và đây là chỗ từng hỏng. Trước kia dùng chung
+     * `messages.*.content => max:1000`, mà dấu `*` áp cho CẢ tin của trợ lý — trong
+     * khi frontend bắt buộc phải gửi lại lịch sử hội thoại để mô hình nhớ ngữ cảnh.
+     * Hệ quả: hỏi câu đầu thì trôi (mới có một tin), hỏi câu thứ hai là 422 với thông
+     * báo `messages.1.content must not be greater than 1000` — và `messages.1` chính
+     * là CÂU TRẢ LỜI DO HỆ THỐNG NÀY SINH RA. Nó tự chặn đường của chính mình.
+     *
+     * Trần 1000 sinh ra để chặn người lạ dán cả bài văn vào đốt hạn mức, nên chỉ có
+     * lý do tồn tại ở tin người dùng gõ. Tin của trợ lý là đầu ra của mình, chặn nó
+     * không bảo vệ được gì.
      */
     private function docTin(Request $request): array
     {
         $validated = $request->validate([
             'messages'           => 'required|array|min:1|max:10',
             'messages.*.role'    => 'required|string|in:user,assistant',
-            'messages.*.content' => 'required|string|max:1000',
+            'messages.*.content' => 'required|string|max:'.self::KY_TU_TRO_LY,
         ]);
+
+        foreach ($validated['messages'] as $i => $tin) {
+            if ($tin['role'] === 'user' && mb_strlen($tin['content']) > self::KY_TU_NGUOI_HOI) {
+                throw ValidationException::withMessages([
+                    "messages.{$i}.content" => 'Câu hỏi dài quá '.self::KY_TU_NGUOI_HOI.' ký tự. Bạn rút gọn lại giúp nhé.',
+                ]);
+            }
+        }
 
         return $validated['messages'];
     }

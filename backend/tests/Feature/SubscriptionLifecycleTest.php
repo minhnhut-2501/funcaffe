@@ -476,6 +476,24 @@ class SubscriptionLifecycleTest extends MongoTestCase
           ->assertJsonPath('message', 'Tài khoản của bạn đã dùng gói dùng thử miễn phí rồi. Mỗi tài khoản chỉ được dùng thử một lần — vui lòng chọn gói trả phí cho quán này.');
     }
 
+    /**
+     * Xin dùng thử lại cho CHÍNH QUÁN ĐÓ cũng phải nghe lý do THẬT: hết lượt của tài
+     * khoản, không phải hết lượt của quán.
+     *
+     * Trước đây cổng theo quán chạy trước nên người dùng luôn đọc "quán này đã dùng" —
+     * câu đó ngụ ý cứ tạo quán khác là xong, trong khi tạo xong vẫn bị chặn tiếp bởi
+     * cổng tài khoản. Bài này khoá lại thứ tự hỏi, để thông báo không dẫn ai vào ngõ cụt.
+     */
+    public function test_xin_lai_goi_dung_thu_cho_cung_quan_thi_bao_het_luot_cua_TAI_KHOAN(): void
+    {
+        $this->mua($this->goiThu)->assertStatus(201);
+
+        $this->postJson("/api/cafes/{$this->cafe->id}/subscriptions", [
+            'package_id' => (string) $this->goiThu->id, 'payment_method' => 'vnpay',
+        ])->assertStatus(400)
+          ->assertJsonPath('message', 'Tài khoản của bạn đã dùng gói dùng thử miễn phí rồi. Mỗi tài khoản chỉ được dùng thử một lần — vui lòng chọn gói trả phí cho quán này.');
+    }
+
     // === 6.6.3 + 6.7 Hết hạn và chặn ghi ==========================================
 
     /**

@@ -179,6 +179,46 @@ class AiConsultTest extends MongoTestCase
             ->assertJsonStructure(['reply']);
     }
 
+    // ------------------------------------------------------- trần độ dài tin
+
+    /**
+     * HỎI SANG CÂU THỨ HAI PHẢI TRÔI.
+     *
+     * Đây là bài sinh ra từ một lỗi đã gặp thật. Luật cũ dùng chung
+     * `messages.*.content => max:1000`, mà dấu `*` áp cho CẢ tin của trợ lý — trong
+     * khi frontend bắt buộc gửi lại lịch sử hội thoại để mô hình nhớ ngữ cảnh. Câu
+     * trả lời của trợ lý thường dài hơn 1000 ký tự, nên hỏi câu đầu thì trôi, hỏi câu
+     * thứ hai là 422 ngay tại `messages.1` — chính là câu do hệ thống này sinh ra.
+     */
+    public function test_cau_tra_loi_dai_cua_tro_ly_khong_chan_luot_hoi_tiep_theo(): void
+    {
+        $this->giaLapGemini('Dạ được ạ.');
+
+        $this->postJson('/api/ai/consult', [
+            'messages' => [
+                ['role' => 'user', 'content' => 'Gói Pro bao nhiêu bàn?'],
+                ['role' => 'assistant', 'content' => str_repeat('Gói Pro cho tối đa 20 bàn. ', 120)], // ~3.240 ký tự
+                ['role' => 'user', 'content' => 'Còn Pro Max thì sao?'],
+            ],
+        ])->assertStatus(200)->assertJsonStructure(['reply']);
+    }
+
+    /**
+     * ĐỐI CHỨNG. Nới trần cho trợ lý không được nới luôn cho người hỏi — trần 1000 ký
+     * tự sinh ra để chặn người lạ dán cả bài văn vào đốt hạn mức của nhà cung cấp, và
+     * tuyến này thì ai trên mạng cũng gọi được.
+     */
+    public function test_cau_hoi_qua_dai_cua_nguoi_dung_van_bi_tu_choi(): void
+    {
+        $this->giaLapGemini();
+
+        $this->postJson('/api/ai/consult', [
+            'messages' => [['role' => 'user', 'content' => str_repeat('a', 1001)]],
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('messages.0.content');
+    }
+
     // ------------------------------------------------- ranh giới dữ liệu quán
 
     /**
