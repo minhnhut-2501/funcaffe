@@ -1,4 +1,10 @@
 /**
+ * KHONG DUNG NUA (8/2026). DemoSeeder gio gan thang duong dan anh vao truong `image`
+ * ngay luc nap du lieu, nen khong con buoc gan anh rieng. Bang LUAT ben duoi con khop
+ * theo ten mon cua thuc don CU (tra sua, cold brew, V60...) — thuc don moi lay theo
+ * Highlands nen chay lai script nay chi gan truot hoac khong gan duoc gi.
+ * Giu lai lam tu lieu ve cach lam cu, xem public/mon/NGUON-ANH.md.
+ *
  * Gan anh cho MON va TOPPING theo ten, cho ca ba quan demo.
  *
  * Vi sao khong tai anh len qua nut "Tai anh" nhu chu quan that: tren ban trien khai
