@@ -1,0 +1,573 @@
+<title>Kịch bản bảo vệ FunCafe</title>
+<style>
+  :root {
+    --ground: #FAF9F6;
+    --surface: #FFFFFF;
+    --surface-2: #F3F1EA;
+    --ink: #191713;
+    --ink-2: #454037;
+    --muted: #6E685C;
+    --line: #E3DFD6;
+    --line-2: #CFC9BC;
+    --pine: #1E5A48;
+    --pine-tint: #E7F0EB;
+    --amber: #8F5D0C;
+    --amber-tint: #FBF1DE;
+    --clay: #A2361F;
+    --clay-tint: #FBEAE5;
+    --shadow: 0 1px 2px rgba(25,23,19,.05), 0 8px 24px -16px rgba(25,23,19,.35);
+
+    --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", "Roboto Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131210;
+      --surface: #1C1A16;
+      --surface-2: #23201B;
+      --ink: #EFEBE2;
+      --ink-2: #D3CDC1;
+      --muted: #968F82;
+      --line: #2E2B25;
+      --line-2: #423E36;
+      --pine: #63C3A4;
+      --pine-tint: #17281F;
+      --amber: #E2A445;
+      --amber-tint: #2A2113;
+      --clay: #E48168;
+      --clay-tint: #2E1A15;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #131210;
+    --surface: #1C1A16;
+    --surface-2: #23201B;
+    --ink: #EFEBE2;
+    --ink-2: #D3CDC1;
+    --muted: #968F82;
+    --line: #2E2B25;
+    --line-2: #423E36;
+    --pine: #63C3A4;
+    --pine-tint: #17281F;
+    --amber: #E2A445;
+    --amber-tint: #2A2113;
+    --clay: #E48168;
+    --clay-tint: #2E1A15;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 16.5px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    padding: 56px 0 28px;
+    border-bottom: 2px solid var(--ink);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--pine);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(30px, 5.2vw, 46px);
+    line-height: 1.06;
+    letter-spacing: -0.025em;
+    font-weight: 800;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .masthead p.lede {
+    margin: 12px 0 0;
+    color: var(--muted);
+    max-width: 54ch;
+    font-size: 16px;
+  }
+  .runtime {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.9;
+    white-space: nowrap;
+  }
+  .runtime b {
+    display: block;
+    font-family: var(--sans);
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  /* ---------- section headings ---------- */
+  h2 {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 64px 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line-2);
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    margin: 0 0 4px;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  a { color: var(--pine); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--pine); outline-offset: 3px; border-radius: 3px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: .855em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .1em .38em;
+    color: var(--ink-2);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------- rundown ---------- */
+  .beat {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 28px;
+    padding: 26px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .beat:last-of-type { border-bottom: none; }
+
+  .cue { font-family: var(--mono); padding-top: 3px; }
+  .cue .tc {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--pine);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+  .cue .dur {
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-top: 4px;
+  }
+  .cue .zone {
+    display: inline-block;
+    margin-top: 12px;
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 9px;
+  }
+
+  .body > p:first-of-type { margin-top: 6px; }
+
+  ol.steps, ul.plain {
+    margin: 12px 0 0;
+    padding-left: 22px;
+  }
+  ol.steps > li, ul.plain > li { margin-bottom: 8px; }
+  ol.steps > li::marker { font-family: var(--mono); font-size: .85em; color: var(--muted); }
+
+  .say {
+    margin: 16px 0 0;
+    padding: 2px 0 2px 20px;
+    border-left: 1px solid var(--pine);
+    font-style: italic;
+    color: var(--ink-2);
+  }
+  .say::before {
+    content: "Nói";
+    display: block;
+    font-family: var(--mono);
+    font-style: normal;
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--pine);
+    margin-bottom: 5px;
+  }
+
+  .note {
+    margin: 16px 0 0;
+    padding: 13px 16px;
+    border: 1px solid var(--amber);
+    background: var(--amber-tint);
+    border-radius: 8px;
+    font-size: 15px;
+    color: var(--ink-2);
+  }
+  .note::before {
+    content: "Bẫy";
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 5px;
+  }
+  .note.stop { border-color: var(--clay); background: var(--clay-tint); }
+  .note.stop::before { content: "Tuyệt đối không"; color: var(--clay); }
+
+  /* ---------- checklist ---------- */
+  .checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .checklist li {
+    background: var(--surface);
+    padding: 14px 18px 14px 46px;
+    position: relative;
+    font-size: 15.5px;
+  }
+  .checklist li::before {
+    content: "";
+    position: absolute;
+    left: 18px;
+    top: 18px;
+    width: 15px;
+    height: 15px;
+    border: 1.5px solid var(--line-2);
+    border-radius: 4px;
+  }
+  .checklist li strong { font-family: var(--sans); font-weight: 700; font-size: 15px; }
+  .checklist li span.hint { display: block; color: var(--muted); font-size: 14.5px; margin-top: 2px; }
+
+  /* ---------- table ---------- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; min-width: 520px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: var(--sans);
+    font-size: 11.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---------- Q&A ---------- */
+  .qa { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  .qa > div { padding: 18px 20px; border-bottom: 1px solid var(--line); }
+  .qa > div:last-child { border-bottom: none; }
+  .qa .q {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 15.5px;
+    margin: 0 0 6px;
+    color: var(--ink);
+  }
+  .qa .a { margin: 0; font-size: 15.5px; color: var(--ink-2); }
+  .qa .src {
+    display: block;
+    margin-top: 7px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; padding: 0 16px 72px; }
+    .beat { grid-template-columns: 1fr; gap: 10px; padding: 22px 0; }
+    .cue { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding-top: 0; }
+    .cue .dur { margin-top: 0; }
+    .cue .zone { margin-top: 0; }
+    .masthead { padding-top: 36px; }
+    .runtime { text-align: left; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Đồ án tốt nghiệp · Run of show</p>
+      <h1>Kịch bản bảo vệ FunCafe</h1>
+      <p class="lede">Bảy chặng theo dòng “một ngày của chủ quán”, chốt bằng màn quản trị. Mỗi chặng có câu mở, thao tác cụ thể và điểm cần nhấn.</p>
+    </div>
+    <div class="runtime">
+      <b>16:00</b>
+      tổng thời lượng demo<br>
+      chuẩn bị T‑30 · hỏi đáp riêng
+    </div>
+  </header>
+
+  <h2>Trước giờ G — T‑30 phút</h2>
+  <ul class="checklist">
+    <li><strong>Đánh thức máy chủ Render</strong><span class="hint">Gói free ngủ sau ~15 phút không ai truy cập, lượt gọi đầu mất vài chục giây. Mở <code>funcafe.pro</code> và bấm vài trang cho nó dậy hẳn.</span></li>
+    <li><strong>Đăng nhập sẵn hai tab: chủ quán và quản trị</strong><span class="hint">Token Sanctum nằm trong SQLite tạm của Render — container khởi động lại là mất phiên. Nếu giữa buổi bỗng văng ra <code>401</code> thì đăng nhập lại, đừng hoảng.</span></li>
+    <li><strong>Mở sẵn đủ 6 tab và giữ nguyên thứ tự chặng</strong><span class="hint">Trang chủ · Bán hàng · Doanh thu · Gói dịch vụ · Admin · và một tab <code>localhost:3000</code> chạy nền làm phương án B.</span></li>
+    <li><strong>Xoá dữ liệu kiểm thử thanh toán khỏi cơ sở dữ liệu thật</strong><span class="hint">Tài khoản <code>kiemthu.thanhtoan.1786984805496@example.com</code> còn 5 giao dịch ~2,2 triệu, sẽ hiện lên trong Doanh thu hệ thống bên Admin và làm số liệu trông giả.</span></li>
+    <li><strong>Đổi mật khẩu hai tài khoản demo trên bản chạy thật</strong><span class="hint">Kho mã là công khai, mà mật khẩu gieo sẵn thì nằm ngay trong <code>DemoSeeder.php</code>. Đổi mật khẩu trên bản chạy là xong — chuỗi trong kho thành vô hại, không phải sửa tệp nào.</span></li>
+    <li><strong>Ghi sẵn thẻ thử VNPay ra giấy để khỏi tra giữa buổi</strong><span class="hint">NCB · <code>9704198526191432198</code> · NGUYEN VAN A · <code>07/15</code> · OTP <code>123456</code>.</span></li>
+    <li><strong>Kiểm nhanh máy in / bản xem trước hoá đơn</strong><span class="hint">Nếu không có máy in, để hộp thoại in ở chế độ “Lưu thành PDF” — vẫn thấy đủ bản A4 và bản giấy nhiệt.</span></li>
+  </ul>
+
+  <div class="note stop">Đừng demo MoMo. Đã thử 3 lượt ngày 18/08, lượt cuối chờ 5 phút: trang giả lập NAPAS đứng mãi ở “Đang hoàn tất giao dịch…”. Lỗi nằm ở phía MoMo — đã chứng minh mã của mình đúng bằng cách gửi callback tay và đơn kích hoạt ngay. Nhưng hội đồng sẽ chỉ thấy một vòng xoay bất tận. <strong>VNPay chạy trọn vẹn cả 3 lượt mua / nâng cấp / gia hạn</strong> — dùng nó.</div>
+
+  <h2>Ba quán dùng để demo</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Quán</th><th>Gói</th><th>Quy mô</th><th>Vai trò trong buổi demo</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Nắng Sài Gòn Coffee</td><td>Pro Max</td><td class="num">43 món · 18 bàn</td><td>Sân khấu chính: bán hàng, doanh thu, trợ lý AI</td></tr>
+        <tr><td>Cà Phê Bên Hiên</td><td>Pro</td><td class="num">30 món · 14 bàn</td><td>Quán để nâng cấp lên Pro Max qua VNPay</td></tr>
+        <tr><td>Cà Phê Phin 76</td><td>Fun Free</td><td class="num">10 món</td><td>Bằng chứng hạn mức gói và cửa chặn AI</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Lộ trình demo</h2>
+
+  <div class="beat">
+    <div class="cue"><span class="tc">00:00</span><span class="dur">1 phút 30</span><span class="zone">Public</span></div>
+    <div class="body">
+      <h3>Trang giới thiệu và trợ lý tư vấn</h3>
+      <p class="say">“Đây là trang khách nhìn thấy đầu tiên. Điểm em muốn nhấn không phải giao diện, mà là hộp chat góc phải: khách <em>chưa đăng nhập</em> vẫn hỏi được.”</p>
+      <ol class="steps">
+        <li>Cuộn nhanh trang chủ — hero slider, khối chức năng, bảng giá ba gói, đánh giá thật của người dùng.</li>
+        <li>Mở hộp chat ở góc phải, gõ: <em>“Quán tôi 25 bàn thì nên chọn gói nào?”</em></li>
+        <li>Chờ câu trả lời chảy ra theo từng chữ (streaming) rồi chốt ý.</li>
+      </ol>
+      <p class="say">“Cùng một hộp chat nhưng chạy hai tuyến khác nhau. Khách chưa đăng nhập đi tuyến <code>/ai/consult</code> — ngữ cảnh chỉ có bảng gói và thông tin sản phẩm, không một truy vấn nào chạm tới doanh thu hay thực đơn của quán nào. Lát nữa em sẽ mở lại chính hộp này ở tuyến thứ hai.”</p>
+      <div class="note">Trang public đã được đệm ở biên Cloudflare Singapore nên vào rất nhanh (~0,15s). Các trang sau là dữ liệu riêng từng quán, không đệm được, sẽ chậm hơn — nói trước một câu để hội đồng không hiểu nhầm là code chậm.</div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="tc">01:30</span><span class="dur">1 phút</span><span class="zone">User Portal</span></div>
+    <div class="body">
+      <h3>Đăng nhập và mô hình một tài khoản nhiều quán</h3>
+      <ol class="steps">
+        <li>Đăng nhập bằng tài khoản chủ quán.</li>
+        <li>Dừng ở Tổng quan: order đang hoạt động, bàn trống, hóa đơn hôm nay.</li>
+        <li>Bấm bộ chọn quán trên thanh trên — cho thấy ba quán, mỗi quán một huy hiệu gói khác nhau.</li>
+      </ol>
+      <p class="say">“Một tài khoản mở được nhiều quán, và <strong>gói dịch vụ gắn theo từng quán chứ không theo tài khoản</strong>. Chủ chuỗi có thể để quán lớn dùng Pro Max còn quán mới mở dùng bản miễn phí. Toàn bộ API vì thế đều mang <code>cafes/{cafe}/…</code> và kiểm quyền sở hữu ở máy chủ.”</p>
+      <p>Chuyển sang <strong>Nắng Sài Gòn Coffee</strong> để vào chặng chính.</p>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="tc">02:30</span><span class="dur">4 phút</span><span class="zone">Trọng tâm</span></div>
+    <div class="body">
+      <h3>Bán hàng theo bàn — từ khách gọi món tới hóa đơn in ra</h3>
+      <p>Đây là chặng dài nhất và là thứ hội đồng nhớ nhất. Làm chậm rãi, đọc thành lời từng thao tác.</p>
+      <ol class="steps">
+        <li>Mở <strong>Bán hàng</strong> — sơ đồ bàn, mỗi bàn một màu trạng thái: trống / đang phục vụ.</li>
+        <li>Bấm một bàn trống → mở order mới.</li>
+        <li>Chọn một món có nhiều size (ví dụ cà phê sữa S/M/L) — <strong>giá đổi theo size</strong>.</li>
+        <li>Chọn tiếp một món có topping → hộp chọn topping bật lên, tick 2 topping, xem tiền cộng thêm ngay trên giỏ.</li>
+        <li>Tăng số lượng một dòng, xoá một dòng — cho thấy tổng tiền cập nhật tức thì.</li>
+        <li>Nhập giảm giá → tổng phải trả đổi theo.</li>
+        <li>Bấm <strong>Thanh toán</strong>, chọn <strong>VietQR</strong> — mã QR sinh ra từ chính tài khoản ngân hàng của quán, số tiền nhúng sẵn.</li>
+        <li>Đổi sang <strong>Tiền mặt</strong>, nhập tiền khách đưa → hệ thống tính tiền thối.</li>
+        <li>Xác nhận → bàn về trạng thái trống, hóa đơn sinh ra.</li>
+        <li>Bấm <strong>In hóa đơn</strong> → cho xem bản A4, rồi khổ giấy nhiệt 58mm và 80mm.</li>
+      </ol>
+      <p class="say">“Mã QR không phải ảnh cố định. Nó dựng từ số tài khoản quán tự khai trong phần Thông tin quán, cộng đúng số tiền của đơn này — nên quán không phải sắm máy POS, khách quét bằng app ngân hàng bất kỳ là xong.”</p>
+      <div class="note">Nếu thầy hỏi “bấm thanh toán hai lần thì sao?” — đơn đã <code>paid</code> sẽ bị từ chối ở máy chủ, có bài kiểm thử riêng (<code>OrderLifecycleTest</code>). Đừng thử trực tiếp trên sân khấu, chỉ nói.</div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="tc">06:30</span><span class="dur">3 phút</span><span class="zone">User Portal</span></div>
+    <div class="body">
+      <h3>Hóa đơn và doanh thu</h3>
+      <ol class="steps">
+        <li>Vào <strong>Hóa đơn</strong> — tìm đúng hóa đơn vừa tạo bằng ô tìm kiếm, mở chi tiết, bấm <strong>In lại</strong>.</li>
+        <li>Sang <strong>Doanh thu</strong>. Đổi mốc thời gian: theo ngày → theo tháng → theo năm, biểu đồ vẽ lại theo từng mốc.</li>
+        <li>Chỉ vào <strong>Top 5 món bán chạy</strong> — số liệu này lấy từ chính các dòng order, không phải nhập tay.</li>
+        <li>Đổi bộ chọn quán sang <strong>Tất cả quán</strong> → hiện thẻ “Quán dẫn đầu” và biểu đồ <strong>so sánh doanh thu giữa các quán</strong>.</li>
+        <li>Bấm <strong>Xuất Excel</strong>, mở tệp vừa tải — cột tiền là <em>số</em>, cột ngày là <em>ngày</em>, mở lên tính toán được ngay.</li>
+      </ol>
+      <p class="say">“Toàn bộ số ở trang này được cộng ở <em>máy chủ</em> bằng aggregation của MongoDB rồi mới trả về, chứ không tải hết hóa đơn về trình duyệt rồi cộng. Quán bán một năm vẫn mở nhanh như quán mới mở.”</p>
+      <div class="note">Nếu nút Xuất Excel không phản hồi: nguyên nhân quen thuộc là <code>npm run build</code> đã chạy trong lúc server dev đang bật, làm hỏng gói nạp động <code>exceljs</code>. Chữa bằng <code>rm -rf .next &amp;&amp; npm run dev</code> — nhưng chỉ áp dụng cho bản localhost, bản trên mạng không dính.</div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="tc">09:30</span><span class="dur">2 phút</span><span class="zone">Điểm nhấn</span></div>
+    <div class="body">
+      <h3>Trợ lý AI đọc số liệu quán</h3>
+      <p>Vẫn đang ở trang Doanh thu của quán Pro Max.</p>
+      <ol class="steps">
+        <li>Bấm <strong>Phân tích doanh thu bằng AI</strong> → AI đọc thẳng số liệu bán hàng và trả về điểm nổi bật, cảnh báo bất thường, gợi ý hành động.</li>
+        <li>Mở lại hộp chat — lần này nó hiện câu gợi ý sinh theo dữ liệu của chính quán, không còn là câu tư vấn bán gói.</li>
+        <li>Hỏi một câu về số liệu thật, ví dụ <em>“Món nào đang kéo doanh thu tuần này?”</em></li>
+        <li><strong>Chứng minh cửa chặn:</strong> đổi sang quán <strong>Cà Phê Phin 76</strong> (Fun Free) → cùng chỗ đó giờ là thẻ khoá, và hộp chat lùi về chế độ tư vấn.</li>
+      </ol>
+      <p class="say">“Điều em muốn nhấn là <strong>ranh giới do máy chủ giữ</strong>, không phải do giao diện ẩn nút. Tuyến <code>cafes/{cafe}/ai/*</code> đi qua middleware <code>ai</code>; gọi thẳng bằng Postman với gói không đủ vẫn nhận <code>403</code>. Giao diện chỉ chọn đúng tuyến từ đầu để người dùng khỏi ăn một lỗi vô duyên.”</p>
+      <div class="note">Gemini bậc miễn phí có hạn ngạch dùng chung. Trước buổi demo nên chạy thử đúng câu định hỏi một lần để chắc còn quota, và tránh bấm phân tích lại nhiều lần trên sân khấu.</div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="tc">11:30</span><span class="dur">3 phút</span><span class="zone">Nghiệp vụ khó</span></div>
+    <div class="body">
+      <h3>Nâng cấp gói giữa kỳ và thanh toán VNPay</h3>
+      <p>Đổi sang quán <strong>Cà Phê Bên Hiên</strong> (đang Pro). Đây là chặng ghi điểm về nghiệp vụ — làm chậm và đọc to các con số.</p>
+      <ol class="steps">
+        <li>Vào <strong>Gói dịch vụ</strong> → thấy gói Pro đang chạy, còn bao nhiêu ngày.</li>
+        <li>Chọn <strong>Pro Max</strong>, chọn thời hạn → màn hình <em>xem trước</em> hiện ba dòng: giá gói mới, số tiền cấn trừ phần Pro chưa dùng, số thực phải trả.</li>
+        <li>Đọc to phép tính: <code>548.900 − 218.875 = 330.025</code>.</li>
+        <li>Bấm thanh toán → chuyển sang cổng VNPay sandbox → chọn NCB → nhập thẻ thử → OTP <code>123456</code>.</li>
+        <li>Quay về trang kết quả → gói Pro Max kích hoạt ngay, hạn mức bàn và món mở ra.</li>
+        <li>Mở lại tab <strong>Lịch sử giao dịch</strong> cho thấy giao dịch vừa rồi ở trạng thái <code>paid</code>.</li>
+      </ol>
+      <p class="say">“Số cấn trừ hụt đúng 25 đồng so với 218.900 đã trả, vì gói Pro đã chạy được vài phút. Hệ thống tính theo thời gian thực còn lại chứ không làm tròn cho gọn.”</p>
+      <p>Ba luật nghiệp vụ nên nói kèm, không cần thao tác:</p>
+      <ul class="plain">
+        <li><strong>Gia hạn nối vào ngày hết hạn cũ</strong>, không tính lại từ hôm nay — người dùng không mất ngày đã mua.</li>
+        <li><strong>Không cho hạ gói</strong> khi gói hiện tại còn hiệu lực.</li>
+        <li><strong>Cổng gọi về hai đường</strong> (Return cho trình duyệt, IPN cho máy chủ) nhưng hạn chỉ cộng một lần — có bài kiểm thử <code>GatewayCallbackTest</code> canh đúng chỗ này.</li>
+      </ul>
+      <div class="note">Nếu VNPay sandbox trục trặc đúng lúc: đừng cố lại lần hai. Chuyển sang mở tab <strong>Lịch sử giao dịch</strong> đã có sẵn giao dịch <code>paid</code> từ trước, kể lại luồng bằng lời, rồi đi tiếp. Mất 20 giây, không mất mạch.</div>
+    </div>
+  </div>
+
+  <div class="beat">
+    <div class="cue"><span class="tc">14:30</span><span class="dur">1 phút 30</span><span class="zone">Admin Portal</span></div>
+    <div class="body">
+      <h3>Khu quản trị hệ thống</h3>
+      <p>Chuyển sang tab đã đăng nhập bằng tài khoản quản trị.</p>
+      <ol class="steps">
+        <li><strong>Tổng quan hệ thống</strong>: tổng người dùng, số đang hoạt động, giao dịch thành công, doanh thu hệ thống, biểu đồ 6 tháng, phân bố ba gói.</li>
+        <li><strong>Người dùng</strong>: khoá / mở khoá một tài khoản.</li>
+        <li><strong>Đánh giá</strong>: ẩn hoặc hiện một đánh giá — đúng cái vừa thấy ở trang chủ lúc mở màn.</li>
+        <li><strong>Liên hệ</strong>: mở một tin chưa đọc, bấm trả lời → thư đi thật qua Resend về hộp thư khách.</li>
+      </ol>
+      <p class="say">“Trang Thanh toán bên quản trị cố ý <strong>chỉ đọc</strong>. Cổng online đã tự kích hoạt và tự cấn trừ rồi, nên không có nút duyệt tay và cũng không sửa được số tiền — thêm nút đó là mở đường cho sai lệch sổ sách.”</p>
+    </div>
+  </div>
+
+  <h2>Hội đồng hay hỏi — trả lời sẵn</h2>
+  <div class="qa">
+    <div>
+      <p class="q">Vì sao chọn MongoDB mà không phải MySQL?</p>
+      <p class="a">Thực đơn quán cà phê là dữ liệu hình cây và không đều nhau: món có size, có topping, mỗi size một giá, quán này có quán kia không. Nhúng thẳng vào tài liệu đọc một lượt là ra cả món, không phải nối bốn bảng. Đổi lại phải tự lo hai việc mà quan hệ cho sẵn: chỉ mục và ràng buộc.<span class="src">Chỉ mục khai bằng lệnh riêng <code>php artisan db:indexes</code> vì Mongo không đi qua migration của Laravel</span></p>
+    </div>
+    <div>
+      <p class="q">MongoDB không có transaction thì tiền có sai không?</p>
+      <p class="a">Máy đơn thì không có transaction thật, nên các chỗ đụng tiền dùng <em>ghi có điều kiện</em>: cập nhật kèm điều kiện trạng thái cũ, ai ghi trước thì thắng, người sau nhận về 0 dòng và bị từ chối. Bản triển khai chạy trên Atlas là replica set nên bật được <code>MONGODB_TRANSACTIONS=true</code>.</p>
+    </div>
+    <div>
+      <p class="q">Tại sao không cho xoá món, xoá danh mục, xoá quán?</p>
+      <p class="a">Vì Mongo không cascade, và món đã bán nằm trong hóa đơn cũ. Xoá món là hóa đơn tháng trước mất tên món; xoá quán là bỏ rơi toàn bộ bàn, thực đơn, hóa đơn và gói đã mua. Nên hệ thống chỉ cho <em>ẩn</em> (<code>is_available</code>) và đổi trạng thái quán.<span class="src">Quyết định này ghi ngay trong <code>routes/api.php</code> ở chỗ lẽ ra là route xoá</span></p>
+    </div>
+    <div>
+      <p class="q">Bảo mật thanh toán thế nào, có giả được không?</p>
+      <p class="a">Mọi lượt cổng gọi về đều xác thực chữ ký HMAC trước khi động vào dữ liệu, và số tiền phải khớp với đơn đã tạo. Đã thử đủ ba trường hợp: chữ ký sai bị từ chối, chữ ký đúng nhưng số tiền lệch cũng bị từ chối, chỉ lượt hợp lệ mới kích hoạt gói.<span class="src"><code>VnpaySignatureTest</code> · <code>MomoSignatureTest</code> · <code>GatewayCallbackTest</code></span></p>
+    </div>
+    <div>
+      <p class="q">Hạn mức gói có bị lách bằng cách gọi thẳng API không?</p>
+      <p class="a">Không. Giới hạn thực thi ở máy chủ bằng trait <code>EnforcesPackageLimits</code> và các middleware <code>subscription</code> / <code>ai</code>. Phía giao diện có kiểm thêm nhưng chỉ để hiện đúng nút, không phải nơi giữ luật.</p>
+    </div>
+    <div>
+      <p class="q">Đã kiểm thử chưa, kiểm những gì?</p>
+      <p class="a">195 bài phía máy chủ (PHPUnit) và 126 bài phía giao diện (Vitest), tập trung vào hai nhóm mà sai sót <em>không hiện ra trên màn hình</em>: các quy tắc liên quan tới tiền và các quy tắc liên quan tới quyền. Bài kiểm thử ghi vào cơ sở dữ liệu riêng và tự từ chối chạy nếu bị trỏ nhầm vào dữ liệu thật.</p>
+    </div>
+    <div>
+      <p class="q">Sao trang trong hơi chậm?</p>
+      <p class="a">Máy chủ đặt ở Virginia, Hoa Kỳ và nhà cung cấp không cho đổi vùng — riêng đường truyền Việt Nam sang đó đã ~250ms một chiều. Trang công khai đã kéo về ~0,15s bằng cách đệm ở biên Cloudflare Singapore. Dữ liệu riêng từng quán thì không đệm được vì mỗi người một nội dung; hướng xử lý là hiện trước rồi lưu ngầm.</p>
+    </div>
+    <div>
+      <p class="q">Ảnh và email xử lý ra sao khi triển khai?</p>
+      <p class="a">Đĩa máy chủ bị xoá sạch sau mỗi lần triển khai lại nên ảnh đẩy sang Cloudinary. Email phải đi qua Resend vì nhà cung cấp chặn mọi cổng SMTP trên gói miễn phí — không từ chối thẳng mà nuốt gói tin, nên triệu chứng là “báo gửi thành công nhưng hộp thư trống”.</p>
+    </div>
+  </div>
+
+  <h2>Phương án B</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Sự cố</th><th>Xử lý ngay tại chỗ</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Mạng phòng bảo vệ hỏng</td><td>Chuyển sang tab <code>localhost:3000</code> đã chạy nền sẵn. Dữ liệu demo giống hệt, chỉ mất phần thanh toán qua cổng.</td></tr>
+        <tr><td>Bị văng ra <code>401 Unauthenticated</code></td><td>Đăng nhập lại, nói một câu ngắn “máy chủ gói miễn phí vừa khởi động lại” rồi đi tiếp. Đừng dừng lại giải thích dài.</td></tr>
+        <tr><td>VNPay sandbox không trả về</td><td>Mở tab Lịch sử giao dịch đã có giao dịch <code>paid</code> sẵn, kể lại luồng bằng lời.</td></tr>
+        <tr><td>Trợ lý AI hết quota Gemini</td><td>Chuyển sang mở kết quả phân tích đã lưu lần trước, hoặc bỏ chặng AI và dồn thời gian cho chặng nâng cấp gói.</td></tr>
+        <tr><td>Cháy giờ, còn dưới 5 phút</td><td>Giữ nguyên chặng Bán hàng và chặng Nâng cấp gói. Cắt Admin, cắt Excel, cắt trang giới thiệu.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Ba câu chốt lúc kết</h2>
+  <ol class="steps">
+    <li><strong>Một tài khoản, nhiều quán, gói theo từng quán</strong> — mô hình kinh doanh nằm ngay trong cấu trúc dữ liệu và cấu trúc API, không phải ghép thêm.</li>
+    <li><strong>Mọi luật về tiền và về quyền đều nằm ở máy chủ</strong> — giao diện chỉ hiển thị, và có 321 bài kiểm thử canh đúng hai nhóm luật đó.</li>
+    <li><strong>Hệ thống đang chạy thật trên tên miền riêng</strong> — có thanh toán qua cổng thật, có gửi email thật, có lưu ảnh trên dịch vụ ngoài, chứ không chỉ chạy trên máy em.</li>
+  </ol>
+
+  <footer>FunCafe · Next.js 15 + Laravel 13 + MongoDB · funcafe.pro</footer>
+
+</div>

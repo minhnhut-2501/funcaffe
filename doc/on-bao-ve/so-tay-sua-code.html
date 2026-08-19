@@ -1,0 +1,537 @@
+<title>Sổ tay sửa code FunCafe</title>
+<style>
+  :root {
+    --ground: #FAF9F6; --surface: #FFFFFF; --surface-2: #F2F1EC;
+    --ink: #17161A; --ink-2: #413F49; --muted: #67646F;
+    --line: #E2E0E4; --line-2: #CBC8D1;
+    --indigo: #35427E; --indigo-tint: #EAECF6;
+    --amber: #8A5A0D; --amber-tint: #FAF0DD;
+    --clay: #9E3520; --clay-tint: #FAE9E4;
+    --green: #1F5D42; --green-tint: #E6F0EB;
+    --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", "Roboto Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #121116; --surface: #1B1A20; --surface-2: #232128;
+      --ink: #EDEBF0; --ink-2: #CFCBD6; --muted: #928E9C;
+      --line: #2D2B33; --line-2: #413E49;
+      --indigo: #9BA8E8; --indigo-tint: #1B1E33;
+      --amber: #E0A445; --amber-tint: #2A2113;
+      --clay: #E48168; --clay-tint: #2E1A15;
+      --green: #6FC49E; --green-tint: #16281F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #121116; --surface: #1B1A20; --surface-2: #232128;
+    --ink: #EDEBF0; --ink-2: #CFCBD6; --muted: #928E9C;
+    --line: #2D2B33; --line-2: #413E49;
+    --indigo: #9BA8E8; --indigo-tint: #1B1E33;
+    --amber: #E0A445; --amber-tint: #2A2113;
+    --clay: #E48168; --clay-tint: #2E1A15;
+    --green: #6FC49E; --green-tint: #16281F;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground); color: var(--ink);
+    font-family: var(--serif); font-size: 16.5px; line-height: 1.63;
+    margin: 0; padding: 0 20px 96px; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+
+  .masthead { padding: 56px 0 26px; border-bottom: 2px solid var(--ink); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--indigo); margin: 0 0 10px;
+  }
+  h1 {
+    font-family: var(--sans); font-size: clamp(30px, 5.2vw, 44px);
+    line-height: 1.07; letter-spacing: -0.025em; font-weight: 800;
+    margin: 0; text-wrap: balance;
+  }
+  .lede { margin: 14px 0 0; color: var(--muted); max-width: 64ch; }
+
+  h2 {
+    font-family: var(--sans); font-size: 12.5px; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+    margin: 58px 0 18px; padding-bottom: 9px; border-bottom: 1px solid var(--line-2);
+  }
+  h3 {
+    font-family: var(--sans); font-size: 21px; font-weight: 700;
+    letter-spacing: -0.018em; margin: 36px 0 6px; text-wrap: balance;
+  }
+  h4 {
+    font-family: var(--sans); font-size: 15.5px; font-weight: 700;
+    margin: 30px 0 6px; letter-spacing: -0.01em;
+  }
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+  a { color: var(--indigo); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--indigo); outline-offset: 3px; border-radius: 3px; }
+
+  code {
+    font-family: var(--mono); font-size: .845em;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 4px; padding: .1em .36em; color: var(--ink-2);
+    overflow-wrap: anywhere;
+  }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 16px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 620px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: var(--sans); font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted); font-weight: 700;
+    background: var(--surface-2); white-space: nowrap;
+  }
+  td.mono, th.mono { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+  td.loc { font-family: var(--mono); font-size: 12px; color: var(--indigo); white-space: nowrap; }
+
+  /* bảng sửa tại chỗ */
+  .fix { border: 1px solid var(--green); border-radius: 12px; overflow: hidden; margin-top: 18px; background: var(--surface); }
+  .fix-head {
+    background: var(--green-tint); padding: 11px 16px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--green); font-weight: 600;
+    border-bottom: 1px solid var(--green);
+  }
+  .fix .tablewrap { border: none; border-radius: 0; margin: 0; }
+  .fix table { min-width: 640px; }
+  .fix th { background: var(--surface-2); }
+
+  ul.plain { margin: 12px 0 0; padding-left: 21px; }
+  ul.plain > li { margin-bottom: 9px; }
+  ol.plain { margin: 12px 0 0; padding-left: 22px; }
+  ol.plain > li { margin-bottom: 9px; }
+
+  .why {
+    margin: 16px 0 0; padding: 2px 0 2px 20px;
+    border-left: 1px solid var(--indigo); color: var(--ink-2);
+  }
+  .why::before {
+    content: "Vì sao viết vậy"; display: block;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--indigo); margin-bottom: 5px;
+  }
+
+  .note {
+    margin: 16px 0 0; padding: 13px 16px;
+    border: 1px solid var(--amber); background: var(--amber-tint);
+    border-radius: 8px; font-size: 15px; color: var(--ink-2);
+  }
+  .note::before {
+    content: "Cẩn thận"; display: block;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--amber); margin-bottom: 5px;
+  }
+  .note.ask { border-color: var(--clay); background: var(--clay-tint); }
+  .note.ask::before { content: "Thầy sẽ hỏi"; color: var(--clay); }
+
+  pre {
+    margin: 16px 0 0; padding: 14px 16px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 10px; overflow-x: auto;
+    font-family: var(--mono); font-size: 13px; line-height: 1.66; color: var(--ink-2);
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  .toc {
+    margin: 18px 0 0; padding: 0; list-style: none;
+    display: grid; gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  }
+  .toc li { background: var(--surface); padding: 12px 16px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+  .toc li b { font-family: var(--mono); font-size: 12px; color: var(--indigo); white-space: nowrap; }
+  .toc li span { color: var(--ink-2); font-size: 15px; }
+
+  footer {
+    margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; padding: 0 15px 72px; }
+    .masthead { padding-top: 36px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">FunCafe · Khối B trong ba tài liệu</p>
+    <h1>Sổ tay sửa code</h1>
+    <p class="lede">Từng hàm trong phần việc của Nhựt: làm gì, nhận gì, trả gì, vì sao viết vậy. Mỗi mảng kết bằng một bảng <strong>“thầy bảo đổi X → sửa ở đâu”</strong> để mở máy ra là gõ được ngay.</p>
+  </header>
+
+  <ul class="toc">
+    <li><b>Mảng 1</b><span>Màn hình bán hàng POS — 30 hàm, việc 15</span></li>
+    <li><b>Mảng 2</b><span>Gói dịch vụ: mua, gia hạn, nâng cấp, phân quyền — việc 17</span></li>
+    <li><b>Mảng 3</b><span>Cổng VNPay — việc 18</span></li>
+    <li><b>Mảng 4</b><span>Doanh thu và trợ lý AI — việc 20</span></li>
+    <li><b>Mảng 5</b><span>Hạ tầng, kiểm thử, bảo mật — việc 26·27·32·36</span></li>
+  </ul>
+
+  <div class="note">
+    Số dòng trong tài liệu này đúng với mã tại thời điểm viết. Sửa code xong là số dòng lệch — cách chắc ăn hơn là tìm theo <em>tên hàm</em>, số dòng chỉ để nhảy tới cho nhanh.
+  </div>
+
+  <h2>Mảng 1 · Màn hình bán hàng POS</h2>
+
+  <h3>1.1 · Bộ nhớ của màn hình</h3>
+  <p>Trước khi đọc hàm, phải biết màn hình đang giữ những gì. Đây là 8 biến trạng thái quan trọng nhất trong tổng số ~25.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Biến</th><th>Kiểu</th><th>Giữ cái gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">carts</td><td class="mono">Record&lt;tableId, CartItem[]&gt;</td><td><strong>Giỏ hàng của TỪNG bàn.</strong> Đổi bàn không mất giỏ.</td></tr>
+        <tr><td class="mono">draftOrderIds</td><td class="mono">Record&lt;tableId, orderId&gt;</td><td>Bàn nào đang gắn với đơn nháp nào trên máy chủ.</td></tr>
+        <tr><td class="mono">activeOrders</td><td class="mono">Order[]</td><td>Mọi đơn đang mở của quán. <strong>Nguồn duy nhất</strong> quyết định bàn trống hay bận.</td></tr>
+        <tr><td class="mono">tables</td><td class="mono">CafeTable[]</td><td>Danh sách bàn thô từ máy chủ. Trường <code>status</code> trong này <em>không được dùng</em>.</td></tr>
+        <tr><td class="mono">selectedTable</td><td class="mono">CafeTable | null</td><td>Bàn đang thao tác.</td></tr>
+        <tr><td class="mono">optionModal</td><td class="mono">{ item } | null</td><td>Hộp chọn size/topping đang mở cho món nào.</td></tr>
+        <tr><td class="mono">optForm</td><td class="mono">{ size, toppings, qty, note }</td><td>Nội dung đang chọn trong hộp đó, chưa bỏ vào giỏ.</td></tr>
+        <tr><td class="mono">editCartItemId</td><td class="mono">string | null</td><td>Đang <em>sửa</em> dòng nào, hay đang <em>thêm mới</em> (<code>null</code>).</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>1.2 · Phép tính tiền — tách ra file riêng để kiểm thử được</h3>
+  <p>Toàn bộ công thức nằm ở <code>src/lib/cart.ts</code> (96 dòng), <em>không</em> nằm trong component.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Công thức / quy tắc</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">isSameCartLine(a, b)</td><td class="loc">cart.ts:37</td><td>Hai dòng có phải cùng một thứ: cùng món, cùng size, cùng ghi chú, cùng bộ topping <em>không phụ thuộc thứ tự chọn</em>.</td></tr>
+        <tr><td class="mono">calcItemBase(c)</td><td class="loc">cart.ts:48</td><td><code>(size ? size.price : basePrice) × quantity</code> — giá theo size <strong>thắng</strong> giá gốc.</td></tr>
+        <tr><td class="mono">calcItemTopping(c)</td><td class="loc">cart.ts:59</td><td><code>Σ(giá topping × số phần) × số lượng món</code></td></tr>
+        <tr><td class="mono">calcCartItem(c)</td><td class="loc">cart.ts:64</td><td>Tiền một dòng = base + topping</td></tr>
+        <tr><td class="mono">calcSubtotal(cart)</td><td class="loc">cart.ts:69</td><td>Tạm tính cả giỏ, chưa trừ giảm giá</td></tr>
+        <tr><td class="mono">clampDiscount(input, sub)</td><td class="loc">cart.ts:77</td><td>Kẹp giảm giá trong <code>[0, tạm tính]</code></td></tr>
+        <tr><td class="mono">calcChange(cash, total)</td><td class="loc">cart.ts:92</td><td>Tiền thối, không bao giờ âm</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="why">Tách ra vì đây là chỗ <em>tiền thật đổi chủ mỗi ngày</em>, mà nằm lẫn trong một component 1.096 dòng thì không có cách nào viết bài kiểm thử cho nó. Ba chi tiết dễ sai: giá size phải thắng giá gốc; tiền topping phải nhân với <em>số lượng món</em> (gọi 2 ly mỗi ly 1 trân châu là 2 phần trân châu — quên phép nhân này thì quán thu thiếu mỗi ngày một ít mà không ai để ý); và tiền thối trả 0 chứ không trả số âm, vì thu ngân đọc “−15.000” rồi đưa nhầm là chuyện có thật.</p>
+
+  <h3>1.3 · Ba mươi hàm của màn hình, theo nhóm</h3>
+
+  <h4>Nhóm A — Dẫn xuất dữ liệu hiển thị</h4>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">tablesLive</td><td class="loc">:204</td><td><strong>Hàm quan trọng nhất file.</strong> Dựng bản đồ <code>tableId → orderId</code> từ <code>activeOrders</code>, rồi gắn <code>status</code> cho từng bàn. Không đọc <code>tables[].status</code>.</td></tr>
+        <tr><td class="mono">filteredTables</td><td class="loc">:214</td><td>Lọc theo tab Tất cả / Trống / Đang phục vụ</td></tr>
+        <tr><td class="mono">danhMucDangAn</td><td class="loc">:228</td><td><code>Set</code> id các danh mục bị ẩn — dựng một lần thay vì tìm lại cho từng món</td></tr>
+        <tr><td class="mono">filteredMenu</td><td class="loc">:233</td><td>Món hiện ra phải: còn bán <strong>và</strong> danh mục không bị ẩn <strong>và</strong> khớp tab <strong>và</strong> khớp ô tìm kiếm</td></tr>
+        <tr><td class="mono">allowedToppings</td><td class="loc">:285</td><td>Topping hiện trong hộp chọn = còn bán <strong>và</strong> nằm trong <code>item.allowedToppingIds</code></td></tr>
+        <tr><td class="mono">baseSubtotal · toppingSubtotal</td><td class="loc">:240–241</td><td>Cộng cả giỏ bằng hai hàm ở <code>cart.ts</code></td></tr>
+        <tr><td class="mono">discount · cartTotal</td><td class="loc">:244–245</td><td>Giảm giá đã kẹp, và tổng phải thu</td></tr>
+        <tr><td class="mono">optTotal</td><td class="loc">:291</td><td>Tiền tạm trong hộp chọn — <em>phải</em> nhân <code>t.qty</code> giống <code>calcItemTopping</code>, nếu không hộp báo một số mà giỏ ra số khác</td></tr>
+        <tr><td class="mono">cashChange · thieuTien · chuaTraDuoc</td><td class="loc">:615–623</td><td>Trạng thái ô tiền mặt: đủ, thiếu, chưa nhập</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Nhóm B — Thao tác giỏ hàng</h4>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">setCart(updater)</td><td class="loc">:112</td><td>Ghi giỏ cho <em>bàn đang chọn</em>. Giỏ rỗng thì <strong>xoá hẳn khoá</strong> khỏi <code>carts</code> thay vì để mảng rỗng.</td></tr>
+        <tr><td class="mono">clearCartForTable(id)</td><td class="loc">:125</td><td>Xoá giỏ của một bàn cụ thể</td></tr>
+        <tr><td class="mono">cartToOrderItems(items)</td><td class="loc">:83</td><td><strong>Cầu nối</strong> giữa kiểu của giao diện và thân JSON gửi lên API</td></tr>
+        <tr><td class="mono">openOption(item)</td><td class="loc">:247</td><td>Mở hộp chọn để <em>thêm mới</em>. Chặn hai điều kiện trước: gói còn hạn, và đã chọn bàn. Tự chọn sẵn size đầu tiên đang bật.</td></tr>
+        <tr><td class="mono">openEditOption(c)</td><td class="loc">:272</td><td>Mở hộp chọn để <em>sửa</em> một dòng đã có — nạp lại size, topping, số lượng, ghi chú</td></tr>
+        <tr><td class="mono">toggleTopping(id)</td><td class="loc">:374</td><td>Tick / bỏ tick một topping</td></tr>
+        <tr><td class="mono">setToppingQty · updateToppingQty</td><td class="loc">:385 · :395</td><td>Đặt thẳng hoặc cộng trừ số phần topping, kẹp trong <code>[1, MAX_TOPPING_QTY]</code></td></tr>
+        <tr><td class="mono">updateQty · setQty</td><td class="loc">:456 · :470</td><td>Cộng trừ hoặc đặt thẳng số lượng món, kẹp trong <code>[1, MAX_QTY]</code></td></tr>
+        <tr><td class="mono">removeCartItem(id)</td><td class="loc">:444</td><td>Gỡ một dòng khỏi giỏ rồi gọi <code>persistCart</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <strong>Ba biến “nháp” dễ bị bỏ qua khi đọc code:</strong> <code>qtyDraft</code>, <code>optQtyDraft</code>, <code>topQtyDraft</code>. Chúng giữ chuỗi người dùng <em>đang gõ dở</em> trong ô số lượng. Không có chúng thì gõ xoá hết để nhập lại sẽ bị ép về <code>1</code> ngay giữa chừng — ô số nhảy lung tung dưới tay người gõ. <code>openOption</code> phải dọn chúng, nếu không ô hiện “12” của món trước trong khi số lượng thật của món mới là 1.
+  </div>
+
+  <h4>Nhóm C — Đồng bộ với máy chủ</h4>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Vào → Ra</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">handleSaveCartItem()</td><td class="loc">:297</td><td>— → <code>Promise&lt;void&gt;</code></td><td><strong>Đường vào chính.</strong> Dựng <code>CartItem</code> từ <code>optForm</code> → gộp dòng trùng hoặc thêm mới → tính lại tổng → <code>create</code> nếu bàn chưa có đơn, <code>update</code> nếu đã có. Có cờ <code>savingItem</code> chống bấm liên tiếp tạo hai đơn.</td></tr>
+        <tr><td class="mono">persistCart(tableId, items)</td><td class="loc">:410</td><td><code>(id, CartItem[])</code> → <code>Promise&lt;void&gt;</code></td><td>Lưu giỏ sau khi <em>sửa</em> hoặc <em>xoá</em> dòng. Gỡ nốt dòng cuối thì <strong>huỷ đơn</strong> chứ không lưu đơn rỗng.</td></tr>
+        <tr><td class="mono">releaseTable(tableId, orderId)</td><td class="loc">:491</td><td>— → <code>Promise&lt;boolean&gt;</code></td><td>Huỷ đơn rồi trả bàn về trống. <strong>Trả <code>false</code> khi máy chủ từ chối</strong> — nơi gọi phải kiểm giá trị này.</td></tr>
+        <tr><td class="mono">handleCancelOrder()</td><td class="loc">:504</td><td>— → <code>Promise&lt;void&gt;</code></td><td>Giỏ rỗng thì huỷ luôn; giỏ còn món thì mở hộp xác nhận</td></tr>
+        <tr><td class="mono">handlePayment()</td><td class="loc">:517</td><td>— → <code>Promise&lt;void&gt;</code></td><td><strong>Hàm dài nhất.</strong> Kiểm tiền mặt → gọi <code>pay</code> → bắt trường hợp mất mạng → lấy số từ phản hồi máy chủ → dọn bàn → mở hộp in biên lai</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="why">Ba hàm C nhìn thì giống nhau nhưng khác nhau ở <em>ai chịu trách nhiệm khi hỏng</em>. <code>releaseTable</code> trả <code>boolean</code> vì trước đây lỗi bị nuốt bằng <code>catch {}</code> rồi vẫn đặt bàn về trống: máy chủ còn giữ đơn <code>active</code> trong khi màn hình báo bàn trống, nên nhân viên mở đơn mới lên cùng một bàn và sau khi tải lại trang thì bàn kẹt hoặc chồng hai đơn.</p>
+
+  <h4>Nhóm D — Sinh mã VietQR</h4>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Nơi</th><th>Dòng</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">VN_BANKS</td><td class="loc">banks.ts:9</td><td>22 ngân hàng phổ biến kèm mã BIN Napas 6 số</td></tr>
+        <tr><td class="mono">buildVietQrImageUrl(opts)</td><td class="loc">banks.ts:40</td><td>Ghép URL ảnh: <code>{bin}-{stk}-compact2.png</code> + tham số <code>amount</code>, <code>addInfo</code>, <code>accountName</code></td></tr>
+        <tr><td class="mono">Khối hiện QR</td><td class="loc">sales:1083</td><td>Chỉ hiện khi quán đã khai <code>bankBin</code> <em>và</em> <code>bankAccountNumber</code>; chưa khai thì hiện lời mời đi cấu hình</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="fix">
+    <div class="fix-head">Bảng sửa tại chỗ · Mảng 1</div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Thầy bảo</th><th>Sửa ở đâu</th><th>Sửa gì</th></tr></thead>
+        <tbody>
+          <tr><td>Số lượng tối đa 999 xuống 99</td><td class="loc">sales:27</td><td><code>MAX_QTY = 99</code>. Một chỗ duy nhất, mọi ô số lượng dùng chung.</td></tr>
+          <tr><td>Topping tối đa 20 phần xuống 10</td><td class="loc">sales:28</td><td><code>MAX_TOPPING_QTY = 10</code></td></tr>
+          <tr><td>Giảm giá theo phần trăm thay vì số tiền</td><td class="loc">sales:244 · cart.ts:77 · OrderController:336</td><td><strong>Ba nơi.</strong> Đổi công thức <code>discount</code>, sửa <code>clampDiscount</code>, và <em>bắt buộc</em> sửa cả máy chủ — nó kẹp lại lần nữa và số của nó mới được ghi vào sổ.</td></tr>
+          <tr><td>Đừng gộp dòng khi gọi trùng món</td><td class="loc">sales:317</td><td>Bỏ nhánh <code>mergeTarget</code>, luôn <code>[...cur, newItem]</code></td></tr>
+          <tr><td>Ngược lại: gộp cả khi khác ghi chú</td><td class="loc">cart.ts:40</td><td>Bỏ dòng so sánh <code>note</code> trong <code>isSameCartLine</code></td></tr>
+          <tr><td>Thanh toán xong bàn sang “cần dọn” chứ đừng trống ngay</td><td class="loc">OrderController:398 · sales:204</td><td><strong>Hai nơi.</strong> Máy chủ đặt <code>status = 'cleaning'</code>, và <code>tablesLive</code> phải ngừng suy diễn nhị phân — đây là chỗ ý tưởng “dẫn xuất” phải nới ra.</td></tr>
+          <tr><td>Thêm ngân hàng vào danh sách VietQR</td><td class="loc">banks.ts:9</td><td>Thêm một dòng <code>{ bin, code, name }</code>. Mã BIN tra ở <code>api.vietqr.io/v2/banks</code>.</td></tr>
+          <tr><td>Thêm phương thức thanh toán thẻ</td><td class="loc">sales:1048 · OrderController:325</td><td><strong>Hai nơi.</strong> Thêm lựa chọn ở giao diện <em>và</em> nới <code>in:cash,vietqr</code> ở validate — chỉ sửa giao diện thì máy chủ trả 422.</td></tr>
+          <tr><td>Cho bán khi quán đã đóng cửa</td><td class="loc">OrderController:123</td><td>Bỏ <code>guardBanHang($cafe)</code> khỏi <code>store()</code>. Giải thích được vì sao hiện tại chặn thì hơn là bỏ.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Mảng 2 · Gói dịch vụ</h2>
+
+  <h3>2.1 · Các hàm trong SubscriptionController</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Vào → Ra</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">calculateProratedCredit($old)</td><td class="loc">:105</td><td><code>Subscription</code> → <code>float</code></td><td><strong>Trái tim nghiệp vụ.</strong> Tiền cấn trừ = <code>total_amount × (giây còn lại / tổng giây)</code>. Ba lối thoát: không có sub, đã trả 0đ, đã hết hạn.</td></tr>
+        <tr><td class="mono">preview($req, $cafe)</td><td class="loc">:147</td><td>→ JSON</td><td>Tính <em>trước</em> số phải trả. <strong>Không ghi gì vào CSDL.</strong> Trả <code>action_type</code>, <code>gross</code>, <code>credit</code>, <code>payable</code>, <code>needs_gateway</code>.</td></tr>
+        <tr><td class="mono">store($req, $cafe)</td><td class="loc">:275</td><td>→ JSON + payUrl</td><td>Hàm dài nhất: validate → dọn đơn quá hạn → kiểm dùng thử → so cấp bậc → rẽ bốn nhánh → tạo bản ghi → dựng URL cổng.</td></tr>
+        <tr><td class="mono">nextTransactionCode($now)</td><td class="loc">:213</td><td><code>Carbon</code> → <code>string</code></td><td>Sinh <code>TXN-yyyymmdd-####</code>: đếm + 1 rồi <em>dò tiếp</em> tới số chưa dùng.</td></tr>
+        <tr><td class="mono">gatewayPendingDeadline()</td><td class="loc">:39</td><td>→ <code>Carbon</code></td><td>Mốc coi đơn cổng là bỏ dở — <code>now() - 30 phút</code></td></tr>
+        <tr><td class="mono">active($req, $cafe)</td><td class="loc">:241</td><td>→ JSON</td><td>Gói <em>mới nhất</em> kể cả đã hết hạn — dùng <code>latestForCafe()</code>, cố ý không dùng <code>effective()</code></td></tr>
+        <tr><td class="mono">payments($req, $cafe)</td><td class="loc">:256</td><td>→ JSON</td><td>Lịch sử trả tiền. Giao dịch qua cổng <strong>chỉ hiện khi đã <code>paid</code></strong>, tránh hiểu nhầm “đã thanh toán”.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Bốn nhánh trong <code>store()</code></h4>
+  <pre><code>$oldLevel = gói hiện hành của QUÁN (latestForCafe)
+$newLevel = gói đang mua
+
+!$activeSub              → NEW       :405   tạo mới, hạn từ hôm nay
+$newLevel &gt;  $oldLevel   → UPGRADE   :470   cấn trừ, huỷ gói cũ
+$newLevel == $oldLevel   → RENEW     :538   nối vào end_date cũ
+$newLevel &lt;  $oldLevel   → DOWNGRADE        từ chối</code></pre>
+
+  <div class="note">
+    <strong>Với cổng online, mọi hệ quả đều bị HOÃN.</strong> Ở <code>store()</code> hệ thống chỉ tạo bản ghi <code>pending</code>: chưa huỷ gói cũ, chưa cộng <code>end_date</code>, chưa cấp quyền. Tất cả được áp ở <code>SubscriptionActivator::markPaidAndActivate()</code> khi cổng xác nhận. Nếu không hoãn thì khách bấm mua rồi <em>back</em> lại là đã được gói mà chưa trả đồng nào.
+  </div>
+
+  <h3>2.2 · Các hàm trong SubscriptionActivator</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Ra</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">markPaidAndActivate($p)</td><td class="loc">:42</td><td><code>bool</code></td><td>Giành quyền xử lý bằng ghi có điều kiện → áp hệ quả bị hoãn → bật <code>active</code> → đánh cờ dùng thử. Trả <code>false</code> nếu đã xử lý dứt điểm trước đó.</td></tr>
+        <tr><td class="mono">computeRenewEndDate($p)</td><td class="loc">:121</td><td><code>Carbon</code></td><td>Ngày hết hạn mới khi gia hạn: cộng vào <code>previous_end_date</code> nếu còn hiệu lực, ngược lại cộng vào hôm nay.</td></tr>
+        <tr><td class="mono">rejectAndRollback($p)</td><td class="loc">:151</td><td><code>bool</code></td><td>Khách huỷ trên cổng: đánh <code>rejected</code>, huỷ sub mới, <strong>khôi phục sub cũ nếu còn hạn</strong>.</td></tr>
+        <tr><td class="mono">ACTIVATABLE_STATUSES</td><td class="loc">:37</td><td>hằng</td><td><code>['pending', 'failed']</code> — <code>failed</code> nằm đây là có chủ ý, xem ghi chú 20 dòng ngay phía trên nó.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>2.3 · Bốn chốt chặn phân quyền</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Nơi</th><th>Tệp</th><th>Kiểm gì</th><th>Trả</th></tr></thead>
+      <tbody>
+        <tr><td>Middleware <code>subscription</code></td><td class="mono">CheckSubscription.php:12</td><td>Quán trong URL có gói <code>effective()</code> không. Admin được bỏ qua.</td><td><code>403</code></td></tr>
+        <tr><td>Middleware <code>ai</code></td><td class="mono">RequiresAI.php:21</td><td>Gói của <em>quán đó</em> có <code>can_use_ai</code> không</td><td><code>403</code></td></tr>
+        <tr><td>Trait hạn mức</td><td class="mono">EnforcesPackageLimits.php:45</td><td>Số bàn / số món hiện có so với <code>max_tables</code> · <code>max_menu_items</code>. <code>null</code> = không giới hạn.</td><td><code>422</code></td></tr>
+        <tr><td>Giao diện</td><td class="mono">permission.ts:27</td><td><code>packageLimits()</code> ưu tiên giá trị trên subscription, chỉ rơi về bảng cứng khi thiếu</td><td>ẩn nút</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="fix">
+    <div class="fix-head">Bảng sửa tại chỗ · Mảng 2</div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Thầy bảo</th><th>Sửa ở đâu</th><th>Sửa gì</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Cho gói Pro lên 30 bàn</strong></td><td>Admin Portal → Gói dịch vụ</td><td><strong>Không sửa code.</strong> Hạn mức đọc từ <code>packages.max_tables</code> trong CSDL, admin sửa được ngay trên giao diện. Bảng trong <code>permission.ts:17</code> chỉ là <em>đường lui</em> cho document cũ thiếu trường — nói được điều này là ghi điểm.</td></tr>
+          <tr><td>Đổi VAT 10% xuống 8%</td><td class="loc">config/funcafe.php:12</td><td>Đặt biến môi trường <code>VAT_RATE=8</code>. Ba nơi đọc chung <code>config('funcafe.vat_rate')</code>: <code>preview</code>, <code>store</code>, và lời tư vấn của AI.</td></tr>
+          <tr><td>Dùng thử 7 ngày lên 14 ngày</td><td class="loc">SubscriptionController:349</td><td><code>addDays(7)</code> → <code>addDays(14)</code>. Nhớ sửa cả câu chữ ở <code>ConsultKnowledgeService:198</code> và mô tả gói trong CSDL, nếu không AI vẫn tư vấn “7 ngày”.</td></tr>
+          <tr><td>Cho phép hạ gói</td><td class="loc">SubscriptionController:538</td><td>Thêm nhánh <code>$newLevel &lt; $oldLevel</code>. Câu hỏi khó là <em>nghiệp vụ</em>: tiền thừa xử lý sao — hoàn, giữ làm credit, hay mất? Nói rõ đã cân nhắc và chọn chặn.</td></tr>
+          <tr><td>Cấn trừ theo ngày thay vì theo giây</td><td class="loc">SubscriptionController:121–127</td><td><code>diffInSeconds</code> → <code>diffInDays</code>. Nêu luôn hệ quả: gói 7 ngày sẽ lệch tới 14% giá trị.</td></tr>
+          <tr><td>Đơn chờ cổng quá 30 phút → đổi thành 2 giờ</td><td class="loc">SubscriptionController:31</td><td><code>GATEWAY_PENDING_TTL_MINUTES = 120</code></td></tr>
+          <tr><td>Gia hạn cũng được cấn trừ</td><td class="loc">SubscriptionController:538</td><td>Trả lời trước khi sửa: gia hạn <em>không mất gì</em> vì thời gian cũ vẫn còn nguyên — cấn trừ ở đây là trả tiền hai lần cho một khoảng.</td></tr>
+          <tr><td>Bỏ chặn dùng thử theo tài khoản, chỉ chặn theo quán</td><td class="loc">SubscriptionController:380</td><td>Bỏ nhánh <code>$user-&gt;has_used_free_trial</code>. Nói rõ hệ quả: Pro Max miễn phí vĩnh viễn, cứ hết 7 ngày thì tạo quán mới.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Mảng 3 · Cổng VNPay</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Vào → Ra</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">buildPaymentUrl($ref,$amt,$info,$ip)</td><td class="loc">VnpayService:19</td><td>→ <code>string</code></td><td>Dựng 12 tham số <code>vnp_*</code> → <code>ksort</code> → ký HMAC-SHA512 → ghép thành URL. <code>vnp_Amount</code> phải <strong>× 100</strong>.</td></tr>
+        <tr><td class="mono">validateSignature($query)</td><td class="loc">VnpayService:48</td><td>→ <code>bool</code></td><td>Bỏ <code>vnp_SecureHash</code> ra khỏi dữ liệu → ký lại y hệt → so bằng <code>hash_equals</code>.</td></tr>
+        <tr><td class="mono">buildHashData($data)</td><td class="loc">VnpayService:67</td><td>→ <code>string</code></td><td>Chuỗi đem ký: <code>urlencode(k)=urlencode(v)</code> nối bằng <code>&amp;</code>.</td></tr>
+        <tr><td class="mono">vnpayReturn($req)</td><td class="loc">Gateway:92</td><td>→ redirect</td><td>Đường <em>trình duyệt</em>. Kiểm chữ ký → tra đơn → mã <code>00</code> thì kích hoạt, khác thì <code>rejectAndRollback</code>.</td></tr>
+        <tr><td class="mono">vnpayIpn($req)</td><td class="loc">Gateway:137</td><td>→ JSON</td><td>Đường <em>máy chủ tới máy chủ</em>. Thêm hai lớp kiểm mà Return không có: <strong>số tiền khớp</strong> và <strong>đơn đã xác nhận chưa</strong>.</td></tr>
+        <tr><td class="mono">isSettled($p, $activated)</td><td class="loc">Gateway</td><td>→ <code>bool</code></td><td>Đơn đã thật sự chốt chưa — kích hoạt hỏng thì báo mã lỗi để cổng gửi lại</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Năm mã trả về của IPN</h4>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Mã</th><th>Nghĩa</th><th>Khi nào</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">97</td><td>Invalid signature</td><td>Chữ ký sai — từ chối trước mọi thứ khác</td></tr>
+        <tr><td class="mono">01</td><td>Order not found</td><td>Không tra được <code>vnp_TxnRef</code></td></tr>
+        <tr><td class="mono">04</td><td>Invalid amount</td><td><code>vnp_Amount ≠ amount × 100</code></td></tr>
+        <tr><td class="mono">02</td><td>Already confirmed</td><td>Đơn đã <code>paid</code> — không xử lý lại</td></tr>
+        <tr><td class="mono">00</td><td>Confirm Success</td><td>Hợp lệ, đã kích hoạt</td></tr>
+        <tr><td class="mono">99</td><td>Activation failed</td><td>Chữ ký đúng nhưng kích hoạt hỏng — <strong>báo thật để VNPay gửi lại</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note ask">
+    <strong>“Sao Return URL không kiểm số tiền mà IPN lại kiểm?”</strong> — Câu này rất có thể bị hỏi vì nhìn qua giống thiếu sót. Trả lời: chữ ký HMAC được tính trên <em>toàn bộ</em> tham số, <code>vnp_Amount</code> nằm trong đó, nên sửa số tiền là chữ ký hỏng ngay. Lớp kiểm riêng ở IPN tồn tại vì <strong>đặc tả của VNPay bắt buộc</strong> phải trả mã <code>04</code> khi số tiền lệch — đó là yêu cầu về giao thức, không phải lớp bảo mật thứ hai. Còn phát lại một URL cũ hợp lệ thì bị chặn bởi tính idempotent của <code>markPaidAndActivate</code>.
+  </div>
+
+  <div class="fix">
+    <div class="fix-head">Bảng sửa tại chỗ · Mảng 3</div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Thầy bảo</th><th>Sửa ở đâu</th><th>Sửa gì</th></tr></thead>
+        <tbody>
+          <tr><td>Đổi thuật toán ký sang SHA-256</td><td class="loc">VnpayService:40 và :61</td><td><strong>Hai chỗ phải khớp nhau.</strong> Sửa một chỗ là mọi giao dịch báo sai chữ ký. Thực tế VNPay quy định SHA-512, đổi là không giao dịch được.</td></tr>
+          <tr><td>Kiểm thêm mã ngân hàng ở IPN</td><td class="loc">Gateway:154</td><td>Chèn sau khối kiểm số tiền, trả mã lỗi riêng</td></tr>
+          <tr><td>Đổi tên miền nhận callback</td><td>biến môi trường <code>APP_URL</code></td><td><code>VNPAY_RETURN_URL</code> để trống sẽ <em>tự suy ra</em> từ <code>APP_URL</code>. Đổi tên miền mà quên là giao dịch treo vĩnh viễn.</td></tr>
+          <tr><td>Thêm cổng thanh toán thứ ba</td><td class="loc">PackagePayment.php:13</td><td>Thêm vào hằng <code>ONLINE_GATEWAYS</code> — danh sách validate ở <code>store()</code> dựng <em>thẳng từ hằng này</em> nên hai nơi không thể lệch.</td></tr>
+          <tr><td>Ghi log mỗi lượt cổng gọi về</td><td class="loc">Gateway:92 · :137</td><td>Thêm <code>Log::info()</code> ngay sau <code>validateSignature</code>. Nhớ <strong>không log <code>vnp_SecureHash</code></strong>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Mảng 4 · Doanh thu và trợ lý AI</h2>
+
+  <h3>4.1 · RevenueStats — một vòng quét, sáu kết quả</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Vào → Ra</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">forCafes($ids,$from,$to,$topN)</td><td class="loc">:46</td><td>→ mảng 6 khoá</td><td>Trả <code>total</code>, <code>count</code>, <code>by_day</code>, <code>by_month</code>, <code>top_items</code>, <code>by_cafe</code> trong <strong>một</strong> vòng lặp. Chỉ nạp 4 trường. Truyền <code>$topN = 0</code> để bỏ hẳn phần dòng món cho rẻ.</td></tr>
+        <tr><td class="mono">apDungKhoang($q,$from,$to)</td><td class="loc">:145</td><td>void</td><td>Giới hạn khoảng ngày, có nhánh <code>orWhere</code> cho đơn cũ thiếu <code>paid_at</code>.</td></tr>
+        <tr><td class="mono">toCarbon($date)</td><td class="loc">:173</td><td>→ <code>?Carbon</code></td><td><strong>Chỗ xử lý múi giờ.</strong> Luôn <code>setTimezone(config('app.timezone'))</code> trước khi cắt chuỗi ngày.</td></tr>
+        <tr><td class="mono">TOP_ITEMS</td><td class="loc">:29</td><td>hằng = 8</td><td>Số món bán chạy trả về khi nơi gọi không nói rõ</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>4.2 · Trang Doanh thu phía giao diện</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm / biến</th><th>Dòng</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">groupBuckets(byDay, mode)</td><td class="loc">:31</td><td>Gom mốc ngày sang tháng hoặc năm bằng cách <strong>cắt bớt khoá</strong> — <code>2026-08-19</code> lấy 7 ký tự thành <code>2026-08</code>. Không cần gọi lại máy chủ.</td></tr>
+        <tr><td class="mono">effectiveMode</td><td class="loc">:87</td><td>Người dùng chưa chọn thì tự đoán theo độ dài khoảng ngày</td></tr>
+        <tr><td class="mono">effectiveScope</td><td class="loc">:80</td><td><code>'all'</code> là quy ước của giao diện — máy chủ hiểu “gộp mọi quán” là <em>vắng mặt tham số</em></td></tr>
+        <tr><td class="mono">cafeRanking</td><td class="loc">:145</td><td>Xếp hạng quán, chỉ hiện khi đang xem tất cả và có từ 2 quán</td></tr>
+        <tr><td class="mono">handleExport()</td><td class="loc">:161</td><td>Xuất Excel: nạp <code>exceljs</code> động lúc bấm, đi lấy chi tiết hóa đơn riêng. <strong>Xuất thiếu quán thì báo lỗi</strong> chứ không đưa ra tệp trông đầy đủ.</td></tr>
+        <tr><td class="mono">SO_NGAY_MAC_DINH</td><td class="loc">:69</td><td>Khoảng ngày mặc định khi mở trang = 30</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>4.3 · Trợ lý AI</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Hàm</th><th>Dòng</th><th>Làm gì</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">AiController::chat</td><td class="loc">:32</td><td>Hỏi đáp một lượt, tối đa 30 tin nhắn × 4000 ký tự</td></tr>
+        <tr><td class="mono">AiController::chatStream</td><td class="loc">:51</td><td>Bản streaming: tắt output buffering rồi <code>echo</code> + <code>flush()</code> từng đoạn</td></tr>
+        <tr><td class="mono">AiController::revenueAnalysis</td><td class="loc">:86</td><td>Phân tích doanh thu, nhớ tạm 1 giờ, chưa có đơn nào thì trả <code>422</code></td></tr>
+        <tr><td class="mono">AiController::suggestions</td><td class="loc">:142</td><td>Sinh 3 câu gợi ý theo <em>tình trạng thật</em>. Không gọi Gemini, chỉ đếm dữ liệu.</td></tr>
+        <tr><td class="mono">cafeContext($cafe)</td><td class="loc">:188</td><td>Dựng ngữ cảnh: phần <strong>sống</strong> (bàn, doanh thu hôm nay) tính lại mỗi lượt; phần <strong>nặng</strong> (thực đơn, thống kê) nhớ tạm 10 phút</td></tr>
+        <tr><td class="mono">tableOccupancy($cafe)</td><td class="loc">:214</td><td>Đếm bàn bận từ <em>đơn đang mở</em>, không đọc <code>tables.status</code> — phải khớp <code>tablesLive</code> bên POS</td></tr>
+        <tr><td class="mono">buildRevenueStats($cafe)</td><td class="loc">:274</td><td>Dùng lại <code>RevenueStats</code>, chỉ quét 12 tháng gần nhất</td></tr>
+        <tr><td class="mono">GeminiService::danhSachModel</td><td class="loc">:92</td><td>Mô hình chính + mô hình dự phòng</td></tr>
+        <tr><td class="mono">GeminiService::dangNghen</td><td class="loc">:101</td><td>Chỉ <code>429</code> và <code>5xx</code> mới đáng đổi mô hình</td></tr>
+        <tr><td class="mono">GeminiService::generateJson</td><td class="loc">:238</td><td>Ép Gemini trả JSON đúng khuôn bằng <code>responseSchema</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="fix">
+    <div class="fix-head">Bảng sửa tại chỗ · Mảng 4</div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Thầy bảo</th><th>Sửa ở đâu</th><th>Sửa gì</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Top 5 món đổi thành top 10</strong></td><td class="loc">revenue/page.tsx:142 · RevenueStats:29</td><td><strong>Hai nơi, và đây là bẫy.</strong> Giao diện cắt <code>.slice(0, 5)</code>, còn máy chủ chỉ trả về 8 món. Sửa mỗi giao diện thì mãi mãi chỉ ra 8.</td></tr>
+          <tr><td>Mặc định mở trang là 7 ngày thay vì 30</td><td class="loc">revenue/page.tsx:69</td><td><code>SO_NGAY_MAC_DINH = 7</code></td></tr>
+          <tr><td>Bỏ nhớ tạm kết quả AI</td><td class="loc">AiController:92 và :129</td><td>Bỏ khối <code>Cache::has</code> và <code>Cache::put</code>. Nói kèm hệ quả: mỗi lượt bấm đốt một lượt hạn ngạch Gemini.</td></tr>
+          <tr><td>Đổi mô hình Gemini</td><td>biến môi trường <code>GEMINI_MODEL</code></td><td>Không sửa code. Có sẵn cả <code>GEMINI_MODEL_FALLBACK</code>.</td></tr>
+          <tr><td>AI trả thêm mục “Dự báo tuần tới”</td><td class="loc">AiController:111 · ai.ts:7 · RevenueAiInsights</td><td><strong>Ba nơi.</strong> Thêm khoá vào <code>responseSchema</code> và <code>required</code>, thêm trường vào kiểu TypeScript, thêm khối hiển thị.</td></tr>
+          <tr><td>Doanh thu tính theo ngày tạo đơn thay vì ngày trả tiền</td><td class="loc">RevenueStats:96</td><td>Đổi <code>paid_at ?? created_at</code> thành <code>created_at</code>. Giải thích được vì sao hiện tại ưu tiên <code>paid_at</code>: đơn mở từ ca tối hôm trước, trả tiền sáng hôm sau.</td></tr>
+          <tr><td>Ngữ cảnh AI nhớ tạm 10 phút xuống 2 phút</td><td class="loc">AiController:242</td><td><code>addMinutes(2)</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Mảng 5 · Hạ tầng, kiểm thử, bảo mật</h2>
+
+  <p>Phần này gần như không sửa code trực tiếp — thầy hỏi ở đây là hỏi “vì sao chọn vậy” và “đổi thì đổi ở đâu”.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Thứ</th><th>Chỉnh ở đâu</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Trần tần suất AI</td><td class="mono">config/funcafe.php</td><td><code>AI_MOI_PHUT=6</code> · <code>AI_MOI_NGAY=40</code> · <code>AI_CHUNG_MOI_NGAY=120</code>. Cái thứ ba tính trên <em>cả khoá API</em>, đặt thấp để khách vãng lai không giành hết lượt của chủ quán đã trả tiền.</td></tr>
+        <tr><td>Hạn chờ mỗi lượt gọi Gemini</td><td class="mono">GEMINI_TIMEOUT=45</td><td>Cũng là hạn chạy của tiến trình PHP. Đặt cao hơn thì người dùng bỏ đi trước khi câu trả lời tới.</td></tr>
+        <tr><td>Trần đăng nhập, liên hệ, tải ảnh</td><td class="mono">routes/api.php:21 · :53 · :47</td><td><code>throttle:10,1</code> · <code>5,1</code> · <code>30,1</code></td></tr>
+        <tr><td>Hạn dùng token đăng nhập</td><td class="mono">SANCTUM_EXPIRATION_MINUTES</td><td>Mặc định 43200 (30 ngày). Để rỗng là token sống mãi.</td></tr>
+        <tr><td>Bật transaction MongoDB</td><td class="mono">MONGODB_TRANSACTIONS</td><td>Chỉ đặt <code>true</code> khi chạy replica set hoặc Atlas. Máy đơn không hỗ trợ.</td></tr>
+        <tr><td>Chạy một bộ test</td><td class="mono">php artisan test --filter=Prorated</td><td>Ghi vào CSDL riêng <code>funcafe_testing</code>, tự từ chối nếu bị trỏ vào dữ liệu thật.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note ask">
+    <strong>“Em thêm một chỉ mục cho collection orders được không?”</strong> — Được, và chỗ khai là <code>php artisan db:indexes</code> (lệnh riêng trong <code>Console/Commands</code>), <em>không phải</em> migration. MongoDB không đi qua hệ thống migration của Laravel nên chỉ mục phải khai và tạo bằng lệnh riêng. Lệnh chạy lại nhiều lần không hỏng gì.
+  </div>
+
+  <h2>Ba câu trả lời dùng được cho mọi tình huống</h2>
+  <ol class="plain">
+    <li><strong>“Chỗ này em kiểm ở cả hai đầu.”</strong> — Giao diện kiểm để hiện đúng, máy chủ kiểm để giữ luật. Đúng với giảm giá, hạn mức gói, quyền AI, tiền mặt, và trạng thái đơn.</li>
+    <li><strong>“MongoDB không có transaction nên em dùng ghi có điều kiện.”</strong> — Đưa điều kiện vào chính câu lệnh <code>update</code>, trả về 0 dòng thì dừng. Dùng ở <code>OrderController::pay</code>, <code>cancel</code>, <code>markPaidAndActivate</code>, <code>rejectAndRollback</code>.</li>
+    <li><strong>“Không xoá, chỉ ẩn.”</strong> — Món, danh mục, topping, quán đều không có route xoá, vì hóa đơn cũ tham chiếu tới chúng và Mongo không cascade.</li>
+  </ol>
+
+  <footer>FunCafe · Khối B · số dòng đúng với mã ngày 19/08/2026</footer>
+
+</div>
