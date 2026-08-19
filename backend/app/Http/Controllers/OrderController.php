@@ -6,6 +6,7 @@ use App\Models\Cafe;
 use App\Models\Order;
 use App\Models\Item;
 use App\Models\ItemPrice;
+use App\Models\ItemTopping;
 use App\Models\Topping;
 use App\Http\Controllers\Concerns\ChecksCafeOwnership;
 use App\Http\Controllers\Concerns\ChecksCafeStatus;
@@ -501,8 +502,25 @@ class OrderController extends Controller
             if (!$itemPrice || (string) $itemPrice->item_id !== (string) $item->id) {
                 $fail('Size không hợp lệ cho món "' . $item->name . '".');
             }
+            // Size đã tắt thì không bán được nữa — cùng lý do với is_available của
+            // món và topping: đơn nháp nằm phía máy chủ nên chủ quán có thể tắt một
+            // size ở tab khác trong khoảng giữa lúc bỏ vào giỏ và lúc chốt đơn.
+            if (!($itemPrice->is_active ?? true)) {
+                $fail('Size "' . $itemPrice->size_name . '" của món "' . $item->name . '" đã ngừng bán, vui lòng chọn size khác.');
+            }
             $unitPrice = (float) $itemPrice->price;
         } else {
+            // MÓN CÓ SIZE THÌ BẮT BUỘC CHỌN SIZE.
+            //
+            // Thiếu chốt này là một đường né giá: `base_price` vẫn nằm trên món kể cả
+            // khi has_size bật (ItemController::store validate nó là `required`), và
+            // chủ quán thường để đó một con số cũ hoặc 0. Bỏ trống `item_price_id` khi
+            // gọi API là rơi thẳng vào nhánh dưới và mua được ly cỡ lớn theo giá đó.
+            // Giao diện luôn gửi size cho món có size (xem openOption), nhưng giao
+            // diện không phải chốt chặn.
+            if ($item->has_size ?? false) {
+                $fail('Món "' . $item->name . '" phải chọn size.');
+            }
             $unitPrice = (float) $item->base_price;
         }
 
@@ -512,7 +530,19 @@ class OrderController extends Controller
         $toppingTotal = 0.0;
         $toppingRows  = [];
 
-        foreach ($itemData['toppings'] ?? [] as $topData) {
+        $dsTopping = $itemData['toppings'] ?? [];
+
+        // Món không nhận topping thì không nhận dòng topping nào.
+        //
+        // Giao diện đã lọc sẵn (ToppingPickerModal chỉ hiện topping trong
+        // `allowedToppingIds`, món tắt cờ thì không có gì để chọn), nhưng lọc để hiển
+        // thị không phải là ràng buộc — gọi thẳng API vẫn gắn được trân châu vào ổ
+        // bánh mì và cộng tiền topping vào hóa đơn của nó.
+        if ($dsTopping !== [] && !($item->allow_topping ?? false)) {
+            $fail('Món "' . $item->name . '" không nhận topping.');
+        }
+
+        foreach ($dsTopping as $topData) {
             $topping = Topping::find($topData['topping_id']);
             // Topping phải tồn tại, thuộc quán này và còn bán (xem chú thích ở phần món)
             if (!$topping || (string) $topping->cafe_id !== (string) $cafe->id) {
@@ -520,6 +550,15 @@ class OrderController extends Controller
             }
             if (!($topping->is_available ?? true)) {
                 $fail('Topping "' . $topping->name . '" đã ngừng bán, vui lòng bỏ khỏi đơn.');
+            }
+            // Và phải nằm trong danh sách topping được gắn cho CHÍNH MÓN NÀY.
+            // Thuộc cùng quán là chưa đủ: mỗi món chỉ đi với một số topping nhất định,
+            // quan hệ đó nằm ở bảng nối `item_toppings` do trang Thực đơn dựng lên.
+            $duocGan = ItemTopping::where('item_id', (string) $item->id)
+                ->where('topping_id', (string) $topData['topping_id'])
+                ->exists();
+            if (!$duocGan) {
+                $fail('Topping "' . $topping->name . '" không dùng được cho món "' . $item->name . '", vui lòng bỏ khỏi đơn.');
             }
             $toppingPrice = (float) $topping->price;
             $toppingQty   = (int) $topData['quantity'];

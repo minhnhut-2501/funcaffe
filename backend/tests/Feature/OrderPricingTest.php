@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Cafe;
 use App\Models\Category;
 use App\Models\Item;
+use App\Models\ItemPrice;
+use App\Models\ItemTopping;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Subscription;
@@ -23,7 +25,7 @@ class OrderPricingTest extends MongoTestCase
 {
     protected array $collections = [
         'users', 'cafes', 'packages', 'subscriptions', 'categories',
-        'items', 'item_prices', 'toppings', 'tables', 'orders',
+        'items', 'item_prices', 'toppings', 'item_toppings', 'tables', 'orders',
         'order_details', 'order_detail_toppings',
     ];
 
@@ -81,6 +83,13 @@ class OrderPricingTest extends MongoTestCase
             'name' => 'Trân châu',
             'price' => 5_000,
             'is_available' => true,
+        ]);
+
+        // Gắn topping vào món. Cùng quán là CHƯA ĐỦ để bán kèm — phải có dòng nối
+        // trong `item_toppings`, đúng thứ trang Thực đơn dựng lên khi lưu món.
+        ItemTopping::create([
+            'item_id' => (string) $this->item->id,
+            'topping_id' => (string) $this->topping->id,
         ]);
 
         $this->table = $this->cafe->tables()->create([
@@ -284,5 +293,96 @@ class OrderPricingTest extends MongoTestCase
 
         $this->postJson($url, ['payment_method' => 'cash', 'cash_received' => 100_000])->assertStatus(200);
         $this->postJson($url, ['payment_method' => 'cash', 'cash_received' => 100_000])->assertStatus(400);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Thực đơn ràng buộc cái gì đi với cái gì
+    |--------------------------------------------------------------------------
+    | Bốn bài dưới đây canh cùng một nguyên tắc: giao diện LỌC để hiển thị, nhưng
+    | lọc không phải là ràng buộc. Ai gọi thẳng API vẫn phải đi qua đúng luật.
+    */
+
+    public function test_khong_gan_duoc_topping_khong_thuoc_mon(): void
+    {
+        // Topping này của CÙNG QUÁN và đang bán, nhưng không được gắn cho món.
+        $khac = Topping::create([
+            'cafe_id' => (string) $this->cafe->id,
+            'name' => 'Thạch dừa',
+            'price' => 7_000,
+            'is_available' => true,
+        ]);
+
+        $res = $this->createOrder([$this->oneItem([
+            'toppings' => [['topping_id' => (string) $khac->id, 'quantity' => 1]],
+        ])]);
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString('không dùng được cho món', (string) $res->json('message'));
+
+        // Và không được để lại dấu vết nào: đơn phải bị chặn TRƯỚC khi ghi.
+        $this->assertSame(0, Order::where('cafe_id', (string) $this->cafe->id)->count());
+    }
+
+    public function test_mon_khong_nhan_topping_thi_bi_tu_choi(): void
+    {
+        $this->item->update(['allow_topping' => false]);
+
+        $res = $this->createOrder([$this->oneItem([
+            'toppings' => [['topping_id' => (string) $this->topping->id, 'quantity' => 1]],
+        ])]);
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString('không nhận topping', (string) $res->json('message'));
+    }
+
+    public function test_mon_co_size_thi_bat_buoc_chon_size(): void
+    {
+        // Đây là một đường NÉ GIÁ, không chỉ là lỗi dữ liệu lệch: `base_price` vẫn nằm
+        // trên món kể cả khi has_size bật, nên bỏ trống item_price_id là mua ly cỡ lớn
+        // theo giá gốc.
+        $this->item->update(['has_size' => true, 'base_price' => 10_000]);
+        ItemPrice::create([
+            'item_id' => (string) $this->item->id,
+            'size_name' => 'Lớn',
+            'price' => 45_000,
+            'is_active' => true,
+        ]);
+
+        $res = $this->createOrder([$this->oneItem()]);  // cố ý KHÔNG gửi item_price_id
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString('phải chọn size', (string) $res->json('message'));
+    }
+
+    public function test_khong_ban_duoc_size_da_tat(): void
+    {
+        $this->item->update(['has_size' => true]);
+        $size = ItemPrice::create([
+            'item_id' => (string) $this->item->id,
+            'size_name' => 'Lớn',
+            'price' => 45_000,
+            'is_active' => false,
+        ]);
+
+        $res = $this->createOrder([$this->oneItem([
+            'item_price_id' => (string) $size->id,
+            'size_name_snapshot' => 'Lớn',
+        ])]);
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString('đã ngừng bán', (string) $res->json('message'));
+    }
+
+    public function test_van_ban_duoc_binh_thuong_khi_topping_da_gan_dung(): void
+    {
+        // Đối chứng cho ba bài trên: luật siết thêm KHÔNG được chặn nhầm đường bán
+        // hàng bình thường. 30.000x2 + 5.000x1x2 = 70.000
+        $res = $this->createOrder([$this->oneItem([
+            'toppings' => [['topping_id' => (string) $this->topping->id, 'quantity' => 1]],
+        ])]);
+
+        $res->assertStatus(201);
+        $this->assertSame(70_000.0, (float) $res->json('subtotal'));
     }
 }
