@@ -237,7 +237,20 @@ export default function InvoicesPage() {
               <h3 className="text-base font-bold text-cafe-900">{viewInvoice.cafeName || activeCafe?.name || 'FunCafe'}</h3>
               <p className="text-cafe-500 text-xs mt-0.5">{viewInvoice.cafeAddress || activeCafe?.address || ''}</p>
               <p className="text-cafe-500 text-xs">{(viewInvoice.cafePhone || activeCafe?.phone) ? `ĐT: ${viewInvoice.cafePhone || activeCafe?.phone}` : ''}</p>
-              <p className="font-bold text-cafe-800 text-sm mt-3 tracking-wide">HÓA ĐƠN THANH TOÁN</p>
+              {/*
+                * "PHIẾU TÍNH TIỀN", KHÔNG phải "HÓA ĐƠN".
+                *
+                * Tờ giấy này là chứng từ nội bộ để quán và khách đối chiếu. Hóa đơn
+                * điện tử theo Nghị định 123/2020/NĐ-CP là thứ khác hẳn: định dạng XML
+                * theo chuẩn Tổng cục Thuế, có chữ ký số của người bán, đăng ký trước
+                * với cơ quan thuế và truyền dữ liệu về đó — bản PDF chỉ là "bản thể
+                * hiện" của nó. Hệ thống chưa làm khâu nào trong số đó, nên in chữ
+                * "HÓA ĐƠN" lên giấy là nói sai về giá trị pháp lý của tờ phiếu.
+                *
+                * Tên MÀN HÌNH vẫn giữ "Hóa đơn" theo đúng thuật ngữ trong báo cáo và
+                * điều hướng — đổi chỗ đó là lệch với tài liệu đã nộp.
+                */}
+              <p className="font-bold text-cafe-800 text-sm mt-3 tracking-wide">PHIẾU TÍNH TIỀN</p>
             </div>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
@@ -322,6 +335,14 @@ export default function InvoicesPage() {
             )}
 
             <p className="text-center text-cafe-500 text-xs pt-1">Cảm ơn quý khách và hẹn gặp lại!</p>
+            {/*
+              * Câu chuẩn vẫn thấy trên phiếu của quán ăn và siêu thị. Nó nói rõ với
+              * khách rằng muốn hóa đơn để kê khai thuế thì phải hỏi riêng — nếu không
+              * họ cầm tờ này về phòng kế toán rồi mới biết là không dùng được.
+              */}
+            <p className="text-center text-cafe-400 text-[10px] leading-snug">
+              Phiếu này không có giá trị thay thế hóa đơn.
+            </p>
           </div>
         )}
       </Modal>

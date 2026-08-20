@@ -77,7 +77,7 @@ for (const d of (hdDai.order_details ?? [])) {
     ok(chuTrongPhieu.includes(t.topping_name_snapshot), `  topping "${t.topping_name_snapshot}"`);
   }
 }
-const nhanBatBuoc = ['HÓA ĐƠN THANH TOÁN', 'Bàn', 'Ngày', 'Thanh toán', 'Tạm tính', 'Giảm giá', 'TỔNG THANH TOÁN'];
+const nhanBatBuoc = ['PHIẾU TÍNH TIỀN', 'Bàn', 'Ngày', 'Thanh toán', 'Tạm tính', 'Giảm giá', 'TỔNG THANH TOÁN'];
 const thieuNhan = nhanBatBuoc.filter(n => !chuTrongPhieu.includes(n));
 ok(thieuNhan.length === 0, `du nhan bat buoc${thieuNhan.length ? ' — thieu: ' + thieuNhan.join(', ') : ''}`);
 if (hdDai.payment_method === 'cash' && hdDai.cash_received != null) {
