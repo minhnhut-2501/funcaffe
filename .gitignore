@@ -82,3 +82,8 @@ backend/*.bat
 # Tep du lieu Mongo xuat de gui cho may khac (scripts/xuat-mongo.mjs) — tu sinh lai duoc
 mongo-*.ndjson
 mongo-*.ndjson.gz
+
+# Ban Word/PDF cua bao cao — moi tep hang chuc MB, day len la nam vinh vien trong
+# lich su kho (kho nay cong khai). Chia se qua Drive; ban .md trong doc/ van theo doi.
+doc/*.docx
+doc/*.pdf
