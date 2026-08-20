@@ -100,6 +100,7 @@ class ConsultKnowledgeService
             $this->kienThucSanPham(),
             $this->bangGoi(),
             $this->quyTacNghiepVu(),
+            $this->cauHoiThuongGap(),
             $this->loiMoi($trangThai),
             $this->cachTraLoi(),
         ]);
@@ -142,7 +143,76 @@ class ConsultKnowledgeService
             . "- Doanh thu: thống kê và biểu đồ theo ngày/tháng, top món bán chạy, xuất Excel.\n"
             . "- Nhiều quán: một tài khoản mở được nhiều quán, dữ liệu từng quán tách biệt hoàn toàn.\n"
             . "- Trợ lý AI: hỏi đáp về tình hình quán và phân tích doanh thu tự động (gói Pro Max).\n"
-            . "- Mua gói trực tuyến qua VNPay hoặc MoMo, kích hoạt tự động ngay khi thanh toán xong.";
+            . "- Mua gói trực tuyến qua VNPay hoặc MoMo, kích hoạt tự động ngay khi thanh toán xong.\n"
+            . "- Thanh toán tại quán: tiền mặt (hệ thống tính sẵn tiền thối) hoặc mã VietQR sinh từ "
+            . "chính số tài khoản ngân hàng quán tự khai — khách quét bằng app ngân hàng bất kỳ, "
+            . "tiền vào thẳng tài khoản quán, phần mềm không giữ tiền của ai.\n"
+            . "- In phiếu tính tiền ngay từ trình duyệt, hợp cả máy in A4 lẫn máy in nhiệt khổ 58mm và 80mm.\n"
+            . "- Xuất doanh thu và danh sách hóa đơn ra tệp Excel, mở lên tính toán được ngay.";
+    }
+
+    /**
+     * Câu hỏi khách hay hỏi trước khi mua, kèm câu trả lời ĐÚNG SỰ THẬT.
+     *
+     * Khối này sinh ra vì phần kiến thức ở trên chỉ kể phần mềm LÀM ĐƯỢC gì, nên khi
+     * khách hỏi những thứ nó KHÔNG làm được, mô hình rơi vào chỗ không có dữ liệu —
+     * hoặc trả lời chung chung, hoặc tệ hơn là suy diễn ra một tính năng không tồn tại.
+     * Hứa hão lúc tư vấn thì khách phát hiện ngay ngày đầu dùng thử.
+     *
+     * Chỗ này cố ý ghi cứng chứ không đọc CSDL: đây là giới hạn của SẢN PHẨM, không
+     * phải cấu hình của một quán. Sửa nó là việc của người viết mã, đúng như vậy.
+     */
+    private function cauHoiThuongGap(): string
+    {
+        return "# CÂU HỎI THƯỜNG GẶP — trả lời theo đúng đây, KHÔNG suy diễn thêm\n"
+            . "Nói thật cả chỗ phần mềm chưa làm được. Khách phát hiện ra ngay ngày đầu "
+            . "dùng thử, nên hứa hão chỉ đổi một lần đăng ký lấy một khách mất niềm tin.\n\n"
+
+            . "**Mất mạng có bán hàng được không?**\n"
+            . "KHÔNG. Đây là phần mềm chạy trên trình duyệt, mọi thao tác đều cần kết nối "
+            . "tới máy chủ. Mất mạng thì không lên order và không thanh toán được. Quán nên "
+            . "có sẵn 4G trên điện thoại làm đường dự phòng.\n\n"
+
+            . "**Có cần cài đặt gì không? Máy nào chạy được?**\n"
+            . "Không cài gì cả, mở trình duyệt là dùng. Chạy được trên máy tính, máy tính bảng "
+            . "và điện thoại — giao diện tự co theo màn hình, nhỏ nhất là điện thoại 390px. "
+            . "KHÔNG có ứng dụng riêng trên CH Play hay App Store.\n\n"
+
+            . "**Nhiều người dùng cùng lúc được không?**\n"
+            . "Được — đăng nhập cùng một tài khoản trên nhiều máy, dữ liệu đồng bộ qua máy chủ. "
+            . "NHƯNG hiện CHƯA có tài khoản riêng cho từng nhân viên và CHƯA phân quyền theo "
+            . "nhân viên: chủ quán và nhân viên dùng chung một tài khoản, nên ai đăng nhập cũng "
+            . "xem được doanh thu. Quán cần tách quyền thu ngân thì nói rõ đây là hạn chế hiện tại.\n\n"
+
+            . "**Phần mềm có xuất hóa đơn điện tử cho khách công ty không?**\n"
+            . "KHÔNG. Thứ in ra là PHIẾU TÍNH TIỀN — chứng từ nội bộ để quán và khách đối chiếu. "
+            . "Hóa đơn điện tử theo Nghị định 123/2020/NĐ-CP là thứ khác: phải có chữ ký số, "
+            . "đăng ký trước với cơ quan thuế và truyền dữ liệu về đó, thường phải qua một nhà "
+            . "cung cấp dịch vụ hóa đơn điện tử. FunCafe chưa tích hợp khâu này. Khách hỏi câu "
+            . "này thường là quán có khách doanh nghiệp — đừng lảng, nói thẳng là chưa có.\n\n"
+
+            . "**Có quản lý kho, nguyên liệu, định lượng pha chế không?**\n"
+            . "KHÔNG. Phần mềm quản lý bán hàng và doanh thu, không theo dõi tồn kho nguyên liệu.\n\n"
+
+            . "**Có tích điểm hay lưu thông tin khách hàng không?**\n"
+            . "KHÔNG. Chưa có phần khách hàng thân thiết.\n\n"
+
+            . "**Dữ liệu của tôi có an toàn không? Quán khác xem được không?**\n"
+            . "Dữ liệu từng quán tách biệt hoàn toàn: mỗi lượt gọi đều kiểm quán đó có thuộc tài "
+            . "khoản đang đăng nhập hay không, sai là bị từ chối ngay ở máy chủ. Mật khẩu lưu dạng "
+            . "băm nên không ai đọc lại được, kể cả quản trị hệ thống. Kết nối đi qua HTTPS.\n\n"
+
+            . "**Ngừng dùng thì lấy dữ liệu ra kiểu gì?**\n"
+            . "Xuất doanh thu và danh sách hóa đơn ra tệp Excel bất cứ lúc nào, kể cả khi gói đã "
+            . "hết hạn — vì xem số liệu cũ không bị khoá, chỉ thao tác bán hàng mới bị.\n\n"
+
+            . "**Đang ghi sổ tay, chuyển sang mất bao lâu?**\n"
+            . "Việc nhập liệu ban đầu là khai bàn và nhập thực đơn. Quán khoảng 30 món thì "
+            . "chừng một hai tiếng là xong, làm một lần rồi thôi. Không cần nhập lại lịch sử cũ.\n\n"
+
+            . "**Một tài khoản mở được mấy quán?**\n"
+            . "Không giới hạn số quán. Nhưng MỖI QUÁN cần gói riêng của nó — mua gói cho quán A "
+            . "không làm quán B dùng được. Trang Doanh thu gộp được số liệu của tất cả các quán.";
     }
 
     /**

@@ -372,4 +372,26 @@ class AiConsultTest extends MongoTestCase
         $this->assertStringContainsString('không giới hạn', $bang);
         $this->assertStringNotContainsString('null', $bang);
     }
+
+    /**
+     * Trợ lý phải nói được cả những thứ phần mềm KHÔNG làm được.
+     *
+     * Thiếu khối câu hỏi thường gặp thì mô hình không có dữ liệu cho mấy câu này, và
+     * nó sẽ suy diễn ra một tính năng không tồn tại — khách phát hiện ngay ngày đầu
+     * dùng thử. Riêng câu hóa đơn điện tử là chỗ dễ hứa hão nhất: nghe "in hóa đơn"
+     * thì rất dễ tưởng là phát hành được hóa đơn đỏ.
+     */
+    public function test_loi_dan_noi_ro_cac_gioi_han_that_cua_san_pham(): void
+    {
+        $loiDan = app(ConsultKnowledgeService::class)->loiDan(null);
+
+        // Không phát hành hóa đơn điện tử — thứ in ra chỉ là phiếu tính tiền.
+        $this->assertStringContainsString('PHIẾU TÍNH TIỀN', $loiDan);
+        $this->assertStringContainsString('123/2020', $loiDan);
+
+        // Ba giới hạn còn lại, đều là câu khách hỏi trước khi xuống tiền.
+        $this->assertStringContainsString('Mất mạng', $loiDan);
+        $this->assertStringContainsString('tồn kho', $loiDan);
+        $this->assertStringContainsString('phân quyền theo', $loiDan);
+    }
 }
