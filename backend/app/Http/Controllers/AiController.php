@@ -205,7 +205,7 @@ class AiController extends Controller
      * Số bàn đang phục vụ / còn trống, đếm từ ĐƠN ĐANG MỞ.
      *
      * KHÔNG đếm theo `tables.status`: trường đó chỉ là bộ nhớ đệm và có thể lệch vì
-     * MongoDB chạy standalone nên không có transaction thật (xem doc/ERD.md mục 2.7).
+     * MongoDB chạy standalone nên không có transaction thật (xem doc/ERD.md, mục `tables`).
      * Màn hình Bán hàng cũng dẫn xuất theo cách này (`tablesLive`) — hai nơi phải
      * đếm cùng một kiểu, nếu không AI sẽ nói một đằng còn lưới bàn hiện một nẻo.
      *
