@@ -114,7 +114,10 @@ export default function Modal({ open, onClose, title, children, footer, size = '
         </div>
         <div className="overflow-y-auto flex-1 px-6 py-5 print:overflow-visible print:p-0">{children}</div>
         {footer && (
-          <div className="shrink-0 border-t border-line px-6 py-4 bg-white rounded-b-3xl">{footer}</div>
+          // no-print: các nút bên trong đã tự ẩn khi in, nhưng KHUNG chứa chúng thì
+          // không — nó vẫn giữ nguyên đường kẻ trên và 2rem đệm dọc, đủ để đẩy bản in
+          // dài hơn tờ giấy đúng một chút và đẻ ra một trang thứ hai gần như trắng.
+          <div className="no-print shrink-0 border-t border-line px-6 py-4 bg-white rounded-b-3xl">{footer}</div>
         )}
       </div>
     </div>,

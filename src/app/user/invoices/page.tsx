@@ -2,6 +2,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
+import { inBill } from '@/lib/in-bill';
 import LockedButton from '@/components/ui/LockedButton';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -95,7 +96,7 @@ export default function InvoicesPage() {
     if (!choIn || !viewInvoice) return;
     // Đợi qua hai khung hình cho hộp thoại vẽ xong rồi mới gọi hộp thoại in.
     const id = requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
+      inBill(viewInvoice.invoiceCode);
       setChoIn(false);
     }));
     return () => cancelAnimationFrame(id);
@@ -218,7 +219,7 @@ export default function InvoicesPage() {
             {canPrint(pkg) ? (
               // Khóa trong lúc chờ dòng món: in sớm là ra một tờ phiếu không có món
               // nào mà vẫn ghi đủ tổng tiền.
-              <button onClick={() => window.print()} disabled={dangTaiChiTiet} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
+              <button onClick={() => inBill(viewInvoice?.invoiceCode)} disabled={dangTaiChiTiet} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
                 <Printer className="w-4 h-4" />{dangTaiChiTiet ? 'Đang tải...' : 'In hóa đơn'}
               </button>
             ) : (
