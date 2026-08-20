@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
+import NumberInput from '@/components/ui/NumberInput';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import LockedButton from '@/components/ui/LockedButton';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
@@ -82,13 +83,16 @@ export default function TablesPage() {
       return;
     }
     setSaving(true);
+    // Ô sức chứa để trống thì hiểu là 1 người, đừng gửi đi thiếu trường rồi nhận 422:
+    // sức chứa là con số tham khảo khi xếp khách, không phải thứ đáng chặn việc lưu bàn.
+    const duLieu = { ...form, capacity: form.capacity ?? 1 };
     try {
       if (editTarget) {
-        const updated = await tableService.update(editTarget.id, form);
+        const updated = await tableService.update(editTarget.id, duLieu);
         setTables(prev => prev.map(t => t.id === editTarget.id ? updated : t));
         toast({ description: 'Đã cập nhật bàn' });
       } else {
-        const created = await tableService.create(form);
+        const created = await tableService.create(duLieu);
         setTables(prev => [...prev, created]);
         toast({ description: 'Đã thêm bàn mới' });
       }
@@ -248,7 +252,10 @@ export default function TablesPage() {
           </div>
           <div>
             <label className="label-funcafe">Sức chứa (người)</label>
-            <input type="number" min={1} max={50} className="input-funcafe" value={form.capacity ?? 4} onChange={e => setForm({ ...form, capacity: Number(e.target.value) })} />
+            {/* Kẹp 1–50 khi RỜI Ô chứ không kẹp từng phím: gõ "12" bao giờ cũng đi
+                qua "1", ép ngay là không gõ nổi số có hai chữ số. */}
+            <NumberInput className="input-funcafe" min={1} max={50}
+              value={form.capacity ?? null} onChange={v => setForm({ ...form, capacity: v ?? undefined })} />
           </div>
           <div>
             <label className="label-funcafe">Trạng thái</label>

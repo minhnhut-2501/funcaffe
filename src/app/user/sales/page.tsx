@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
 import { generateId } from '@/lib/utils';
 import { tableService, menuService, categoryService, toppingService, orderService, invoiceService, cafeService } from '@/services';
 import { ApiError } from '@/lib/api-client';
@@ -13,6 +13,7 @@ import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, Re
 import { VietQrMark } from '@/components/ui/PaymentLogos';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import MoneyInput from '@/components/ui/MoneyInput';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import TableTile from '@/components/user/TableTile';
 import MenuCard from '@/components/user/MenuCard';
@@ -48,7 +49,8 @@ export default function SalesPage() {
   const [paymentModal, setPaymentModal] = useState(false);
   const [successModal, setSuccessModal] = useState<{ code: string; orderId: string; total: number; method: string; cashGiven?: number; change?: number } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [cashGiven, setCashGiven] = useState('');
+  // null = CHƯA NHẬP GÌ, khác hẳn số 0 (xem MoneyInput).
+  const [cashGiven, setCashGiven] = useState<number | null>(null);
   // Giảm giá (đồng) do thu ngân nhập khi thanh toán. Backend đã hỗ trợ đầy đủ từ
   // trước (validate, kẹp không vượt tạm tính, lưu vào orders.discount_amount) nhưng
   // màn hình chưa từng có ô nhập nào nên tính năng chưa chạy được lần nào.
@@ -517,7 +519,7 @@ export default function SalesPage() {
   const handlePayment = async () => {
     if (!selectedTable || cart.length === 0) return;
 
-    const cashReceived = paymentMethod === 'cash' ? Number(cashGiven.replace(/\D/g, '')) : 0;
+    const cashReceived = paymentMethod === 'cash' ? (cashGiven ?? 0) : 0;
     // Trả tiền mặt thì phải khai số khách đưa, và số đó phải đủ (backend cũng chặn 422).
     if (paymentMethod === 'cash' && chuaNhapTien) {
       showToast('Nhập số tiền khách đưa trước khi xác nhận.');
@@ -591,7 +593,7 @@ export default function SalesPage() {
       clearCartForTable(selectedTable.id);
       setSelectedTable(null);
       setPaymentModal(false);
-      setCashGiven('');
+      setCashGiven(null);
       setDiscountInput(0);
       setSuccessModal({
         code: invoiceCode,
@@ -611,11 +613,11 @@ export default function SalesPage() {
   // Tiền khách đưa và hai câu trả lời rút ra từ nó. `calcChange` KHÔNG trả số âm
   // (thu ngân đọc "-15.000" rồi đưa nhầm là chuyện có thật), nên việc "đưa thiếu"
   // phải hỏi bằng một cờ riêng chứ không dò dấu âm của tiền thối.
-  const cashGivenNumber = Number(cashGiven.replace(/\D/g, '')) || 0;
+  const cashGivenNumber = cashGiven ?? 0;
   const cashChange = calcChange(cashGivenNumber, cartTotal);
   // BỎ TRỐNG và ĐƯA THIẾU là hai chuyện khác nhau, phải nói khác nhau: ô trống mà báo
   // "chưa đủ 130.000" thì thu ngân tưởng mình gõ sai số, chứ không hiểu là chưa gõ gì.
-  const chuaNhapTien = cashGiven.trim() === '';
+  const chuaNhapTien = cashGiven === null;
   const thieuTien = !chuaNhapTien && cashGivenNumber < cartTotal;
   const conThieu = Math.max(0, cartTotal - cashGivenNumber);
   // Trước đây bỏ trống là đi lọt: chốt `cashReceived > 0` coi ô trống như "không khai
@@ -1025,13 +1027,11 @@ export default function SalesPage() {
 
           <div>
             <label className="label-funcafe">Giảm giá (đ)</label>
-            <input
-              type="text"
-              inputMode="numeric"
+            <MoneyInput
               className="input-funcafe"
               placeholder="0"
-              value={discountInput ? formatThousands(discountInput) : ''}
-              onChange={e => setDiscountInput(parseThousands(e.target.value))}
+              value={discountInput || null}
+              onChange={v => setDiscountInput(v ?? 0)}
             />
             {discountInput > baseSubtotal + toppingSubtotal && (
               <p className="text-sm text-gold-deep mt-1.5">
@@ -1064,15 +1064,13 @@ export default function SalesPage() {
                   tiền là trường hợp thường gặp nhất, một cú bấm xong. Không có nó thì
                   ràng buộc mới chỉ tổ bắt thu ngân gõ lại con số đang hiện trên màn hình. */}
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  inputMode="numeric"
+                <MoneyInput
                   className="input-funcafe flex-1"
                   placeholder="0"
-                  value={cashGiven === '' ? '' : formatThousands(cashGivenNumber)}
-                  onChange={e => setCashGiven(e.target.value.replace(/\D/g, ''))}
+                  value={cashGiven}
+                  onChange={setCashGiven}
                 />
-                <button type="button" onClick={() => setCashGiven(String(cartTotal))} className="btn-secondary shrink-0 px-3">Vừa đủ</button>
+                <button type="button" onClick={() => setCashGiven(cartTotal)} className="btn-secondary shrink-0 px-3">Vừa đủ</button>
               </div>
               {chuaNhapTien && <p className="text-sm text-cafe-500 mt-1.5">Nhập số tiền khách đưa, hoặc bấm <strong>Vừa đủ</strong>.</p>}
               {thieuTien && <p className="text-sm text-red-500 mt-1.5">Chưa đủ {formatCurrency(conThieu)}</p>}

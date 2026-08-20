@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
+import NumberInput from '@/components/ui/NumberInput';
+import MoneyInput from '@/components/ui/MoneyInput';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { packageService, timeSubscriptionService, donDongTinhNang } from '@/services';
 import { ApiError } from '@/lib/api-client';
@@ -289,10 +291,10 @@ export default function AdminPackagesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                 <div>
                   <label className="label-funcafe">Số bàn tối đa</label>
-                  <input type="number" min={1} className="input-funcafe" placeholder="Không giới hạn"
+                  <NumberInput min={1} className="input-funcafe" placeholder="Không giới hạn"
                     disabled={form.maxTables == null}
-                    value={form.maxTables ?? ''}
-                    onChange={e => setForm({ ...form, maxTables: e.target.value === '' ? null : Number(e.target.value) })} />
+                    value={form.maxTables ?? null}
+                    onChange={v => setForm({ ...form, maxTables: v })} />
                   <label className="flex items-center gap-1.5 text-xs text-cafe-600 mt-1.5 cursor-pointer">
                     <input type="checkbox" checked={form.maxTables == null}
                       onChange={e => setForm({ ...form, maxTables: e.target.checked ? null : 20 })} />
@@ -301,10 +303,10 @@ export default function AdminPackagesPage() {
                 </div>
                 <div>
                   <label className="label-funcafe">Số món tối đa</label>
-                  <input type="number" min={1} className="input-funcafe" placeholder="Không giới hạn"
+                  <NumberInput min={1} className="input-funcafe" placeholder="Không giới hạn"
                     disabled={form.maxMenuItems == null}
-                    value={form.maxMenuItems ?? ''}
-                    onChange={e => setForm({ ...form, maxMenuItems: e.target.value === '' ? null : Number(e.target.value) })} />
+                    value={form.maxMenuItems ?? null}
+                    onChange={v => setForm({ ...form, maxMenuItems: v })} />
                   <label className="flex items-center gap-1.5 text-xs text-cafe-600 mt-1.5 cursor-pointer">
                     <input type="checkbox" checked={form.maxMenuItems == null}
                       onChange={e => setForm({ ...form, maxMenuItems: e.target.checked ? null : 40 })} />
@@ -394,7 +396,7 @@ export default function AdminPackagesPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-funcafe">Giá trị</label>
-              <input type="number" min={1} className="input-funcafe" value={tsForm.duration_value} onChange={e => setTsForm({ ...tsForm, duration_value: Number(e.target.value) })} />
+              <NumberInput min={1} className="input-funcafe" value={tsForm.duration_value ?? null} onChange={v => setTsForm({ ...tsForm, duration_value: v ?? 1 })} />
             </div>
             <div>
               <label className="label-funcafe">Đơn vị</label>
@@ -406,7 +408,7 @@ export default function AdminPackagesPage() {
           </div>
           <div>
             <label className="label-funcafe">Giá (đ)</label>
-            <input type="number" min={0} className="input-funcafe" value={tsForm.price} onChange={e => setTsForm({ ...tsForm, price: Number(e.target.value) })} />
+            <MoneyInput min={0} className="input-funcafe" value={tsForm.price || null} onChange={v => setTsForm({ ...tsForm, price: v ?? 0 })} />
           </div>
           <label className="flex items-center gap-2 text-sm text-cafe-700 cursor-pointer">
             <input type="checkbox" checked={tsForm.status === 'active'} onChange={e => setTsForm({ ...tsForm, status: e.target.checked ? 'active' : 'inactive' })} />

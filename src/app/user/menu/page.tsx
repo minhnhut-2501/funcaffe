@@ -6,7 +6,8 @@ import LockedButton from '@/components/ui/LockedButton';
 import { useAuth } from '@/context/AuthContext';
 import { menuService, categoryService, toppingService } from '@/services';
 import { canManage, packageLimits } from '@/lib/permission';
-import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
+import MoneyInput from '@/components/ui/MoneyInput';
 import { generateId, compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ImageUpload from '@/components/ui/ImageUpload';
@@ -495,9 +496,9 @@ export default function MenuPage() {
             </div>
             <div>
               <label className="label-funcafe">Giá mặc định (đ)</label>
-              <input type="text" inputMode="numeric" className="input-funcafe" placeholder="0"
-                value={formatThousands(form.basePrice ?? 0)}
-                onChange={e => setForm({ ...form, basePrice: parseThousands(e.target.value) })} />
+              <MoneyInput className="input-funcafe" placeholder="0"
+                value={form.basePrice || null}
+                onChange={v => setForm({ ...form, basePrice: v ?? 0 })} />
             </div>
             <div className="col-span-2">
               <label className="label-funcafe">Ảnh món</label>
@@ -576,8 +577,8 @@ export default function MenuPage() {
                       <input className="input-funcafe" placeholder="Tên size (S / M / L)" value={sz.name} onChange={e => updateSize(idx, 'name', e.target.value)} />
                     </div>
                     <div className="w-28 shrink-0">
-                      <input type="text" inputMode="numeric" className="input-funcafe" placeholder="Giá (đ)"
-                        value={formatThousands(sz.price)} onChange={e => updateSize(idx, 'price', parseThousands(e.target.value))} />
+                      <MoneyInput className="input-funcafe" placeholder="Giá (đ)"
+                        value={sz.price || null} onChange={v => updateSize(idx, 'price', v ?? 0)} />
                     </div>
                     <label className="flex items-center gap-1 text-xs text-cafe-600 whitespace-nowrap shrink-0">
                       <input type="checkbox" checked={sz.isActive} onChange={e => updateSize(idx, 'isActive', e.target.checked)} />Bật

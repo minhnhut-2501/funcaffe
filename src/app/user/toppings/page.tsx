@@ -6,7 +6,8 @@ import LockedButton from '@/components/ui/LockedButton';
 import { useAuth } from '@/context/AuthContext';
 import { toppingService } from '@/services';
 import { canManage } from '@/lib/permission';
-import { formatCurrency, formatThousands, parseThousands } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
+import MoneyInput from '@/components/ui/MoneyInput';
 import { compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ImageUpload from '@/components/ui/ImageUpload';
@@ -170,8 +171,8 @@ export default function ToppingsPage() {
           </div>
           <div>
             <label className="label-funcafe">Giá (đ)</label>
-            <input type="text" inputMode="numeric" className="input-funcafe" placeholder="0"
-              value={formatThousands(form.price ?? 0)} onChange={e => setForm({ ...form, price: parseThousands(e.target.value) })} />
+            <MoneyInput className="input-funcafe" placeholder="0"
+              value={form.price || null} onChange={v => setForm({ ...form, price: v ?? 0 })} />
           </div>
           <div>
             <label className="label-funcafe">Ảnh topping</label>
