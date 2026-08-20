@@ -13,6 +13,15 @@ import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { isSubscriptionExpired } from '@/lib/permission';
+import Link from 'next/link';
+
+/**
+ * Mọi lệnh gọi API gói đều đi qua `cafes/{cafeId}/subscriptions`, nên chưa tạo quán là
+ * getCafeId() ném Error('NO_CAFE') — chuỗi đó lọt thẳng ra giao diện thì người dùng
+ * không hiểu gì. Chặn trước bằng thông báo tiếng Việt, và vẫn dịch lại ở nhánh catch
+ * phòng khi danh sách quán trong context chưa kịp cập nhật.
+ */
+const MSG_CHUA_CO_QUAN = 'Bạn chưa tạo quán nào. Hãy nhập thông tin quán trước, vì mỗi gói dịch vụ được đăng ký cho một quán cụ thể.';
 
 const durations: { value: DurationMonths; label: string }[] = [
   { value: 1, label: '1 tháng' },
@@ -44,11 +53,14 @@ type FlowAction = 'new' | 'renew' | 'upgrade' | null;
 type Tab = 'plans' | 'history';
 
 export default function SubscriptionPage() {
-  const { user, refreshUser, cafes, activeCafeId } = useAuth();
+  const { user, refreshUser, cafes, cafesError, activeCafeId } = useAuth();
   const { toast } = useToast();
   const pkg = user?.subscription.packageType ?? 'none';
   const sub = user?.subscription;
   const activeCafeName = cafes.find(c => c.id === activeCafeId)?.name ?? null;
+  // CHỈ khi danh sách quán tải THÀNH CÔNG mà rỗng — lượt gọi /cafes hỏng cũng cho ra
+  // mảng rỗng, tính luôn trường hợp đó thì chủ quán đang có quán lại bị chặn mua gói.
+  const chuaCoQuan = !cafesError && cafes.length === 0;
   const [tab, setTab] = useState<Tab>('plans');
   const [packages, setPackages] = useState<Package[]>([]);
   const [timeSubsMap, setTimeSubsMap] = useState<Record<string, TimeSubscription[]>>({});
@@ -148,6 +160,10 @@ export default function SubscriptionPage() {
 
   // Mở popup mua/nâng cấp/gia hạn cho một gói cụ thể.
   const openPackageModal = (p: Package) => {
+    if (chuaCoQuan) {
+      toast({ description: MSG_CHUA_CO_QUAN, variant: 'destructive' });
+      return;
+    }
     const action = actionFor(p);
     if (action === 'downgrade') {
       toast({
@@ -171,6 +187,10 @@ export default function SubscriptionPage() {
   };
 
   const openPayment = (action: FlowAction, pkgId?: string) => {
+    if (chuaCoQuan) {
+      toast({ description: MSG_CHUA_CO_QUAN, variant: 'destructive' });
+      return;
+    }
     setFlowAction(action);
     if (pkgId) setSelectedPkg(pkgId);
     else if (action === 'renew') {
@@ -202,7 +222,9 @@ export default function SubscriptionPage() {
       setPaymentModal(false);
       resetSelection();
     } catch (err: any) {
-      const msg = err?.message || err?.errors?.message || 'Thao tác thất bại, vui lòng thử lại';
+      const raw = err?.message || err?.errors?.message;
+      // 'NO_CAFE' là mã nội bộ của getCafeId(), không phải câu để đọc.
+      const msg = raw === 'NO_CAFE' ? MSG_CHUA_CO_QUAN : (raw || 'Thao tác thất bại, vui lòng thử lại');
       setSubmitError(msg); // hiện lỗi NGAY TRONG modal — toast có thể bị bỏ lỡ
       toast({ description: msg, variant: 'destructive' });
     } finally {
@@ -216,6 +238,21 @@ export default function SubscriptionPage() {
   return (
     <div className="max-w-6xl">
       <PageHeader title="Gói dịch vụ" description="Mỗi quán có gói riêng — bạn đang thao tác cho quán đang chọn" />
+
+      {/* Chưa có quán: nói trước lý do không mua được gói, kèm lối đi tạo quán.
+          Trang này được MIỄN TRỪ khỏi guard "chưa có quán -> /user/cafe" ở UserLayout
+          (để người dùng còn xem được bảng giá), nên chốt chặn phải nằm ngay tại đây. */}
+      {chuaCoQuan && (
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+          <p className="text-sm text-amber-900 flex-1">
+            <b>Chưa thể đăng ký gói.</b> {MSG_CHUA_CO_QUAN}
+          </p>
+          <Link href="/user/cafe" className="btn-primary inline-flex items-center justify-center gap-2 shrink-0">
+            <Store className="w-4 h-4" /> Tạo thông tin quán
+          </Link>
+        </div>
+      )}
 
       {/* Thẻ gói hiện tại — gộp tên quán + trạng thái + hành động + hoàn tiền vào một chỗ */}
       <div className="card-funcafe mb-6">
@@ -320,7 +357,9 @@ export default function SubscriptionPage() {
                     className={`relative rounded-2xl border bg-white shadow-soft p-5 transition-all flex flex-col ${
                       isBlocked
                         ? 'border-line opacity-60 cursor-not-allowed'
-                        : 'border-line hover:border-bean hover:-translate-y-0.5 hover:shadow-card cursor-pointer'
+                        : chuaCoQuan
+                          ? 'border-line opacity-60 cursor-pointer'
+                          : 'border-line hover:border-bean hover:-translate-y-0.5 hover:shadow-card cursor-pointer'
                     } ${isCurrent ? 'border-bean ring-1 ring-bean/30' : ''}`}>
                     {isCurrent && (
                       <span className="absolute -top-2.5 left-4 text-[11px] font-bold bg-bean text-white px-2.5 py-0.5 rounded-full">Gói hiện tại</span>
