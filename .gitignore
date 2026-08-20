@@ -78,3 +78,7 @@ backend/*.bat
 
 # Tep khoa cua Word khi dang mo tai lieu
 ~$*.docx
+
+# Tep du lieu Mongo xuat de gui cho may khac (scripts/xuat-mongo.mjs) — tu sinh lai duoc
+mongo-*.ndjson
+mongo-*.ndjson.gz

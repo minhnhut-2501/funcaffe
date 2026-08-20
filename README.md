@@ -124,6 +124,33 @@ node scripts/doi-chieu-doanh-thu.mjs  # doanh thu ở năm nơi phải ra cùng 
 
 Cả ba chỉ đọc, không tạo hay sửa bản ghi nào.
 
+### Chuyển dữ liệu MongoDB sang máy khác
+
+Dữ liệu **không nằm trong kho mã**. Máy mới có hai đường: gieo lại bằng `db:seed` +
+`DemoSeeder` (ở trên), hoặc chép nguyên trạng dữ liệu từ máy đang có:
+
+```bash
+# Máy nguồn — xuất ra một tệp rồi gửi qua Zalo/Drive
+node scripts/xuat-mongo.mjs                     # -> mongo-funcafe-<ngày>.ndjson.gz
+
+# Máy đích — nạp vào MongoDB của máy đó
+node scripts/nhap-mongo.mjs mongo-funcafe-<ngày>.ndjson.gz
+cd backend && php artisan db:indexes            # xóa collection là xóa luôn chỉ mục
+```
+
+Không cần cài MongoDB Database Tools (`mongodump`): hai lệnh này chỉ dùng driver
+`mongodb` đã có sẵn trong `npm install`.
+
+- Dữ liệu ghi bằng **Extended JSON canonical** nên `ObjectId` và ngày giữ nguyên kiểu.
+  Xuất bằng JSON thường thì ngày thành chuỗi, mọi thống kê theo khoảng ngày trả về rỗng
+  mà không báo lỗi dòng nào.
+- Token đăng nhập (`personal_access_tokens`) và các bảng kỹ thuật của Laravel bị **bỏ
+  qua**; thêm `--tat-ca` nếu muốn xuất đủ.
+- `nhap-mongo.mjs` **xóa sạch rồi nạp lại** đúng những collection có trong tệp, và hỏi
+  xác nhận trước khi làm. Trỏ sang CSDL khác cho an toàn: `--db=funcafe_thu`.
+- Cả hai đọc `MONGODB_DSN` / `MONGODB_DATABASE` trong `backend/.env`, ghi đè bằng
+  `--dsn=` / `--db=`.
+
 ## Kiểm thử
 
 **195 bài máy chủ** (PHPUnit) và **126 bài frontend** (Vitest), tập trung vào các quy tắc liên quan tới **tiền** và tới **quyền** — những chỗ sai sót không hiện ra trên giao diện:
