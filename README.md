@@ -151,6 +151,29 @@ Không cần cài MongoDB Database Tools (`mongodump`): hai lệnh này chỉ d�
 - Cả hai đọc `MONGODB_DSN` / `MONGODB_DATABASE` trong `backend/.env`, ghi đè bằng
   `--dsn=` / `--db=`.
 
+### Làm việc trên một máy khác
+
+Kho này **công khai**, nên khóa bí mật và dữ liệu không nằm trong đó. Máy mới cần ba
+bước, trong đó chỉ bước 2 là phải mang tay:
+
+```bash
+git clone https://github.com/minhnhut-2501/funcaffe.git && cd funcaffe
+node scripts/setup-may-moi.mjs        # kiểm tra môi trường + dựng những gì còn thiếu
+```
+
+1. **Môi trường** — lệnh trên tự lo: `npm install`, `composer install`, tạo `.env`,
+   `.env.local`, tệp SQLite, `migrate`, `db:indexes`, và gieo dữ liệu nếu CSDL trống.
+   Bước nào đã xong thì bỏ qua, nên chạy lại bao nhiêu lần cũng được. Chỉ muốn xem máy
+   thiếu gì mà không đụng vào máy: `--kiem-tra`.
+2. **Khóa bí mật** — chép `backend/.env` từ máy cũ qua USB hoặc điền tay các khóa
+   `VNPAY_*`, `MOMO_*`, `GEMINI_API_KEY`, `CLOUDINARY_URL`, `MAIL_*`. Thiếu chúng thì
+   hệ thống vẫn chạy, chỉ mất mua gói / trợ lý AI / gửi thư thật.
+3. **Dữ liệu** — gieo lại bằng `DemoSeeder`, hoặc mang tệp `mongo-*.ndjson.gz` xuất từ
+   máy cũ (mục ngay trên).
+
+Ghi chú dành cho Claude Code nằm ở [CLAUDE.md](CLAUDE.md) và **đi theo kho** — máy nào
+clone về cũng có, không phụ thuộc vào máy đã dùng trước đó.
+
 ## Kiểm thử
 
 **195 bài máy chủ** (PHPUnit) và **126 bài frontend** (Vitest), tập trung vào các quy tắc liên quan tới **tiền** và tới **quyền** — những chỗ sai sót không hiện ra trên giao diện:
