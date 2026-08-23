@@ -294,6 +294,41 @@ class OrderVnpayTest extends MongoTestCase
         ])->assertStatus(200)->assertJsonPath('status', 'paid');
     }
 
+    /**
+     * VNPay chỉ gọi MỘT địa chỉ IPN đã khai trong cổng thương nhân — đó là
+     * `payments/vnpay/ipn` (vốn của luồng mua gói). Nên chính tuyến ĐÓ phải nhận ra
+     * callback của đơn bán hàng và xử lý đúng.
+     *
+     * Đây là bài kiểm đắt giá nhất tệp này: thiếu nó, đơn thanh toán thật trên bản
+     * deploy trả tiền xong vẫn nằm ở 'active/pending' — đúng chuyện đã xảy ra ngày
+     * 24/08 khi chạy thử lần đầu trên Render.
+     */
+    public function test_IPN_chung_cua_VNPay_nhan_ra_va_chot_dung_don_ban_hang(): void
+    {
+        $id = $this->taoDon();
+        $ref = $this->xinLienKet($id)->json('txn_ref');
+        $du = $this->callbackVnpay(['vnp_TxnRef' => $ref]);
+
+        // Gọi vào tuyến CỦA LUỒNG MUA GÓI — đúng như VNPay thật sẽ làm.
+        $this->getJson('/api/payments/vnpay/ipn?' . http_build_query($du))
+            ->assertStatus(200)->assertJsonPath('RspCode', '00');
+
+        $don = Order::find($id);
+        $this->assertSame('paid', $don->status, 'Đơn phải được chốt qua tuyến IPN chung.');
+        $this->assertNotEmpty($don->invoice_code);
+    }
+
+    /** Và callback của MUA GÓI đi vào đúng nhánh cũ, không bị nhánh đơn hàng nuốt mất. */
+    public function test_IPN_chung_van_xu_ly_dung_callback_mua_goi(): void
+    {
+        $du = $this->callbackVnpay(['vnp_TxnRef' => 'TXN-20260824-0001']);
+
+        // Không có package_payment nào khớp -> nhánh mua gói trả '01', KHÔNG phải '00'.
+        // Nếu nhánh đơn hàng nuốt mất thì mã trả về sẽ khác.
+        $this->getJson('/api/payments/vnpay/ipn?' . http_build_query($du))
+            ->assertStatus(200)->assertJsonPath('RspCode', '01');
+    }
+
     // --- Trang khách quay về ----------------------------------------------------
 
     public function test_trang_quay_ve_khong_chot_don(): void

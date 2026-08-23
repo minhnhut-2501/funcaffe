@@ -142,6 +142,28 @@ class PaymentGatewayController extends Controller
     {
         $query = $request->query();
 
+        /*
+         * PHÂN LUỒNG NGAY Ở CỬA: VNPay chỉ gọi MỘT địa chỉ IPN duy nhất.
+         *
+         * Địa chỉ đó khai một lần trong cổng thương nhân, không gửi kèm từng giao dịch
+         * như `vnp_ReturnUrl`. Nghĩa là tuyến `payments/vnpay/order/ipn` mà mã nguồn có
+         * sẵn sẽ KHÔNG BAO GIỜ được VNPay gọi tới — mọi callback đều đổ vào đây.
+         *
+         * Đã trả giá để biết điều này: đơn bán hàng đầu tiên thanh toán thật trên bản
+         * deploy trả tiền xong mà vẫn nằm ở 'active/pending', vì callback rơi vào hàm
+         * này rồi không tìm thấy `package_payments` nào khớp mã.
+         *
+         * Hai luồng phân biệt được bằng tiền tố mã tham chiếu, không cần đoán:
+         *   - mua gói   : TXN-<ngày>-0001   (SubscriptionController)
+         *   - bán hàng  : OD<ymdHis><6 ký tự> (OrderPaymentController)
+         *
+         * Tuyến `/order/ipn` vẫn giữ: nó là nơi logic thật nằm, và gọi thẳng được khi
+         * cần thử tay hoặc khi VNPay cho khai nhiều địa chỉ về sau.
+         */
+        if (str_starts_with((string) ($query['vnp_TxnRef'] ?? ''), 'OD')) {
+            return $this->vnpayOrderIpn($request);
+        }
+
         if (!$this->vnpay->validateSignature($query)) {
             return response()->json(['RspCode' => '97', 'Message' => 'Invalid signature']);
         }
