@@ -40,7 +40,7 @@ trait EnforcesPackageLimits
 
     /**
      * Ném lỗi 422 khi thao tác tạo mới vượt giới hạn của gói.
-     * $resource: 'tables' | 'products'.
+     * $resource: 'tables' | 'products' | 'staff'.
      */
     protected function enforcePackageLimit(Shop $shop, string $resource, int $currentCount): void
     {
@@ -50,14 +50,22 @@ trait EnforcesPackageLimits
             return; // chưa có gói active — không thuộc phạm vi giới hạn số lượng
         }
 
-        $max = $resource === 'tables' ? $pkg->max_tables : $pkg->max_menu_items;
+        $max = match ($resource) {
+            'tables' => $pkg->max_tables,
+            'staff'  => $pkg->max_staff,
+            default  => $pkg->max_menu_items,
+        };
 
         if ($max === null) {
             return; // không giới hạn
         }
 
         if ($currentCount >= $max) {
-            $label = $resource === 'tables' ? 'bàn' : 'món';
+            $label = match ($resource) {
+                'tables' => 'bàn',
+                'staff'  => 'tài khoản nhân viên',
+                default  => 'món',
+            };
             throw new HttpResponseException(response()->json([
                 'message' => "Gói {$pkg->name} chỉ cho phép tối đa {$max} {$label}. Nâng cấp gói để dùng nhiều hơn.",
             ], 422));

@@ -39,7 +39,7 @@ class SyncPackageCatalog extends Command
     /** Chỉ những trường thuộc về ĐỊNH NGHĨA gói. Không đụng gì khác trong tài liệu. */
     private const TRUONG_GOI = [
         'name', 'type', 'level', 'is_trial', 'description',
-        'features', 'max_tables', 'max_menu_items', 'can_use_ai',
+        'features', 'max_tables', 'max_menu_items', 'max_staff', 'can_use_ai',
     ];
 
     private const TRUONG_THOI_HAN = [

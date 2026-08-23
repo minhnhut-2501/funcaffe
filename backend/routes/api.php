@@ -44,7 +44,7 @@ Route::get('reviews', [ReviewController::class, 'publicReviews']);
 // tài khoản bất kỳ đốt hết hạn mức miễn phí, làm hỏng ảnh của MỌI quán khác.
 // 30/phút vẫn thoải mái cho thao tác thật (thêm ảnh cho cả thực đơn một lượt).
 Route::post('/upload', [\App\Http\Controllers\UploadController::class, 'store'])
-    ->middleware(['auth:sanctum', 'throttle:30,1']);
+    ->middleware(['auth:sanctum', 'chu-quan', 'throttle:30,1']);
 
 // Contact (public) — PHẢI có throttle: endpoint này ghi thẳng vào CSDL, không cần
 // đăng nhập và không có captcha. Không giới hạn thì một script đơn giản đủ để lấp
@@ -71,21 +71,26 @@ Route::middleware('throttle:ai-tu-van')->group(function () {
 // KHÔNG có route xóa quán: xóa một quán sẽ bỏ rơi toàn bộ bàn, thực đơn, hóa đơn
 // và gói đã mua của quán đó (Mongo không cascade). Chủ quán chỉ đổi
 // shops.status: open (đang mở cửa) / closed (đã đóng cửa) / inactive (ngừng hoạt động).
-Route::apiResource('shops', ShopController::class)->except('destroy')->middleware('auth:sanctum');
+// `chu-quan` cho store/update: nhân viên không tạo quán mới và không sửa quán.
+// `index`/`show` KHÔNG chặn — màn Bán hàng cần đọc thông tin quán (tên, tài khoản
+// nhận tiền VietQR) để in hóa đơn và dựng mã QR.
+Route::apiResource('shops', ShopController::class)->except('destroy')
+    ->middleware('auth:sanctum')
+    ->middlewareFor(['store', 'update'], 'chu-quan');
 
 // Shop-scoped resources (read allowed without subscription, write requires subscription)
 Route::middleware('auth:sanctum')->group(function () {
     // Categories - CRUD
     Route::get('shops/{shop}/categories', [CategoryController::class, 'index']);
-    Route::post('shops/{shop}/categories', [CategoryController::class, 'store'])->middleware('subscription');
-    Route::put('shops/{shop}/categories/{category}', [CategoryController::class, 'update'])->middleware('subscription');
+    Route::post('shops/{shop}/categories', [CategoryController::class, 'store'])->middleware(['subscription', 'chu-quan']);
+    Route::put('shops/{shop}/categories/{category}', [CategoryController::class, 'update'])->middleware(['subscription', 'chu-quan']);
     // KHÔNG có route xóa danh mục: xóa sẽ bỏ rơi các món bên trong (mồ côi
     // danh mục) — chủ quán chỉ ẨN danh mục (is_active = false).
 
     // Items - CRUD
     Route::get('shops/{shop}/products', [ProductController::class, 'index']);
-    Route::post('shops/{shop}/products', [ProductController::class, 'store'])->middleware('subscription');
-    Route::put('shops/{shop}/products/{product}', [ProductController::class, 'update'])->middleware('subscription');
+    Route::post('shops/{shop}/products', [ProductController::class, 'store'])->middleware(['subscription', 'chu-quan']);
+    Route::put('shops/{shop}/products/{product}', [ProductController::class, 'update'])->middleware(['subscription', 'chu-quan']);
     // KHÔNG có route xóa món: món đã bán nằm trong order/hóa đơn cũ,
     // chủ quán chỉ được ẨN món (is_available = false) thay vì xóa.
     // KHÔNG có route cấu hình topping riêng cho món: topping đi kèm trường
@@ -93,17 +98,25 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Toppings - CRUD
     Route::get('shops/{shop}/toppings', [ToppingController::class, 'index']);
-    Route::post('shops/{shop}/toppings', [ToppingController::class, 'store'])->middleware('subscription');
-    Route::put('shops/{shop}/toppings/{topping}', [ToppingController::class, 'update'])->middleware('subscription');
+    Route::post('shops/{shop}/toppings', [ToppingController::class, 'store'])->middleware(['subscription', 'chu-quan']);
+    Route::put('shops/{shop}/toppings/{topping}', [ToppingController::class, 'update'])->middleware(['subscription', 'chu-quan']);
     // KHÔNG có route xóa topping: topping từng bán nằm trong hóa đơn cũ và
     // cấu hình gắn món — chủ quán chỉ ẨN topping (is_available = false).
 
     // Tables - CRUD
     Route::get('shops/{shop}/tables', [TableController::class, 'index']);
-    Route::post('shops/{shop}/tables', [TableController::class, 'store'])->middleware('subscription');
-    Route::put('shops/{shop}/tables/{table}', [TableController::class, 'update'])->middleware('subscription');
+    Route::post('shops/{shop}/tables', [TableController::class, 'store'])->middleware(['subscription', 'chu-quan']);
+    Route::put('shops/{shop}/tables/{table}', [TableController::class, 'update'])->middleware(['subscription', 'chu-quan']);
 
     // Orders - create/pay requires subscription
+    // Tuyến quản lý NHÂN VIÊN — chỉ chủ quán.
+    Route::get('shops/{shop}/staff', [\App\Http\Controllers\StaffController::class, 'index'])->middleware('chu-quan');
+    Route::post('shops/{shop}/staff', [\App\Http\Controllers\StaffController::class, 'store'])->middleware(['subscription', 'chu-quan']);
+    Route::put('shops/{shop}/staff/{staff}', [\App\Http\Controllers\StaffController::class, 'update'])->middleware(['subscription', 'chu-quan']);
+    Route::put('shops/{shop}/staff/{staff}/password', [\App\Http\Controllers\StaffController::class, 'doiMatKhau'])->middleware(['subscription', 'chu-quan']);
+    // KHÔNG có route xóa nhân viên: người đã bán hàng nằm trong orders.created_by,
+    // xóa là hóa đơn cũ mất tên người thu. Chủ quán chỉ KHÓA (update status=locked).
+
     Route::get('shops/{shop}/orders', [OrderController::class, 'index']);
     Route::post('shops/{shop}/orders', [OrderController::class, 'store'])->middleware('subscription');
     Route::get('shops/{shop}/orders/{order}', [OrderController::class, 'show']);
@@ -119,21 +132,25 @@ Route::middleware('auth:sanctum')->group(function () {
     // Đánh giá là về PHẦN MỀM, mỗi tài khoản một cái — nên route đọc "của tôi" KHÔNG
     // đi qua {shop}. Frontend hỏi theo quán thì đổi sang quán chưa đánh giá sẽ tưởng
     // là chưa từng viết và mời viết lại.
-    Route::get('reviews/mine', [ReviewController::class, 'mine']);
-    Route::get('shops/{shop}/reviews', [ReviewController::class, 'index']);
-    Route::post('shops/{shop}/reviews', [ReviewController::class, 'store'])->middleware('subscription');
+    // Đánh giá là ý kiến về PHẦN MỀM FunCafe — chuyện của người mua gói, không phải
+    // của nhân viên đứng quầy.
+    Route::get('reviews/mine', [ReviewController::class, 'mine'])->middleware('chu-quan');
+    Route::get('shops/{shop}/reviews', [ReviewController::class, 'index'])->middleware('chu-quan');
+    Route::post('shops/{shop}/reviews', [ReviewController::class, 'store'])->middleware(['subscription', 'chu-quan']);
 
     // Trợ lý AI (chỉ gói bật can_use_ai — middleware 'ai'; throttle chống đốt credit)
+    // Trợ lý AI đọc doanh thu, thực đơn, tình hình bàn của cả quán — nhân viên không
+    // được hỏi nó, cùng lý do với việc không cho xem trang Doanh thu.
     Route::post('shops/{shop}/ai/chat', [AiController::class, 'chat'])
-        ->middleware(['ai', 'throttle:20,1']);
+        ->middleware(['ai', 'chu-quan', 'throttle:20,1']);
     Route::post('shops/{shop}/ai/chat/stream', [AiController::class, 'chatStream'])
-        ->middleware(['ai', 'throttle:20,1']);
+        ->middleware(['ai', 'chu-quan', 'throttle:20,1']);
     Route::post('shops/{shop}/ai/revenue-analysis', [AiController::class, 'revenueAnalysis'])
-        ->middleware(['ai', 'throttle:10,1']);
+        ->middleware(['ai', 'chu-quan', 'throttle:10,1']);
     // Câu gợi ý mở đầu cho chat — chỉ đếm dữ liệu của quán, KHÔNG gọi Gemini,
     // nên throttle rộng tay hơn các endpoint đốt credit ở trên.
     Route::get('shops/{shop}/ai/suggestions', [AiController::class, 'suggestions'])
-        ->middleware(['ai', 'throttle:60,1']);
+        ->middleware(['ai', 'chu-quan', 'throttle:60,1']);
 });
 
 // Packages & Time Subscriptions
@@ -154,7 +171,14 @@ Route::get('payments/momo/return', [\App\Http\Controllers\PaymentGatewayControll
 Route::post('payments/momo/ipn', [\App\Http\Controllers\PaymentGatewayController::class, 'momoIpn']);
 
 // Subscriptions — ĐA QUÁN: gói/thanh toán độc lập theo từng quán (shops/{shop}/...)
-Route::middleware('auth:sanctum')->group(function () {
+/*
+ * GÓI DỊCH VỤ VÀ DOANH THU — CẤM NHÂN VIÊN, không có ngoại lệ.
+ *
+ * `shops/{shop}/subscriptions` (POST) là chỗ nguy hiểm nhất trong toàn hệ thống với
+ * tài khoản nhân viên: nó TẠO GIAO DỊCH MUA GÓI. Sót nó là nhân viên tiêu tiền của
+ * chủ quán. Doanh thu thì là số liệu kinh doanh, không phải việc của người đứng quầy.
+ */
+Route::middleware(['auth:sanctum', 'chu-quan'])->group(function () {
     Route::get('shops/{shop}/subscriptions', [SubscriptionController::class, 'index']);
     Route::get('shops/{shop}/subscriptions/active', [SubscriptionController::class, 'active']);
     Route::get('shops/{shop}/subscriptions/payments', [SubscriptionController::class, 'payments']);

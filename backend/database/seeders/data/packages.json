@@ -1,29 +1,39 @@
 [
   {
-    "_id": { "$oid": "6a3e50c13a064fb807035542" },
+    "_id": {
+      "$oid": "6a3e50c13a064fb807035542"
+    },
     "name": "Fun Free",
     "type": "free",
     "level": 0,
     "is_trial": true,
-    "description": "Dùng thử toàn bộ tính năng Pro Max trong 7 ngày (1 lần/tài khoản)",
+    "description": "Dùng thử gói Pro trong 7 ngày, có kèm trợ lý AI (1 lần/tài khoản)",
     "features": [
-      "Trải nghiệm TOÀN BỘ tính năng Pro Max trong 7 ngày",
-      "Không giới hạn bàn & thực đơn",
+      "Trải nghiệm gói Pro trong 7 ngày",
+      "Tối đa 20 bàn & 40 món",
       "Trợ lý AI & phân tích doanh thu tự động",
+      "Tối đa 2 tài khoản nhân viên",
       "Quản lý size & topping",
-      "Bán hàng theo bàn, order & hóa đơn",
+      "Bán tại quán, mang về, order & hóa đơn",
       "Thống kê & biểu đồ doanh thu",
       "Chỉ dùng thử 1 lần / tài khoản"
     ],
-    "max_tables": null,
-    "max_menu_items": null,
+    "max_tables": 20,
+    "max_menu_items": 40,
     "can_use_ai": true,
     "status": "active",
-    "created_at": { "$date": "2026-01-01T00:00:00Z" },
-    "updated_at": { "$date": "2026-01-01T00:00:00Z" }
+    "created_at": {
+      "$date": "2026-01-01T00:00:00Z"
+    },
+    "updated_at": {
+      "$date": "2026-01-01T00:00:00Z"
+    },
+    "max_staff": 2
   },
   {
-    "_id": { "$oid": "6a3e50c13a064fb807035543" },
+    "_id": {
+      "$oid": "6a3e50c13a064fb807035543"
+    },
     "name": "Pro",
     "type": "pro",
     "level": 1,
@@ -33,8 +43,10 @@
       "Quản lý thông tin quán",
       "Tối đa 20 bàn",
       "Thực đơn tối đa 40 món",
+      "Tối đa 2 tài khoản nhân viên",
       "Quản lý size & topping",
-      "Bán hàng theo bàn",
+      "Bán tại quán và mang về",
+      "Thanh toán tiền mặt, VietQR, VNPay",
       "Quản lý order & hóa đơn",
       "In hóa đơn",
       "Thống kê & biểu đồ doanh thu"
@@ -43,11 +55,18 @@
     "max_menu_items": 40,
     "can_use_ai": false,
     "status": "active",
-    "created_at": { "$date": "2026-01-01T00:00:00Z" },
-    "updated_at": { "$date": "2026-01-01T00:00:00Z" }
+    "created_at": {
+      "$date": "2026-01-01T00:00:00Z"
+    },
+    "updated_at": {
+      "$date": "2026-01-01T00:00:00Z"
+    },
+    "max_staff": 2
   },
   {
-    "_id": { "$oid": "6a3e50c13a064fb807035544" },
+    "_id": {
+      "$oid": "6a3e50c13a064fb807035544"
+    },
     "name": "Pro Max",
     "type": "promax",
     "level": 2,
@@ -56,6 +75,7 @@
     "features": [
       "Toàn bộ chức năng gói Pro",
       "Không giới hạn bàn & thực đơn",
+      "Không giới hạn tài khoản nhân viên",
       "Thống kê doanh thu chi tiết",
       "Top món bán chạy & báo cáo",
       "Trợ lý AI & phân tích doanh thu tự động"
@@ -64,7 +84,12 @@
     "max_menu_items": null,
     "can_use_ai": true,
     "status": "active",
-    "created_at": { "$date": "2026-01-01T00:00:00Z" },
-    "updated_at": { "$date": "2026-01-01T00:00:00Z" }
+    "created_at": {
+      "$date": "2026-01-01T00:00:00Z"
+    },
+    "updated_at": {
+      "$date": "2026-01-01T00:00:00Z"
+    },
+    "max_staff": null
   }
 ]

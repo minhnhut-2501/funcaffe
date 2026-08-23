@@ -12,7 +12,7 @@ class Package extends Model
         'name', 'type',
         'is_trial', 'description',
         'features', 'status', 'level',
-        'max_tables', 'max_menu_items', 'can_use_ai',
+        'max_tables', 'max_menu_items', 'max_staff', 'can_use_ai',
     ];
 
     protected $casts = [
@@ -26,6 +26,7 @@ class Package extends Model
         'level' => 'integer',
         'max_tables' => 'integer',
         'max_menu_items' => 'integer',
+        'max_staff' => 'integer',
         'can_use_ai' => 'boolean',
     ];
 

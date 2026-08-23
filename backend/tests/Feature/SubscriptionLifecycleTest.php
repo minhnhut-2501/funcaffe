@@ -525,6 +525,11 @@ class SubscriptionLifecycleTest extends MongoTestCase
             '{product}'  => (string) \App\Models\Product::create(['shop_id' => (string) $this->shop->id, 'name' => 'Món', 'base_price' => 1000, 'is_available' => true])->id,
             '{topping}'  => (string) \App\Models\Topping::create(['shop_id' => (string) $this->shop->id, 'name' => 'Top', 'price' => 1000, 'is_available' => true])->id,
             '{table}'    => (string) $this->shop->tables()->create(['name' => 'Bàn 1', 'capacity' => 2, 'status' => 'empty'])->id,
+            '{staff}'    => (string) \App\Models\User::create([
+                'full_name' => 'NV kiểm thử', 'email' => 'nv-' . uniqid() . '@funcafe.test',
+                'password' => 'khong-dung-toi', 'role' => 'staff', 'status' => 'active',
+                'shop_id' => (string) $this->shop->id,
+            ])->id,
             '{order}'    => (string) \App\Models\Order::create(['shop_id' => (string) $this->shop->id, 'code' => 'ORD-X', 'status' => 'active', 'subtotal' => 0, 'total_amount' => 0])->id,
         ];
 

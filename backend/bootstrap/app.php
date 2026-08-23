@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'subscription' => \App\Http\Middleware\CheckSubscription::class,
             'ai' => \App\Http\Middleware\RequiresAI::class,
+            // Chặn tài khoản NHÂN VIÊN. Gắn vào mọi tuyến không phải bán hàng.
+            'chu-quan' => \App\Http\Middleware\OwnerOnly::class,
         ]);
 
         $middleware->statefulApi();

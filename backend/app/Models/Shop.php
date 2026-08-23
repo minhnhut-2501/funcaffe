@@ -25,6 +25,18 @@ class Shop extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Nhân viên làm việc tại quán này (`users.shop_id`).
+     *
+     * KHÁC HẲN `user()` ở trên — đó là CHỦ quán. Hai quan hệ này trỏ ngược nhau giữa
+     * `users` và `shops`, nhưng chúng mang hai nghĩa khác nhau chứ không phải vòng lặp:
+     * `shops.user_id` = ai sở hữu, `users.shop_id` = làm việc ở đâu.
+     */
+    public function staff()
+    {
+        return $this->hasMany(User::class, 'shop_id');
+    }
+
     public function subscriptions()
     {
         return $this->hasMany(Subscription::class, 'shop_id');
