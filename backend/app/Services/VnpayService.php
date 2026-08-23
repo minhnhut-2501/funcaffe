@@ -15,8 +15,13 @@ class VnpayService
      * @param int    $amountVnd Số tiền (VND, chưa nhân 100)
      * @param string $orderInfo Mô tả đơn hàng (không dấu)
      * @param string $ipAddr    IP người dùng
+     * @param ?string $returnUrl Nơi VNPay đưa khách quay về. Bỏ trống = trang kết quả
+     *                           mua GÓI (mặc định trong config). Luồng thu tiền BÁN
+     *                           HÀNG phải truyền đường riêng: khách quét mã bằng điện
+     *                           thoại của họ, quay về trang mua gói thì vừa vô nghĩa
+     *                           vừa lộ khu vực quản trị của chủ quán.
      */
-    public function buildPaymentUrl(string $txnRef, int $amountVnd, string $orderInfo, string $ipAddr): string
+    public function buildPaymentUrl(string $txnRef, int $amountVnd, string $orderInfo, string $ipAddr, ?string $returnUrl = null): string
     {
         $cfg = config('services.vnpay');
 
@@ -30,7 +35,7 @@ class VnpayService
             'vnp_OrderInfo' => $orderInfo,
             'vnp_OrderType' => 'other',
             'vnp_Locale'    => 'vn',
-            'vnp_ReturnUrl' => $cfg['return_url'],
+            'vnp_ReturnUrl' => $returnUrl ?: $cfg['return_url'],
             'vnp_IpAddr'    => $ipAddr ?: '127.0.0.1',
             'vnp_CreateDate' => now()->format('YmdHis'),
         ];

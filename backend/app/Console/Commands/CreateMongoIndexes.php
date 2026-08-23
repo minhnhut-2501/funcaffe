@@ -56,6 +56,20 @@ class CreateMongoIndexes extends Command
                     'partialFilterExpression' => ['invoice_code' => ['$type' => 'string']],
                 ],
             ],
+            [
+                // IPN của VNPay tra đơn theo mã này — không có chỉ mục thì mỗi lượt
+                // callback là một lượt quét toàn bộ lịch sử bán hàng.
+                //
+                // Duy nhất, và cũng phải partial vì cùng lý do với invoice_code: đơn
+                // trả tiền mặt không có trường này. KHÔNG kèm shop_id vào khóa —
+                // callback từ VNPay chỉ mang mã tham chiếu, không biết quán nào.
+                'keys' => ['gateway_txn_ref' => 1],
+                'options' => [
+                    'unique' => true,
+                    'name' => 'uniq_gateway_txn_ref',
+                    'partialFilterExpression' => ['gateway_txn_ref' => ['$type' => 'string']],
+                ],
+            ],
         ],
         'order_details' => [
             ['keys' => ['order_id' => 1]],

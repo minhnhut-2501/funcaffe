@@ -110,6 +110,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('shops/{shop}/orders/{order}', [OrderController::class, 'update'])->middleware('subscription');
     Route::post('shops/{shop}/orders/{order}/pay', [OrderController::class, 'pay'])->middleware('subscription');
     Route::post('shops/{shop}/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('subscription');
+    // Dựng liên kết VNPay cho một đơn để khách quét mã trả tiền. Đơn được CHỐT ở
+    // tuyến IPN công khai bên dưới, không phải ở đây.
+    Route::post('shops/{shop}/orders/{order}/vnpay', [\App\Http\Controllers\OrderPaymentController::class, 'taoLienKetVnpay'])
+        ->middleware('subscription');
 
     // Reviews
     // Đánh giá là về PHẦN MỀM, mỗi tài khoản một cái — nên route đọc "của tôi" KHÔNG
@@ -139,6 +143,12 @@ Route::get('packages/{package}/time-subscriptions', [TimeSubscriptionController:
 // Cổng thanh toán (public - cổng/trình duyệt gọi không kèm token)
 Route::get('payments/vnpay/return', [\App\Http\Controllers\PaymentGatewayController::class, 'vnpayReturn']);
 Route::get('payments/vnpay/ipn', [\App\Http\Controllers\PaymentGatewayController::class, 'vnpayIpn']);
+// Thu tiền BÁN HÀNG qua VNPay (khách trả cho chủ quán) — ĐƯỜNG RIÊNG, không dùng
+// chung với hai tuyến mua gói ở trên. Luồng mua gói đã chạy ổn qua nhiều lượt thật;
+// nhét thêm nhánh vào đó là đem thứ đang tốt ra đánh cược.
+Route::get('payments/vnpay/order/return', [\App\Http\Controllers\PaymentGatewayController::class, 'vnpayOrderReturn']);
+Route::get('payments/vnpay/order/ipn', [\App\Http\Controllers\PaymentGatewayController::class, 'vnpayOrderIpn']);
+
 // MoMo: IPN là POST với thân JSON, không phải GET như VNPay.
 Route::get('payments/momo/return', [\App\Http\Controllers\PaymentGatewayController::class, 'momoReturn']);
 Route::post('payments/momo/ipn', [\App\Http\Controllers\PaymentGatewayController::class, 'momoIpn']);

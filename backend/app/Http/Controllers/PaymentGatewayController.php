@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\RunsAtomically;
+use App\Http\Controllers\Concerns\ChotDonHang;
+use App\Models\Order;
 use App\Models\PackagePayment;
+use App\Models\Shop;
 use App\Services\MomoService;
 use App\Services\SubscriptionActivator;
 use App\Services\VnpayService;
@@ -17,6 +20,7 @@ use Illuminate\Support\Facades\Log;
 class PaymentGatewayController extends Controller
 {
     use RunsAtomically;
+    use ChotDonHang;
 
     public function __construct(
         private VnpayService $vnpay,
@@ -270,5 +274,110 @@ class PaymentGatewayController extends Controller
         }
 
         return response()->noContent();
+    }
+
+    // =========================================================================
+    // THU TIỀN BÁN HÀNG (khách trả tiền cho chủ quán) — KHÁC luồng mua gói ở trên.
+    //
+    // Ở trên là CHỦ QUÁN trả tiền cho FunCafe, ghi vào `package_payments` và kích
+    // hoạt gói. Dưới đây là KHÁCH trả tiền cho chủ quán, ghi vào `orders` và chốt
+    // hóa đơn. Hai luồng dùng chung `VnpayService` để ký nhưng đi tuyến riêng hoàn
+    // toàn — luồng mua gói đã chạy ổn qua nhiều lượt thật, không đụng vào.
+    // =========================================================================
+
+    /**
+     * Khách quay về sau khi trả tiền trên điện thoại của họ.
+     *
+     * KHÔNG chốt đơn ở đây. Return URL do TRÌNH DUYỆT KHÁCH gọi nên có thể không bao
+     * giờ tới (khách tắt tab, mất mạng), và ai cũng gọi được nó. Việc chốt đơn nằm ở
+     * IPN — đường server-to-server có chữ ký. Chỗ này chỉ hiện một trang cảm ơn.
+     */
+    public function vnpayOrderReturn(Request $request)
+    {
+        $query = $request->query();
+        $ok = $this->vnpay->validateSignature($query) && ($query['vnp_ResponseCode'] ?? null) === '00';
+
+        $tieuDe = $ok ? 'Thanh toán thành công' : 'Thanh toán chưa hoàn tất';
+        $loi    = $ok
+            ? 'Cảm ơn bạn. Vui lòng quay lại quầy để nhận đồ và hóa đơn.'
+            : 'Giao dịch chưa hoàn tất. Vui lòng báo nhân viên tại quầy.';
+        $mau    = $ok ? '#0F7B4F' : '#B4341C';
+
+        // Trang tĩnh, không phụ thuộc frontend: khách đang mở trên điện thoại của họ,
+        // đưa họ vào khu vực quản trị của chủ quán là vừa vô nghĩa vừa không nên.
+        return response(
+            '<!doctype html><html lang="vi"><head><meta charset="utf-8">'
+            . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            . '<title>' . $tieuDe . '</title></head>'
+            . '<body style="font-family:system-ui,-apple-system,sans-serif;display:grid;'
+            . 'place-items:center;min-height:100vh;margin:0;background:#FAF7F2;text-align:center;padding:24px">'
+            . '<div><h1 style="color:' . $mau . ';font-size:22px;margin:0 0 12px">' . $tieuDe . '</h1>'
+            . '<p style="color:#4A4A4A;font-size:15px;line-height:1.6;margin:0">' . $loi . '</p></div>'
+            . '</body></html>',
+            200,
+            ['Content-Type' => 'text/html; charset=UTF-8'],
+        );
+    }
+
+    /**
+     * IPN cho đơn BÁN HÀNG (server-to-server). Đây mới là nơi đơn được chốt.
+     *
+     * Trả JSON theo đúng chuẩn VNPay: `RspCode` '00' nghĩa là "đã nhận và xử lý xong",
+     * mã khác thì VNPay sẽ gọi lại. Nói '00' cho một giao dịch mình chưa ghi nhận được
+     * là mất tiền của khách mà không có hóa đơn.
+     */
+    public function vnpayOrderIpn(Request $request)
+    {
+        $query = $request->query();
+
+        if (!$this->vnpay->validateSignature($query)) {
+            return response()->json(['RspCode' => '97', 'Message' => 'Invalid signature']);
+        }
+
+        $order = Order::where('gateway_txn_ref', $query['vnp_TxnRef'] ?? '')->first();
+        if (!$order) {
+            return response()->json(['RspCode' => '01', 'Message' => 'Order not found']);
+        }
+
+        // Số tiền phải khớp (VNPay gửi vnp_Amount đã nhân 100). Không kiểm là mở đường
+        // cho việc trả 1.000đ rồi được chốt một hóa đơn 500.000đ.
+        $canThu = (int) round(max(0, (int) $order->subtotal - (int) ($order->discount_amount ?? 0)));
+        if ((int) ($query['vnp_Amount'] ?? -1) !== $canThu * 100) {
+            return response()->json(['RspCode' => '04', 'Message' => 'Invalid amount']);
+        }
+
+        if (($query['vnp_ResponseCode'] ?? null) !== '00') {
+            // Khách hủy hoặc trả hỏng: đơn quay về chờ, thu ngân đổi cách thu khác.
+            // KHÔNG hủy đơn — món đã pha rồi, khách vẫn đứng đó.
+            $order->update(['payment_status' => 'failed']);
+            return response()->json(['RspCode' => '00', 'Message' => 'Confirmed']);
+        }
+
+        $shop = Shop::find($order->shop_id);
+        if (!$shop) {
+            Log::error('[thanh-toan] IPN đơn bán hàng: không tìm thấy quán của đơn', [
+                'order_id' => (string) $order->id, 'shop_id' => (string) $order->shop_id,
+            ]);
+            return response()->json(['RspCode' => '01', 'Message' => 'Shop not found']);
+        }
+
+        $maPhieu = $this->chotDon($shop, $order, [
+            'payment_method' => 'vnpay',
+            'discount'       => (int) ($order->discount_amount ?? 0),
+            'total'          => $canThu,
+            'cash_received'  => null,
+            'change_amount'  => null,
+            // Thu qua cổng thì KHÔNG có thu ngân nào cầm tiền — để trống thay vì gán
+            // bừa cho chủ quán, không thì báo cáo đối ca đổ nhầm doanh số cho họ.
+            'paid_by'        => null,
+        ]);
+
+        if ($maPhieu === null) {
+            // Đơn đã chốt trước đó (IPN gọi hai lần là chuyện bình thường của VNPay).
+            // Vẫn báo '00': đã xử lý xong, đừng gọi lại nữa.
+            return response()->json(['RspCode' => '00', 'Message' => 'Confirmed']);
+        }
+
+        return response()->json(['RspCode' => '00', 'Message' => 'Confirmed']);
     }
 }
