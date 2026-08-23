@@ -104,16 +104,41 @@ class RenameSchemaToShopProduct extends Command
                 $this->line("  bỏ qua   {$cu} (không có trong CSDL này)");
                 continue;
             }
+            $soLuongCu = $db->selectCollection($cu)->countDocuments();
+
             if ($coMoi) {
-                // Cả hai cùng tồn tại: KHÔNG tự ý gộp. Đây là dấu hiệu ai đó đã nạp
-                // dữ liệu mới đè lên nửa chừng — đoán bừa ở đây là mất dữ liệu.
-                $this->error("  DỪNG    {$cu} và {$moi} cùng tồn tại. Phải xử lý tay rồi chạy lại.");
-                return self::FAILURE;
+                $soMoi = $db->selectCollection($moi)->countDocuments();
+
+                if ($soMoi > 0) {
+                    // Cả hai cùng có DỮ LIỆU: KHÔNG tự ý gộp. Đây là dấu hiệu ai đó đã
+                    // nạp dữ liệu mới đè lên nửa chừng — đoán bừa ở đây là mất dữ liệu.
+                    $this->error("  DỪNG    {$cu} ({$soLuongCu} doc) và {$moi} ({$soMoi} doc) cùng có dữ liệu. Phải xử lý tay rồi chạy lại.");
+                    return self::FAILURE;
+                }
+
+                /*
+                 * Đích tồn tại nhưng RỖNG -> nó không phải dữ liệu, mà là cái vỏ do
+                 * `db:indexes` đẻ ra. Xóa đi rồi đổi tên như thường.
+                 *
+                 * Vì sao gặp: Dockerfile chạy `db:indexes` mỗi lần khởi động. Khi mã mới
+                 * lên Render TRƯỚC lúc dữ liệu được đổi tên, lệnh đó tạo chỉ mục cho
+                 * `shops`/`products`/... — mà tạo chỉ mục trên collection chưa có thì
+                 * MongoDB tự sinh ra collection rỗng. Thế là đúng thứ tự triển khai
+                 * đã khuyến nghị (deploy trước, đổi dữ liệu sau) lại tự chặn đường mình.
+                 *
+                 * Không có nhánh này thì lệnh dừng ở đây và người chạy phải vào Atlas
+                 * xóa tay bốn collection — đúng lúc bản deploy đang hỏng.
+                 */
+                if ($khoTest) {
+                    $this->line("  sẽ dọn   {$moi} (rỗng, do db:indexes tạo) rồi đổi {$cu} -> {$moi}");
+                    continue;
+                }
+                $db->selectCollection($moi)->drop();
+                $this->line("  dọn vỏ   {$moi} (rỗng, do db:indexes tạo)");
             }
 
-            $soLuong = $db->selectCollection($cu)->countDocuments();
             if ($khoTest) {
-                $this->line("  sẽ đổi   {$cu} -> {$moi} ({$soLuong} document)");
+                $this->line("  sẽ đổi   {$cu} -> {$moi} ({$soLuongCu} document)");
                 continue;
             }
 
@@ -125,7 +150,7 @@ class RenameSchemaToShopProduct extends Command
                     'renameCollection' => "{$db->getDatabaseName()}.{$cu}",
                     'to'               => "{$db->getDatabaseName()}.{$moi}",
                 ]));
-                $this->line("  đổi rồi  {$cu} -> {$moi} ({$soLuong} document)");
+                $this->line("  đổi rồi  {$cu} -> {$moi} ({$soLuongCu} document)");
             } catch (CommandException $e) {
                 $this->error("  LỖI     {$cu} -> {$moi}: " . $e->getMessage());
                 return self::FAILURE;
