@@ -143,7 +143,7 @@ export default function PricingPage() {
       {/* Hero banner ảnh thật */}
       <Banner
         image="/banners/cafe-counter.jpg"
-        alt="Quầy pha chế trong quán cafe"
+        alt="Quầy pha chế trong quán shop"
         title="Giá rõ ràng, hợp túi tiền quán nhỏ"
         subtitle="Bắt đầu miễn phí, nâng cấp khi cần thêm tính năng. Không phí ẩn, không ràng buộc."
         align="center"
@@ -236,7 +236,7 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <Link href="/register" className={`${p.highlight ? 'btn-cafe' : 'btn-cafe-outline'} w-full mt-auto`}>
+              <Link href="/register" className={`${p.highlight ? 'btn-shop' : 'btn-cafe-outline'} w-full mt-auto`}>
                 {p.key === 'free' ? 'Dùng thử miễn phí' : 'Đăng ký'}
               </Link>
             </Reveal>

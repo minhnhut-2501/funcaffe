@@ -56,13 +56,13 @@ const goiApi = (duong) => page.evaluate(async ({ api, duong }) => {
 }, { api: API, duong });
 
 // ===== Nguon chan ly =====
-const quan = await goiApi('/cafes');
+const quan = await goiApi('/shops');
 const donTheoQuan = {};
 for (const c of quan) {
   const cid = c.id ?? c._id;
-  donTheoQuan[cid] = { ten: c.name, don: await goiApi(`/cafes/${cid}/orders?status=paid`) };
+  donTheoQuan[cid] = { ten: c.name, don: await goiApi(`/shops/${cid}/orders?status=paid`) };
 }
-const moiDon = Object.entries(donTheoQuan).flatMap(([cid, v]) => v.don.map(o => ({ cafeId: cid, ...o })));
+const moiDon = Object.entries(donTheoQuan).flatMap(([cid, v]) => v.don.map(o => ({ shopId: cid, ...o })));
 const tongCua = (ds) => ds.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
 
 // Cua so MAC DINH cua trang: 30 ngay gan nhat, tinh ca hom nay.
@@ -81,7 +81,7 @@ ok(Number(sum.total) === tayGop, `gop moi quan: ${tien(sum.total)} = cong tay ${
 ok(Number(sum.count) === moiDon.filter(trongCuaSo).length, `so hoa don: ${sum.count} = ${moiDon.filter(trongCuaSo).length}`);
 
 for (const [cid, v] of Object.entries(donTheoQuan)) {
-  const rieng = await goiApi(`/revenue/summary?from=${tuNgay}&to=${homNay}&cafe_id=${cid}`);
+  const rieng = await goiApi(`/revenue/summary?from=${tuNgay}&to=${homNay}&shop_id=${cid}`);
   const that = tongCua(v.don.filter(trongCuaSo));
   ok(Number(rieng.total) === that, `  "${v.ten}": ${tien(rieng.total)} = ${tien(that)}`);
 }
@@ -156,7 +156,7 @@ try {
 
 // ===== 4. TRANG QUAN LY QUAN =====
 console.log('\n4) TRANG QUAN LY QUAN');
-await page.goto(BASE + '/user/cafe', { waitUntil: 'domcontentloaded' });
+await page.goto(BASE + '/user/shop', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => /Tổng doanh thu/.test(document.body.innerText), null, { timeout: 120000 }).catch(() => {});
 await page.waitForTimeout(4000);
 let chuQ = await page.locator('main').innerText();

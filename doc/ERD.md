@@ -23,13 +23,13 @@ Sanctum bắt buộc một bảng quan hệ để lưu token đăng nhập, khô
 | 3 | `time_subscriptions` | Thời hạn và giá bán của từng gói |
 | 4 | `subscriptions` | Quyền dùng gói của một quán |
 | 5 | `package_payments` | Chứng từ thanh toán gói |
-| 6 | `cafes` | Quán cà phê |
+| 6 | `shops` | Quán cà phê |
 | 7 | `tables` | Bàn trong quán |
 | 8 | `categories` | Danh mục món |
-| 9 | `items` | Món trong thực đơn |
-| 10 | `item_prices` | Giá theo size của món |
+| 9 | `products` | Món trong thực đơn |
+| 10 | `product_sizes` | Giá theo size của món |
 | 11 | `toppings` | Topping của quán |
-| 12 | `item_toppings` | Món ↔ Topping (N–N) |
+| 12 | `product_toppings` | Món ↔ Topping (N–N) |
 | 13 | `orders` | Đơn bán hàng, kiêm hóa đơn khi đã thanh toán |
 | 14 | `order_details` | Dòng món trong đơn |
 | 15 | `order_detail_toppings` | Topping của từng dòng món |
@@ -42,7 +42,7 @@ Sanctum bắt buộc một bảng quan hệ để lưu token đăng nhập, khô
 
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
-| `_id` | ObjectId | PK | Định danh tài khoản, được `cafes.user_id` và `package_payments.user_id` trỏ tới |
+| `_id` | ObjectId | PK | Định danh tài khoản, được `shops.user_id` và `package_payments.user_id` trỏ tới |
 | `full_name` | String | NN | Họ tên, hiện trên thanh tài khoản và trong màn quản trị người dùng |
 | `email` | String | UK, NN | Tên đăng nhập, đồng thời là nơi nhận thư đặt lại mật khẩu. Duy nhất toàn hệ thống |
 | `password` | String | NN | Mật khẩu đã băm bcrypt. Không bao giờ trả ra API |
@@ -50,7 +50,7 @@ Sanctum bắt buộc một bảng quan hệ để lưu token đăng nhập, khô
 | `avatar` | String | | Đường dẫn ảnh đại diện (Cloudinary hoặc thư mục public) |
 | `role` | String | NN | `user` = chủ quán, `admin` = quản trị viên. Quyết định vào được khu `/user` hay `/admin` |
 | `status` | String | NN | `active` \| `locked`. Bị `locked` là không đăng nhập được nữa, dùng để khóa tài khoản vi phạm |
-| `has_used_free_trial` | Boolean | | Tài khoản này đã nhận gói dùng thử Fun Free chưa. Đi **cặp** với `cafes.has_used_free_trial`: thiếu vế tài khoản thì chủ quán chỉ cần tạo quán mới là lại có 7 ngày Pro Max, lặp vô hạn |
+| `has_used_free_trial` | Boolean | | Tài khoản này đã nhận gói dùng thử Fun Free chưa. Đi **cặp** với `shops.has_used_free_trial`: thiếu vế tài khoản thì chủ quán chỉ cần tạo quán mới là lại có 7 ngày Pro Max, lặp vô hạn |
 | `reset_token` | String | | **Bản băm SHA-256** của token đặt lại mật khẩu; bản thô chỉ đi qua email. Băm để ai đọc được CSDL cũng không chiếm được tài khoản |
 | `reset_token_expires_at` | Date | | Hạn của token trên (1 giờ). Quá hạn thì liên kết đặt lại mật khẩu vô hiệu |
 
@@ -92,7 +92,7 @@ tiết tiền bạc nằm ở `package_payments`.
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh lượt đăng ký |
-| `cafe_id` | ObjectId | FK → `cafes` | **Gói tính theo QUÁN, không theo tài khoản.** Không có `user_id`: chủ sở hữu suy qua `cafes.user_id`, giữ thêm bản sao chỉ tạo nguồn sự thật thứ hai có thể lệch |
+| `shop_id` | ObjectId | FK → `shops` | **Gói tính theo QUÁN, không theo tài khoản.** Không có `user_id`: chủ sở hữu suy qua `shops.user_id`, giữ thêm bản sao chỉ tạo nguồn sự thật thứ hai có thể lệch |
 | `package_id` | ObjectId | FK → `packages` | Gói đang được cấp, dùng để tra hạn mức bàn/món và quyền AI |
 | `time_subscription_id` | ObjectId | FK → `time_subscriptions` | Mốc thời hạn đã chọn lúc mua |
 | `package_name_snapshot` | String | | Tên gói **tại thời điểm mua**. Admin đổi tên gói về sau thì lịch sử cũ vẫn hiện đúng tên hồi đó |
@@ -109,8 +109,8 @@ thêm một chứng từ mới.
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh giao dịch |
-| `user_id` | ObjectId | FK → `users` | **Người trả tiền.** Lưu thẳng ở đây (dù suy được qua `cafe_id`) để màn quản trị gom tổng chi tiêu của một tài khoản bằng một truy vấn duy nhất |
-| `cafe_id` | ObjectId | FK → `cafes` | Quán được cấp quyền dùng nhờ giao dịch này |
+| `user_id` | ObjectId | FK → `users` | **Người trả tiền.** Lưu thẳng ở đây (dù suy được qua `shop_id`) để màn quản trị gom tổng chi tiêu của một tài khoản bằng một truy vấn duy nhất |
+| `shop_id` | ObjectId | FK → `shops` | Quán được cấp quyền dùng nhờ giao dịch này |
 | `package_id` | ObjectId | FK → `packages` | Gói đã mua |
 | `time_subscription_id` | ObjectId | FK → `time_subscriptions` | Mốc thời hạn đã mua |
 | `subscription_id` | ObjectId | FK → `subscriptions` | Lượt đăng ký mà giao dịch này thanh toán cho |
@@ -131,7 +131,7 @@ thêm một chứng từ mới.
 | `gateway_bank_code` | String | | Ngân hàng khách đã dùng, do cổng trả về |
 | `gateway_order_id` | String | | Mã đơn **đã gửi sang cổng** khi nó khác `transaction_code`. Cần cho MoMo: MoMo bắt mã đơn duy nhất theo mã đối tác, mà mã đối tác môi trường thử nghiệm là dùng chung, trong khi `transaction_code` lại đếm theo từng CSDL nên hai máy cùng sinh ra `TXN-<ngày>-0001`. Gửi kèm đuôi ngẫu nhiên rồi lưu lại đây để callback tra đúng đơn |
 
-## 6. `cafes` — Quán cà phê
+## 6. `shops` — Quán cà phê
 
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
@@ -153,7 +153,7 @@ thêm một chứng từ mới.
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh bàn |
-| `cafe_id` | ObjectId | FK → `cafes` | Bàn thuộc quán nào |
+| `shop_id` | ObjectId | FK → `shops` | Bàn thuộc quán nào |
 | `name` | String | NN | Tên bàn hiện trên sơ đồ ("Bàn 1", "VIP 2"…) |
 | `capacity` | Int | | Số chỗ ngồi, chỉ để tham khảo khi xếp khách |
 | `status` | String | NN | `empty` \| `serving`. **Chỉ là bộ nhớ đệm** cho tiện hiển thị — nguồn chân lý là "có đơn `active` nào trỏ vào bàn này không". Mongo chạy standalone nên không có transaction thật, hai lệnh ghi tách rời có thể làm trường này kẹt ở `serving`; màn Bán hàng vì vậy dẫn xuất lại trạng thái từ danh sách đơn đang mở |
@@ -165,33 +165,33 @@ thêm một chứng từ mới.
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh danh mục |
-| `cafe_id` | ObjectId | FK → `cafes` | Danh mục thuộc quán nào |
+| `shop_id` | ObjectId | FK → `shops` | Danh mục thuộc quán nào |
 | `name` | String | NN | Tên nhóm món ("Cà phê", "Trà sữa"…), dùng làm tab lọc ở màn bán hàng |
 | `description` | String | | Mô tả ngắn cho nhóm món |
 | `is_active` | Boolean | | Bật/tắt hiển thị. Danh mục chỉ được **ẩn, không xóa** — xóa sẽ làm các món bên trong mồ côi |
 
-## 9. `items` — Món
+## 9. `products` — Món
 
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh món |
-| `cafe_id` | ObjectId | FK → `cafes` | Món thuộc quán nào |
+| `shop_id` | ObjectId | FK → `shops` | Món thuộc quán nào |
 | `category_id` | ObjectId | FK → `categories` | Món nằm trong danh mục nào |
 | `name` | String | NN | Tên món hiện trên thực đơn và trên hóa đơn |
-| `base_price` | Int | ≥ 0 | Giá dùng khi món **không** chia size. Món có size thì lấy giá ở `item_prices` |
+| `base_price` | Int | ≥ 0 | Giá dùng khi món **không** chia size. Món có size thì lấy giá ở `product_sizes` |
 | `has_size` | Boolean | | Món có chia size hay không. Bật thì màn bán hàng bắt chọn size trước khi thêm vào đơn |
-| `allow_topping` | Boolean | | Cho phép gắn topping hay không. Tắt thì không hiện bước chọn topping |
+| `has_topping` | Boolean | | Cho phép gắn topping hay không. Tắt thì không hiện bước chọn topping |
 | `is_available` | Boolean | | Còn bán hay tạm hết. Món chỉ được **ẩn, không xóa** vì hóa đơn cũ còn tham chiếu tới |
 | `image` | String | | Đường dẫn ảnh món, giúp nhân viên mới chọn đúng |
 | `description` | String | | Mô tả món |
 | `display_order` | Int | | Thứ tự hiện trong danh mục, để xếp món bán chạy lên đầu |
 
-## 10. `item_prices` — Giá theo size
+## 10. `product_sizes` — Giá theo size
 
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh một mức giá |
-| `item_id` | ObjectId | FK → `items` | Mức giá này của món nào |
+| `product_id` | ObjectId | FK → `products` | Mức giá này của món nào |
 | `size_name` | String | NN | Tên size ("S" / "M" / "L"), **lưu thẳng chuỗi**, không có collection `sizes` riêng vì tên size chỉ có nghĩa trong phạm vi một món |
 | `price` | Int | ≥ 0 | Giá bán của size này |
 | `is_active` | Boolean | | Size này còn bán hay không, tắt mà không phải xóa để hóa đơn cũ vẫn tra được |
@@ -201,13 +201,13 @@ thêm một chứng từ mới.
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh topping |
-| `cafe_id` | ObjectId | FK → `cafes` | Topping thuộc quán nào |
+| `shop_id` | ObjectId | FK → `shops` | Topping thuộc quán nào |
 | `name` | String | NN | Tên topping ("Trân châu", "Thạch"…) |
 | `price` | Number | ≥ 0 | Giá cộng thêm cho mỗi phần topping |
 | `is_available` | Boolean | | Còn dùng hay tạm hết. Chỉ ẩn, không xóa |
 | `image` | String | | Đường dẫn ảnh topping |
 
-## 12. `item_toppings` — Món ↔ Topping (N–N)
+## 12. `product_toppings` — Món ↔ Topping (N–N)
 
 Bảng nối: quy định **topping nào được phép gắn vào món nào**, để nhân viên không chọn nhầm
 trân châu vào ly espresso.
@@ -215,7 +215,7 @@ trân châu vào ly espresso.
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh cặp ghép |
-| `item_id` | ObjectId | FK → `items` | Món được phép gắn |
+| `product_id` | ObjectId | FK → `products` | Món được phép gắn |
 | `topping_id` | ObjectId | FK → `toppings` | Topping được phép gắn vào món đó |
 
 ## 13. `orders` — Đơn bán hàng, kiêm hóa đơn
@@ -226,7 +226,7 @@ tách hai bảng sẽ sinh nguy cơ đơn và hóa đơn lệch nhau.
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh đơn |
-| `cafe_id` | ObjectId | FK → `cafes` | Đơn của quán nào — mọi thống kê doanh thu đều lọc theo trường này |
+| `shop_id` | ObjectId | FK → `shops` | Đơn của quán nào — mọi thống kê doanh thu đều lọc theo trường này |
 | `table_id` | ObjectId | FK → `tables` | Đơn đang phục vụ ở bàn nào |
 | `code` | String | UK theo quán | Mã đơn `ORD-YYYYMMDD-NNNN`, cấp ngay khi mở đơn |
 | `status` | String | NN | `active` (đang phục vụ) \| `paid` (đã thanh toán) \| `cancelled` (hủy trước khi thu tiền). Hệ thống **không có nghiệp vụ hoàn tiền**: lỡ tay thì hủy trước khi thanh toán |
@@ -247,9 +247,9 @@ tách hai bảng sẽ sinh nguy cơ đơn và hóa đơn lệch nhau.
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh dòng món |
 | `order_id` | ObjectId | FK → `orders` | Dòng này thuộc đơn nào |
-| `item_id` | ObjectId | FK → `items` | Món được gọi |
-| `item_name_snapshot` | String | NN | Tên món **lúc bán**. Chủ quán đổi tên món về sau thì hóa đơn cũ vẫn giữ nguyên nội dung đã in cho khách |
-| `item_price_id` | ObjectId | FK → `item_prices` | Size đã chọn, null nếu món không chia size |
+| `product_id` | ObjectId | FK → `products` | Món được gọi |
+| `product_name_snapshot` | String | NN | Tên món **lúc bán**. Chủ quán đổi tên món về sau thì hóa đơn cũ vẫn giữ nguyên nội dung đã in cho khách |
+| `product_size_id` | ObjectId | FK → `product_sizes` | Size đã chọn, null nếu món không chia size |
 | `size_name_snapshot` | String | | Tên size **lúc bán**, cùng lý do như tên món |
 | `quantity` | Int | ≥ 1 | Số phần khách gọi |
 | `unit_price` | Number | | Đơn giá lúc bán, **lấy từ CSDL** chứ không tin giá client gửi lên |
@@ -273,13 +273,13 @@ tách hai bảng sẽ sinh nguy cơ đơn và hóa đơn lệch nhau.
 ## 16. `reviews` — Đánh giá dịch vụ FunCafe
 
 Mỗi chủ quán chỉ có **một** đánh giá cho **mỗi quán**: gửi lại là cập nhật chính document cũ
-(upsert theo cặp `user_id` + `cafe_id`), không sinh bản ghi mới.
+(upsert theo cặp `user_id` + `shop_id`), không sinh bản ghi mới.
 
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh đánh giá |
 | `user_id` | ObjectId | FK → `users` | Người viết đánh giá |
-| `cafe_id` | ObjectId | FK → `cafes` | Đánh giá đứng tên quán nào |
+| `shop_id` | ObjectId | FK → `shops` | Đánh giá đứng tên quán nào |
 | `package_id` | ObjectId | FK → `packages` | Gói đang dùng lúc đánh giá — để biết lời khen/chê đến từ người dùng gói nào |
 | `rating` | Int | 1–5 | Số sao, dùng tính điểm trung bình hiện ở trang giới thiệu |
 | `title` | String | | Tiêu đề ngắn của đánh giá |
@@ -298,7 +298,7 @@ Người gửi là **khách vãng lai chưa có tài khoản**, nên không có 
 | `full_name` | String | NN | Tên người gửi |
 | `email` | String | NN | Nơi nhận thư trả lời của admin |
 | `phone` | String | | Số điện thoại để gọi lại nếu cần |
-| `cafe_name` | String | | Tên quán khách khai, giúp admin nắm bối cảnh trước khi tư vấn |
+| `shop_name` | String | | Tên quán khách khai, giúp admin nắm bối cảnh trước khi tư vấn |
 | `content` | String | NN | Nội dung khách hỏi |
 | `is_read` | Boolean | | Admin đã đọc chưa, dùng đếm số tin chưa xử lý |
 | `reply` | String | | Nội dung admin đã trả lời, lưu lại để tra cứu về sau |

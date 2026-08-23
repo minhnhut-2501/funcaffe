@@ -16,7 +16,7 @@ export interface RawId {
   _id?: string;
 }
 
-export interface RawItemPrice extends RawId {
+export interface RawProductSize extends RawId {
   size_name?: string;
   /** Bản ghi rất cũ còn nhúng cả object size. */
   size?: { name?: string };
@@ -24,20 +24,20 @@ export interface RawItemPrice extends RawId {
   is_active?: boolean;
 }
 
-export interface RawItemTopping {
+export interface RawProductTopping {
   topping_id?: string;
 }
 
-export interface RawItem extends RawId {
+export interface RawProduct extends RawId {
   name?: string;
   base_price?: number;
   category_id?: string;
   image?: string;
   description?: string;
   has_size?: boolean;
-  item_prices?: RawItemPrice[];
-  allow_topping?: boolean;
-  item_toppings?: RawItemTopping[];
+  product_sizes?: RawProductSize[];
+  has_topping?: boolean;
+  product_toppings?: RawProductTopping[];
   is_available?: boolean;
 }
 
@@ -64,9 +64,9 @@ export interface RawOrderDetailTopping {
 }
 
 export interface RawOrderDetail extends RawId {
-  item_id?: string;
-  item_name_snapshot?: string;
-  item_price_id?: string;
+  product_id?: string;
+  product_name_snapshot?: string;
+  product_size_id?: string;
   size_name_snapshot?: string;
   quantity?: number;
   unit_price?: number;
@@ -79,7 +79,7 @@ export interface RawOrderDetail extends RawId {
 
 export interface RawOrder extends RawId {
   code?: string;
-  cafe_id?: string;
+  shop_id?: string;
   table_id?: string;
   table?: { name?: string };
   order_details?: RawOrderDetail[];

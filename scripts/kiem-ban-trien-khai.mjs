@@ -94,7 +94,7 @@ console.log('\n8.7.1b · Khu chu quan');
 const vaoUser = await dangNhap(process.env.USER_EMAIL, process.env.USER_PASS, '/user');
 ok(vaoUser, 'dang nhap chu quan vao duoc khu lam viec');
 if (vaoUser) {
-  const quan = await goiApi('/cafes');
+  const quan = await goiApi('/shops');
   ok(quan.status === 200 && Array.isArray(quan.body), 'doc duoc danh sach quan tu Atlas', `${quan.body?.length ?? 0} quan`);
 }
 
@@ -131,11 +131,11 @@ if (!TAO_DON) {
 } else if (!vaoUser) {
   ok(false, 'khong dang nhap duoc nen khong tao don duoc');
 } else {
-  const quan = await goiApi('/cafes');
-  const cafeId = quan.body?.[0]?.id ?? quan.body?.[0]?._id;
+  const quan = await goiApi('/shops');
+  const shopId = quan.body?.[0]?.id ?? quan.body?.[0]?._id;
   const proGoi = goi.find((p) => p.type === 'pro');
   const moc = await fetch(`${API}/packages/${proGoi.id}/time-subscriptions`).then((r) => r.json());
-  const don = await goiApi(`/cafes/${cafeId}/subscriptions`, {
+  const don = await goiApi(`/shops/${shopId}/subscriptions`, {
     method: 'POST',
     body: { package_id: proGoi.id, time_subscription_id: moc[0].id, payment_method: 'vnpay' },
   });

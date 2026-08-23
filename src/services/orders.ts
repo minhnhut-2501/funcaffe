@@ -2,14 +2,14 @@
 import type { Invoice, Order, OrderItem } from '@/types';
 import { api } from '@/lib/api-client';
 import type { RawOrder, RawOrderDetail, RawOrderDetailTopping } from './raw';
-import { getCafeId } from './cafe-id';
+import { getShopId } from './shop-id';
 
 function mapOrderItem(raw: RawOrderDetail): OrderItem {
   return {
     id: raw.id ?? raw._id ?? '',
-    itemId: raw.item_id ?? '',
-    itemNameSnapshot: raw.item_name_snapshot ?? '',
-    sizeId: raw.item_price_id ?? undefined,
+    productId: raw.product_id ?? '',
+    productNameSnapshot: raw.product_name_snapshot ?? '',
+    sizeId: raw.product_size_id ?? undefined,
     sizeNameSnapshot: raw.size_name_snapshot ?? undefined,
     quantity: raw.quantity ?? 0,
     unitPrice: raw.unit_price ?? 0,
@@ -59,13 +59,13 @@ function mapInvoice(raw: RawOrder): Invoice {
     id: raw.id ?? raw._id ?? '',
     invoiceCode: raw.invoice_code ?? raw.code ?? '',
     orderId: raw.id ?? raw._id ?? '',
-    cafeId: raw.cafe_id ?? undefined,
+    shopId: raw.shop_id ?? undefined,
     tableId: raw.table_id ?? undefined,
     orderCode: raw.code ?? '',
     tableName: raw.table?.name ?? '',
-    cafeName: undefined,
-    cafeAddress: undefined,
-    cafePhone: undefined,
+    shopName: undefined,
+    shopAddress: undefined,
+    shopPhone: undefined,
     items,
     subtotal: raw.subtotal ?? 0,
     discountAmount: raw.discount_amount ?? 0,
@@ -83,7 +83,7 @@ function mapInvoice(raw: RawOrder): Invoice {
 
 // Orders
 /**
- * Bộ lọc cho `GET /cafes/{cafe}/orders`.
+ * Bộ lọc cho `GET /shops/{shop}/orders`.
  * Luôn truyền ít nhất `status`: không truyền gì là kéo về TOÀN BỘ lịch sử bán hàng
  * của quán kèm dòng món và topping.
  */
@@ -125,10 +125,10 @@ function orderBody(data: Partial<Order>) {
     note: data.note,
     discount_amount: data.discountAmount,
     items: (data.items ?? []).map((item) => ({
-      item_id: item.itemId,
-      item_name_snapshot: item.itemNameSnapshot,
+      product_id: item.productId,
+      product_name_snapshot: item.productNameSnapshot,
       quantity: item.quantity,
-      item_price_id: item.sizeId,
+      product_size_id: item.sizeId,
       size_name_snapshot: item.sizeNameSnapshot,
       note: item.note,
       toppings: (item.toppings ?? []).map((t) => ({
@@ -143,39 +143,39 @@ function orderBody(data: Partial<Order>) {
 export const orderService = {
   /** Đơn ĐANG PHỤC VỤ. Màn hình Bán hàng chỉ cần chỗ này, không cần đơn đã đóng. */
   listActive: async () => {
-    const cafeId = await getCafeId();
-    const items = await api.get<RawOrder[]>(`/cafes/${cafeId}/orders${orderQueryString({ status: 'active' })}`);
+    const shopId = await getShopId();
+    const items = await api.get<RawOrder[]>(`/shops/${shopId}/orders${orderQueryString({ status: 'active' })}`);
     return items.map(mapOrder);
   },
   list: async (query: OrderQuery = {}) => {
-    const cafeId = await getCafeId();
-    const items = await api.get<RawOrder[]>(`/cafes/${cafeId}/orders${orderQueryString(query)}`);
+    const shopId = await getShopId();
+    const items = await api.get<RawOrder[]>(`/shops/${shopId}/orders${orderQueryString(query)}`);
     return items.map(mapOrder);
   },
   getById: async (id: string) => {
-    const cafeId = await getCafeId();
-    const raw = await api.get<RawOrder>(`/cafes/${cafeId}/orders/${id}`);
+    const shopId = await getShopId();
+    const raw = await api.get<RawOrder>(`/shops/${shopId}/orders/${id}`);
     return mapOrder(raw);
   },
   create: async (data: Partial<Order>) => {
-    const cafeId = await getCafeId();
-    const raw = await api.post<RawOrder>(`/cafes/${cafeId}/orders`, orderBody(data));
+    const shopId = await getShopId();
+    const raw = await api.post<RawOrder>(`/shops/${shopId}/orders`, orderBody(data));
     return mapOrder(raw);
   },
   pay: async (orderId: string, data: { payment_method: string; discount_amount?: number; cash_received?: number }) => {
-    const cafeId = await getCafeId();
-    const raw = await api.post<RawOrder>(`/cafes/${cafeId}/orders/${orderId}/pay`, data);
+    const shopId = await getShopId();
+    const raw = await api.post<RawOrder>(`/shops/${shopId}/orders/${orderId}/pay`, data);
     return raw;
   },
   // Hủy order đang phục vụ -> đánh dấu 'cancelled' và trả bàn về trống.
   cancel: async (orderId: string) => {
-    const cafeId = await getCafeId();
-    const raw = await api.post<RawOrder>(`/cafes/${cafeId}/orders/${orderId}/cancel`, {});
+    const shopId = await getShopId();
+    const raw = await api.post<RawOrder>(`/shops/${shopId}/orders/${orderId}/cancel`, {});
     return mapOrder(raw);
   },
   update: async (id: string, data: Partial<Order>) => {
-    const cafeId = await getCafeId();
-    const raw = await api.put<RawOrder>(`/cafes/${cafeId}/orders/${id}`, orderBody(data));
+    const shopId = await getShopId();
+    const raw = await api.put<RawOrder>(`/shops/${shopId}/orders/${id}`, orderBody(data));
     return mapOrder(raw);
   },
 };
@@ -196,8 +196,8 @@ export const invoiceService = {
    * TOÀN BỘ lịch sử ngay tại trình duyệt, không phải hỏi lại máy chủ mỗi lần gõ phím.
    */
   list: async (query: Omit<OrderQuery, 'status'> = {}) => {
-    const cafeId = await getCafeId();
-    const orders = await api.get<RawOrder[]>(`/cafes/${cafeId}/orders${orderQueryString({ ...query, status: 'paid', slim: true })}`);
+    const shopId = await getShopId();
+    const orders = await api.get<RawOrder[]>(`/shops/${shopId}/orders${orderQueryString({ ...query, status: 'paid', slim: true })}`);
     return orders.map(mapInvoice);
   },
   /**
@@ -205,18 +205,18 @@ export const invoiceService = {
    * Trang doanh thu dùng hàm này để gộp số liệu nhiều quán: /revenue/overview chỉ
    * trả về tổng và số theo tháng nên không đủ để lọc theo ngày hay tính top món.
    */
-  listByCafe: async (cafeId: string, cafeName?: string, query: Omit<OrderQuery, 'status'> = {}) => {
+  listByShop: async (shopId: string, shopName?: string, query: Omit<OrderQuery, 'status'> = {}) => {
     // getList chứ không phải get: đây là lượt gọi NẶNG NHẤT của cả ứng dụng (toàn bộ
     // hóa đơn của một quán kèm dòng món và topping) và là lượt duy nhất từng chạm
     // hạn chờ mặc định. Xem LIST_TIMEOUT_MS trong api-client.
-    const orders = await api.getList<RawOrder[]>(`/cafes/${cafeId}/orders${orderQueryString({ ...query, status: 'paid' })}`);
+    const orders = await api.getList<RawOrder[]>(`/shops/${shopId}/orders${orderQueryString({ ...query, status: 'paid' })}`);
     return orders
       .map(mapInvoice)
-      .map((inv) => ({ ...inv, cafeId, cafeName }));
+      .map((inv) => ({ ...inv, shopId, shopName }));
   },
   getById: async (id: string) => {
-    const cafeId = await getCafeId();
-    const raw = await api.get<RawOrder>(`/cafes/${cafeId}/orders/${id}`);
+    const shopId = await getShopId();
+    const raw = await api.get<RawOrder>(`/shops/${shopId}/orders/${id}`);
     return mapInvoice(raw);
   },
 };

@@ -2,9 +2,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '@/lib/format';
 import { generateId } from '@/lib/utils';
-import { tableService, menuService, categoryService, toppingService, orderService, invoiceService, cafeService } from '@/services';
+import { tableService, menuService, categoryService, toppingService, orderService, invoiceService, shopService } from '@/services';
 import { ApiError } from '@/lib/api-client';
-import type { CafeTable, MenuItem, MenuItemSize, Topping, Order, OrderItem, CafeInfo } from '@/types';
+import type { ShopTable, Product, ProductSize, Topping, Order, OrderItem, ShopInfo } from '@/types';
 // Phép tính tiền nằm ở lib/cart để kiểm được bằng bài kiểm thử — xem src/lib/cart.test.ts.
 import { calcItemBase, calcItemTopping, calcCartItem, clampDiscount, calcChange, isSameCartLine, type CartItem } from '@/lib/cart';
 import { buildVietQrImageUrl } from '@/lib/banks';
@@ -35,16 +35,16 @@ const tableStatusFilter = [
 ];
 
 export default function SalesPage() {
-  const [tables, setTables] = useState<CafeTable[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [tables, setTables] = useState<ShopTable[]>([]);
+  const [menuItems, setMenuItems] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Awaited<ReturnType<typeof categoryService.list>>>([]);
   const [allToppings, setAllToppings] = useState<Topping[]>([]);
-  const [selectedTable, setSelectedTable] = useState<CafeTable | null>(null);
+  const [selectedTable, setSelectedTable] = useState<ShopTable | null>(null);
   const [tableFilter, setTableFilter] = useState('all');
   const [carts, setCarts] = useState<Record<string, CartItem[]>>({});
   const [catFilter, setCatFilter] = useState('all');
   const [menuSearch, setMenuSearch] = useState('');
-  const [optionModal, setOptionModal] = useState<{ item: MenuItem } | null>(null);
+  const [optionModal, setOptionModal] = useState<{ item: Product } | null>(null);
   const [editCartItemId, setEditCartItemId] = useState<string | null>(null);
   const [paymentModal, setPaymentModal] = useState(false);
   const [successModal, setSuccessModal] = useState<{ code: string; orderId: string; total: number; method: string; cashGiven?: number; change?: number } | null>(null);
@@ -64,7 +64,7 @@ export default function SalesPage() {
   const [savingItem, setSavingItem] = useState(false);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [draftOrderIds, setDraftOrderIds] = useState<Record<string, string>>({});
-  const [cafeInfo, setCafeInfo] = useState<CafeInfo | null>(null);
+  const [shopInfo, setShopInfo] = useState<ShopInfo | null>(null);
   // Chuỗi đang gõ trong ô số lượng, theo từng dòng giỏ. Ô số lượng KHÔNG bám thẳng
   // vào c.quantity: gõ số bao giờ cũng đi qua trạng thái dở dang (rỗng khi xóa để
   // gõ lại, "1" trên đường tới "10"). Ép ô hiển thị số thật ở mọi lần gõ thì không
@@ -85,8 +85,8 @@ export default function SalesPage() {
   const cartToOrderItems = (items: CartItem[]): OrderItem[] =>
     items.map(c => ({
       id: c.id,
-      itemId: c.item.id,
-      itemNameSnapshot: c.item.name,
+      productId: c.item.id,
+      productNameSnapshot: c.item.name,
       sizeId: c.size?.id,
       sizeNameSnapshot: c.size?.name,
       quantity: c.quantity,
@@ -103,7 +103,7 @@ export default function SalesPage() {
     }));
 
   const [optForm, setOptForm] = useState<{
-    size: MenuItemSize | null;
+    size: ProductSize | null;
     toppings: { toppingId: string; qty: number }[];
     qty: number;
     note: string;
@@ -134,7 +134,7 @@ export default function SalesPage() {
   const showToast = (msg: string) => toast({ description: msg });
 
   useEffect(() => {
-    cafeService.get().then(setCafeInfo).catch(() => {});
+    shopService.get().then(setShopInfo).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function SalesPage() {
       categoryService.list().then(setCategories),
       toppingService.list().then(setAllToppings),
       // Thực đơn phải về CÙNG LÚC với order: order chỉ lưu snapshot tên/giá,
-      // muốn có ảnh món cho phiếu order thì phải tra ngược từ thực đơn theo itemId.
+      // muốn có ảnh món cho phiếu order thì phải tra ngược từ thực đơn theo productId.
       // listActive: màn hình bán hàng chỉ quan tâm đơn ĐANG PHỤC VỤ (để dựng lại giỏ
       // của từng bàn). Trước đây gọi list() rồi lọc `status === 'active'` tại đây —
       // tức là tải toàn bộ đơn từ ngày khai trương, kèm dòng món và topping, cho một
@@ -160,15 +160,15 @@ export default function SalesPage() {
           cartsFromOrders[order.tableId] = order.items.map(oi => ({
             id: oi.id,
             item: {
-              id: oi.itemId,
-              name: oi.itemNameSnapshot,
+              id: oi.productId,
+              name: oi.productNameSnapshot,
               basePrice: oi.unitPrice,
-              categoryId: menuById.get(oi.itemId)?.categoryId ?? '',
-              imageUrl: menuById.get(oi.itemId)?.imageUrl,
+              categoryId: menuById.get(oi.productId)?.categoryId ?? '',
+              imageUrl: menuById.get(oi.productId)?.imageUrl,
               description: undefined,
               hasSize: !!oi.sizeId,
               sizes: oi.sizeId ? [{ id: oi.sizeId, name: oi.sizeNameSnapshot ?? '', price: oi.unitPrice, isActive: true }] : [],
-              allowTopping: false,
+              hasTopping: false,
               allowedToppingIds: [],
               isAvailable: true,
             },
@@ -246,7 +246,7 @@ export default function SalesPage() {
   const discount = clampDiscount(discountInput, baseSubtotal + toppingSubtotal);
   const cartTotal = baseSubtotal + toppingSubtotal - discount;
 
-  const openOption = (item: MenuItem) => {
+  const openOption = (item: Product) => {
     if (!managable) {
       showToast('Gói đã hết hạn — chỉ có thể xem. Vui lòng gia hạn để bán hàng.');
       return;
@@ -638,13 +638,13 @@ export default function SalesPage() {
 
       {/* Quán không ở trạng thái mở cửa thì máy chủ từ chối mở đơn mới. Nói trước ở
           đây, đừng để nhân viên chọn xong cả giỏ mới nhận một thông báo lỗi. */}
-      {!loading && cafeInfo && cafeInfo.status !== 'open' && (
+      {!loading && shopInfo && shopInfo.status !== 'open' && (
         <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-gold/25 bg-gold/10 px-4 py-3 text-sm text-gold-deep">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <p>
-            Quán đang ở trạng thái <strong>{cafeInfo.status === 'closed' ? 'Đã đóng cửa' : 'Ngừng hoạt động'}</strong> nên
+            Quán đang ở trạng thái <strong>{shopInfo.status === 'closed' ? 'Đã đóng cửa' : 'Ngừng hoạt động'}</strong> nên
             không mở được đơn mới. Bàn đang ngồi vẫn gọi thêm và thanh toán bình thường.{' '}
-            <Link href="/user/cafe" className="font-semibold underline">Đổi trạng thái quán</Link> để bán tiếp.
+            <Link href="/user/shop" className="font-semibold underline">Đổi trạng thái quán</Link> để bán tiếp.
           </p>
         </div>
       )}
@@ -1079,13 +1079,13 @@ export default function SalesPage() {
           )}
 
           {paymentMethod === 'vietqr' && (
-            cafeInfo?.bankBin && cafeInfo?.bankAccountNumber ? (
+            shopInfo?.bankBin && shopInfo?.bankAccountNumber ? (
               <div className="bg-sand/70 border border-line rounded-2xl p-4 flex flex-col items-center gap-2">
                 <img
                   src={buildVietQrImageUrl({
-                    bankBin: cafeInfo.bankBin,
-                    accountNumber: cafeInfo.bankAccountNumber,
-                    accountName: cafeInfo.bankAccountName,
+                    bankBin: shopInfo.bankBin,
+                    accountNumber: shopInfo.bankAccountNumber,
+                    accountName: shopInfo.bankAccountName,
                     amount: cartTotal,
                     addInfo: activeOrders.find(o => o.tableId === selectedTable?.id)?.code || 'Thanh toan FunCafe',
                   })}
@@ -1100,7 +1100,7 @@ export default function SalesPage() {
             ) : (
               <div className="bg-gold/10 border border-gold/25 rounded-2xl p-4 text-sm text-gold-deep">
                 Quán chưa cấu hình tài khoản ngân hàng nhận tiền.{' '}
-                <Link href="/user/cafe" className="font-semibold underline">Cấu hình ngay</Link> để dùng VietQR.
+                <Link href="/user/shop" className="font-semibold underline">Cấu hình ngay</Link> để dùng VietQR.
               </div>
             )
           )}

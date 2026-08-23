@@ -53,7 +53,7 @@ const CONG_KHAI = [
 
 const QUAN_LY = [
   ['/user/dashboard', 'tong-quan'],
-  ['/user/cafe', 'thong-tin-quan'],
+  ['/user/shop', 'thong-tin-quan'],
   ['/user/tables', 'quan-ly-ban'],
   ['/user/menu', 'thuc-don'],
   ['/user/toppings', 'topping'],
@@ -221,19 +221,19 @@ async function chonQuanTot(ctx) {
     const t = localStorage.getItem('funcafe_token');
     const h = { Authorization: 'Bearer ' + t, Accept: 'application/json' };
     const goc = location.origin.replace('funcafe.pro', 'api.funcafe.pro');
-    const quan = await (await fetch(`${goc}/api/cafes`, { headers: h })).json();
+    const quan = await (await fetch(`${goc}/api/shops`, { headers: h })).json();
     let tot = null;
     for (const c of quan) {
       const id = c.id ?? c._id;
       try {
-        const s = await (await fetch(`${goc}/api/cafes/${id}/subscriptions`, { headers: h })).json();
+        const s = await (await fetch(`${goc}/api/shops/${id}/subscriptions`, { headers: h })).json();
         const dang = (Array.isArray(s) ? s : s?.data ?? []).find((x) => x.status === 'active');
         if (dang && (!tot || new Date(dang.end_date) > new Date(tot.het))) {
           tot = { id, ten: c.name, het: dang.end_date, goi: dang.package_name_snapshot };
         }
       } catch { /* quán không đọc được gói thì bỏ qua */ }
     }
-    if (tot) localStorage.setItem('funcafe.activeCafeId', tot.id);
+    if (tot) localStorage.setItem('funcafe.activeShopId', tot.id);
     return tot;
   });
 

@@ -2,7 +2,7 @@
 
 @theme {
   /* ============================================================
-     FunCafe — Warm Cafe palette (đồng bộ Public + Portal)
+     FunCafe — Warm Shop palette (đồng bộ Public + Portal)
      surfaces (paper/sand/line) · chữ slate/ink · accent xanh dương bean
      (Tên biến vẫn là "bean" vì ~600 chỗ đang dùng; giá trị đã đổi từ nâu
       sang xanh dương ở lần làm lại giao diện — xem --color-bean bên dưới.)
@@ -178,7 +178,7 @@
   }
 
   /* ===================== Public Website utilities ===================== */
-  .btn-cafe {
+  .btn-shop {
     @apply inline-flex items-center justify-center gap-2 bg-bean hover:bg-bean-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors;
   }
   .btn-cafe-outline {
@@ -240,7 +240,7 @@
       radial-gradient(55% 65% at 12% 8%, rgba(37,99,235,0.07), transparent 55%),
       #F8FAFC;
   }
-  .btn-cafe, .btn-cafe-outline {
+  .btn-shop, .btn-cafe-outline {
     @apply active:translate-y-px;
   }
   /* Soft tactile lift on interactive surfaces.

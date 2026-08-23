@@ -200,7 +200,7 @@ export default function FeaturesPage() {
     <PublicLayout>
       <Banner
         image="/banners/cafe-interior.jpg"
-        alt="Không gian bên trong một quán cafe"
+        alt="Không gian bên trong một quán shop"
         title="Tất cả những gì FunCafe làm được"
         subtitle="Từ khai báo bàn và thực đơn, bán hàng tại quầy, thanh toán, hóa đơn cho tới báo cáo doanh thu và trợ lý AI — đầy đủ trong một hệ thống."
         align="center"
@@ -316,7 +316,7 @@ export default function FeaturesPage() {
               Gói Fun Free cho dùng thử <strong className="font-semibold text-ink">toàn bộ</strong> chức năng
               trong 7 ngày. Sau đó gói Pro giới hạn số bàn và số món, gói Pro Max mở lại không giới hạn kèm trợ lý AI.
             </p>
-            <Link href="/pricing" className="btn-cafe shrink-0">
+            <Link href="/pricing" className="btn-shop shrink-0">
               So sánh ba gói <ArrowRight className="w-4 h-4" aria-hidden />
             </Link>
           </Reveal>

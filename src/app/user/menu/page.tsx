@@ -15,7 +15,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge from '@/components/user/StatusBadge';
 import ToppingPickerModal from '@/components/user/ToppingPickerModal';
-import type { MenuItem, MenuItemSize, Topping } from '@/types';
+import type { Product, ProductSize, Topping } from '@/types';
 import { Plus, Pencil, Trash2, Eye, RotateCcw, FolderPlus, Image as ImageIcon, UtensilsCrossed, AlertCircle, CupSoda, ChevronRight, FolderTree } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import Pagination, { usePagination } from '@/components/ui/Pagination';
@@ -23,7 +23,7 @@ import Pagination, { usePagination } from '@/components/ui/Pagination';
 export default function MenuPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [items, setItems] = useState<MenuItem[]>([]);
+  const [items, setItems] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Awaited<ReturnType<typeof categoryService.list>>>([]);
   const [toppings, setToppings] = useState<Topping[]>([]);
   const [search, setSearch] = useState('');
@@ -32,8 +32,8 @@ export default function MenuPage() {
   const [sizeFilter, setSizeFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [toppingFilter, setToppingFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [modalOpen, setModalOpen] = useState(false);
-  const [viewTarget, setViewTarget] = useState<MenuItem | null>(null);
-  const [editTarget, setEditTarget] = useState<MenuItem | null>(null);
+  const [viewTarget, setViewTarget] = useState<Product | null>(null);
+  const [editTarget, setEditTarget] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toppingPickerOpen, setToppingPickerOpen] = useState(false);
@@ -52,17 +52,17 @@ export default function MenuPage() {
   };
   useEffect(load, []);
 
-  const emptyForm = (): Partial<MenuItem> => ({
+  const emptyForm = (): Partial<Product> => ({
     name: '', basePrice: 0, categoryId: categories[0]?.id ?? '', description: '',
-    hasSize: false, sizes: [], allowTopping: false, allowedToppingIds: [], isAvailable: true,
+    hasSize: false, sizes: [], hasTopping: false, allowedToppingIds: [], isAvailable: true,
   });
-  const [form, setForm] = useState<Partial<MenuItem>>(emptyForm());
+  const [form, setForm] = useState<Partial<Product>>(emptyForm());
 
   const filtered = items.filter(i =>
     (catFilter === 'all' || i.categoryId === catFilter) &&
     (statusFilter === 'all' || (statusFilter === 'available' ? i.isAvailable : !i.isAvailable)) &&
     (sizeFilter === 'all' || (sizeFilter === 'yes' ? i.hasSize : !i.hasSize)) &&
-    (toppingFilter === 'all' || (toppingFilter === 'yes' ? i.allowTopping : !i.allowTopping)) &&
+    (toppingFilter === 'all' || (toppingFilter === 'yes' ? i.hasTopping : !i.hasTopping)) &&
     i.name.toLowerCase().includes(search.toLowerCase())
   ).sort((a, b) => compareByName(a.name, b.name));
 
@@ -79,7 +79,7 @@ export default function MenuPage() {
 
   const resetFilters = () => { setSearch(''); setCatFilter('all'); setStatusFilter('all'); setSizeFilter('all'); setToppingFilter('all'); };
   const openAdd = () => { setEditTarget(null); setForm(emptyForm()); setModalOpen(true); };
-  const openEdit = (item: MenuItem) => { setEditTarget(item); setForm({ ...item, sizes: [...item.sizes] }); setModalOpen(true); };
+  const openEdit = (item: Product) => { setEditTarget(item); setForm({ ...item, sizes: [...item.sizes] }); setModalOpen(true); };
 
   const handleSave = async () => {
     if (!form.name?.trim()) { toast({ description: 'Vui lòng nhập tên món', variant: 'destructive' }); return; }
@@ -126,7 +126,7 @@ export default function MenuPage() {
   };
 
   // Món KHÔNG xóa được (đã nằm trong order/hóa đơn cũ) — chỉ ẩn/mở bán lại.
-  const handleToggleAvailable = async (item: MenuItem) => {
+  const handleToggleAvailable = async (item: Product) => {
     try {
       const updated = await menuService.update(item.id, { isAvailable: !item.isAvailable });
       setItems(prev => prev.map(i => i.id === item.id ? updated : i));
@@ -137,10 +137,10 @@ export default function MenuPage() {
   };
 
   const addSize = () => {
-    const newSize: MenuItemSize = { id: generateId('sz'), name: '', price: 0, isActive: true };
+    const newSize: ProductSize = { id: generateId('sz'), name: '', price: 0, isActive: true };
     setForm(f => ({ ...f, sizes: [...(f.sizes ?? []), newSize] }));
   };
-  const updateSize = (idx: number, field: keyof MenuItemSize, value: string | number | boolean) => {
+  const updateSize = (idx: number, field: keyof ProductSize, value: string | number | boolean) => {
     setForm(f => ({ ...f, sizes: f.sizes?.map((s, i) => i === idx ? { ...s, [field]: value } : s) }));
   };
   const removeSize = (idx: number) => {
@@ -274,7 +274,7 @@ export default function MenuPage() {
                   <p className="text-sm font-semibold text-bean mt-1">{item.hasSize ? `Từ ${formatCurrency(minPrice)}` : formatCurrency(item.basePrice)}</p>
                   <div className="flex gap-1.5 mt-1.5">
                     {item.hasSize && <span className="badge-free text-[10px]">Có size</span>}
-                    {item.allowTopping && <span className="badge-pro text-[10px]">Topping</span>}
+                    {item.hasTopping && <span className="badge-pro text-[10px]">Topping</span>}
                   </div>
                 </div>
               </div>
@@ -336,7 +336,7 @@ export default function MenuPage() {
                   <td className="px-4 py-3 text-cafe-600">{getCatName(item.categoryId)}</td>
                   <td className="px-4 py-3 font-semibold text-bean">{item.hasSize ? `Từ ${formatCurrency(minPrice)}` : formatCurrency(item.basePrice)}</td>
                   <td className="px-4 py-3 text-center text-cafe-500">{item.hasSize ? <span className="badge-free text-xs">Có</span> : '—'}</td>
-                  <td className="px-4 py-3 text-center text-cafe-500">{item.allowTopping ? <span className="badge-pro text-xs">Có</span> : '—'}</td>
+                  <td className="px-4 py-3 text-center text-cafe-500">{item.hasTopping ? <span className="badge-pro text-xs">Có</span> : '—'}</td>
                   <td className="px-4 py-3"><StatusBadge tone={item.isAvailable ? 'success' : 'neutral'}>{item.isAvailable ? 'Đang bán' : 'Hết món'}</StatusBadge></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
@@ -445,8 +445,8 @@ export default function MenuPage() {
                 </div>
               </div>
             )}
-            <div className="flex justify-between py-2 border-b border-cafe-50"><span className="text-cafe-500">Cho phép topping</span><span>{viewTarget.allowTopping ? 'Có' : 'Không'}</span></div>
-            {viewTarget.allowTopping && (viewTarget.allowedToppingIds?.length ?? 0) > 0 && (
+            <div className="flex justify-between py-2 border-b border-cafe-50"><span className="text-cafe-500">Cho phép topping</span><span>{viewTarget.hasTopping ? 'Có' : 'Không'}</span></div>
+            {viewTarget.hasTopping && (viewTarget.allowedToppingIds?.length ?? 0) > 0 && (
               <div className="py-2">
                 <span className="text-cafe-500">Topping đã chọn</span>
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -517,7 +517,7 @@ export default function MenuPage() {
               Có size
             </label>
             <label className="flex items-center gap-2 text-sm text-cafe-700 cursor-pointer">
-              <input type="checkbox" checked={form.allowTopping ?? false} onChange={e => setForm({ ...form, allowTopping: e.target.checked })} />
+              <input type="checkbox" checked={form.hasTopping ?? false} onChange={e => setForm({ ...form, hasTopping: e.target.checked })} />
               Cho phép topping
             </label>
             <label className="flex items-center gap-2 text-sm text-cafe-700 cursor-pointer">
@@ -526,7 +526,7 @@ export default function MenuPage() {
             </label>
           </div>
 
-          {form.allowTopping && (() => {
+          {form.hasTopping && (() => {
             const selIds = form.allowedToppingIds ?? [];
             const selected = toppings.filter(t => selIds.includes(t.id));
             return (

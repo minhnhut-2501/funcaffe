@@ -139,14 +139,14 @@ await page.check('#reg-agree');
 await page.click('button[type=submit]');
 await page.waitForFunction(() => location.pathname.startsWith('/user'), null, { timeout: 60000 });
 
-ok(page.url().includes('/user/cafe'), 'đăng ký xong vào thẳng bước tạo quán đầu tiên');
+ok(page.url().includes('/user/shop'), 'đăng ký xong vào thẳng bước tạo quán đầu tiên');
 
 const { than: dangNhap } = await api('/auth/login', { method: 'POST', body: { email: emailMoi, password: MAT_KHAU } });
 const token = dangNhap?.token;
 ok(!!token, 'tài khoản mới đăng nhập được ngay');
 ok(dangNhap?.user?.role === 'user', 'vai trò mặc định là chủ quán, không phải quản trị');
 
-const { ma: maTaoQuan, than: quanMoi } = await api('/cafes', {
+const { ma: maTaoQuan, than: quanMoi } = await api('/shops', {
   token, method: 'POST', body: { name: `Quán E2E ${duy}`, address: '1 Đường Thử, TP.HCM', phone: '0901234567' },
 });
 ok(maTaoQuan === 201, 'tạo được quán đầu tiên');
@@ -156,18 +156,18 @@ const { than: dsGoi } = await api('/packages');
 const goiThu = dsGoi.find((g) => g.is_trial);
 ok(!!goiThu, 'bảng giá có gói dùng thử');
 
-const { ma: maNhanThu } = await api(`/cafes/${quanId}/subscriptions`, {
+const { ma: maNhanThu } = await api(`/shops/${quanId}/subscriptions`, {
   token, method: 'POST', body: { package_id: goiThu.id ?? goiThu._id, payment_method: 'vnpay' },
 });
 ok(maNhanThu === 201, 'nhận được gói dùng thử miễn phí');
 
-const { than: goiCuaQuan } = await api(`/cafes/${quanId}/subscriptions`, { token });
+const { than: goiCuaQuan } = await api(`/shops/${quanId}/subscriptions`, { token });
 const subThu = goiCuaQuan?.[0];
 const soNgayThu = subThu ? Math.round((new Date(subThu.end_date) - new Date(subThu.start_date)) / 86400000) : 0;
 ok(soNgayThu === 7, `gói dùng thử đúng 7 ngày (đo được ${soNgayThu})`);
 ok(subThu?.status === 'active', 'gói ở trạng thái đang hiệu lực, dùng được ngay');
 
-const { ma: maLanHai } = await api(`/cafes/${quanId}/subscriptions`, {
+const { ma: maLanHai } = await api(`/shops/${quanId}/subscriptions`, {
   token, method: 'POST', body: { package_id: goiThu.id ?? goiThu._id, payment_method: 'vnpay' },
 });
 ok(maLanHai >= 400, 'không xin được gói dùng thử lần thứ hai');
@@ -175,24 +175,24 @@ ok(maLanHai >= 400, 'không xin được gói dùng thử lần thứ hai');
 // ═══ 8.6.2 ═══ bán một đơn có topping và giảm giá → hóa đơn → doanh thu ════════
 batDau('8.6.2', 'Dựng thực đơn → bán đơn có topping và giảm giá → hóa đơn → doanh thu');
 
-const { than: dm } = await api(`/cafes/${quanId}/categories`, { token, method: 'POST', body: { name: 'Trà sữa', is_active: true } });
+const { than: dm } = await api(`/shops/${quanId}/categories`, { token, method: 'POST', body: { name: 'Trà sữa', is_active: true } });
 const dmId = dm?.id ?? dm?._id;
 ok(!!dmId, 'tạo được danh mục');
 
-const { than: mon } = await api(`/cafes/${quanId}/items`, {
+const { than: mon } = await api(`/shops/${quanId}/products`, {
   token, method: 'POST',
   body: { category_id: dmId, name: 'Trà sữa E2E', base_price: 30000, is_available: true, allow_topping: true },
 });
 const monId = mon?.id ?? mon?._id;
 ok(!!monId, 'tạo được món giá 30.000 đ');
 
-const { than: tp } = await api(`/cafes/${quanId}/toppings`, {
+const { than: tp } = await api(`/shops/${quanId}/toppings`, {
   token, method: 'POST', body: { name: 'Trân châu E2E', price: 7000, is_available: true },
 });
 const tpId = tp?.id ?? tp?._id;
 ok(!!tpId, 'tạo được topping giá 7.000 đ');
 
-const { than: ban } = await api(`/cafes/${quanId}/tables`, { token, method: 'POST', body: { name: 'Bàn E2E', capacity: 4 } });
+const { than: ban } = await api(`/shops/${quanId}/tables`, { token, method: 'POST', body: { name: 'Bàn E2E', capacity: 4 } });
 const banId = ban?.id ?? ban?._id;
 ok(!!banId, 'tạo được bàn');
 
@@ -200,12 +200,12 @@ ok(!!banId, 'tạo được bàn');
 //
 // Giảm giá nhập ở bước THANH TOÁN chứ không phải lúc lên order — đúng như quầy thật:
 // thu ngân bấm giảm giá rồi mới nhận tiền. `store()` không nhận trường này.
-const { ma: maDon, than: don } = await api(`/cafes/${quanId}/orders`, {
+const { ma: maDon, than: don } = await api(`/shops/${quanId}/orders`, {
   token, method: 'POST',
   body: {
     table_id: banId,
     items: [{
-      item_id: monId, item_name_snapshot: 'Trà sữa E2E', quantity: 2,
+      product_id: monId, product_name_snapshot: 'Trà sữa E2E', quantity: 2,
       toppings: [{ topping_id: tpId, topping_name_snapshot: 'Trân châu E2E', quantity: 1 }],
     }],
   },
@@ -213,10 +213,10 @@ const { ma: maDon, than: don } = await api(`/cafes/${quanId}/orders`, {
 const donId = don?.id ?? don?._id;
 ok(maDon === 201, 'lên được order có topping');
 
-const { than: donDoc } = await api(`/cafes/${quanId}/orders/${donId}`, { token });
+const { than: donDoc } = await api(`/shops/${quanId}/orders/${donId}`, { token });
 ok(Number(donDoc?.subtotal) === 74000, `tạm tính = 2 × (30.000 + 7.000) = 74.000 (đọc được ${donDoc?.subtotal})`);
 
-const { ma: maTra, than: hoaDon } = await api(`/cafes/${quanId}/orders/${donId}/pay`, {
+const { ma: maTra, than: hoaDon } = await api(`/shops/${quanId}/orders/${donId}/pay`, {
   token, method: 'POST', body: { payment_method: 'cash', cash_received: 100000, discount_amount: 4000 },
 });
 ok(maTra === 200, 'thanh toán thành công');
@@ -224,10 +224,10 @@ ok(Number(hoaDon?.total_amount) === 70000, `sau giảm 4.000 phải thu 70.000 (
 ok(Number(hoaDon?.change_amount) === 30000, `tiền thối = 100.000 − 70.000 = 30.000 (đọc được ${hoaDon?.change_amount})`);
 ok(!!hoaDon?.invoice_code, `sinh mã hóa đơn (${hoaDon?.invoice_code})`);
 
-const { than: banSau } = await api(`/cafes/${quanId}/tables`, { token });
+const { than: banSau } = await api(`/shops/${quanId}/tables`, { token });
 ok(banSau.find((b) => (b.id ?? b._id) === banId)?.status === 'empty', 'bàn được trả về trống sau khi thu tiền');
 
-const { than: dsHoaDon } = await api(`/cafes/${quanId}/orders?status=paid`, { token });
+const { than: dsHoaDon } = await api(`/shops/${quanId}/orders?status=paid`, { token });
 const tongDoanhThu = dsHoaDon.reduce((s, h) => s + Number(h.total_amount ?? 0), 0);
 ok(tongDoanhThu === 70000, `doanh thu quán = đúng 70.000 (đọc được ${tongDoanhThu})`);
 
@@ -247,7 +247,7 @@ const { than: mocThoiHan } = await api(`/packages/${goiTraPhi.id ?? goiTraPhi._i
 const moc1Thang = mocThoiHan.find((m) => m.duration_unit === 'month' && Number(m.duration_value) === 1) ?? mocThoiHan[0];
 ok(!!moc1Thang, `có mốc thời hạn để mua (${moc1Thang?.label})`);
 
-const { ma: maMua, than: ketQuaMua } = await api(`/cafes/${quanId}/subscriptions`, {
+const { ma: maMua, than: ketQuaMua } = await api(`/shops/${quanId}/subscriptions`, {
   token, method: 'POST',
   body: { package_id: goiTraPhi.id ?? goiTraPhi._id, time_subscription_id: moc1Thang.id ?? moc1Thang._id, payment_method: 'vnpay' },
 });
@@ -264,7 +264,7 @@ const soTien = Number(urlCong.searchParams.get('vnp_Amount'));
 ok(!!maGiaoDich && soTien > 0, `đường dẫn cổng mang đủ mã giao dịch và số tiền (${maGiaoDich}, ${soTien / 100} đ)`);
 
 // Điều thật sự cần giữ ở bước này: CHƯA trả tiền thì CHƯA có gói.
-const { than: goiTruocKhiTra } = await api(`/cafes/${quanId}/subscriptions`, { token });
+const { than: goiTruocKhiTra } = await api(`/shops/${quanId}/subscriptions`, { token });
 ok(!goiTruocKhiTra.some((s) => s.status === 'active' && s.package?.type === 'pro'),
   'trước khi cổng xác nhận: gói Pro CHƯA được cấp');
 
@@ -282,11 +282,11 @@ const chuKy = createHmac('sha512', biMat).update(chuoiKy).digest('hex');
 const traLoiCong = await fetch(`${API}/payments/vnpay/return?${chuoiKy}&vnp_SecureHash=${chuKy}`);
 ok(traLoiCong.status < 400, `cổng gọi về được chấp nhận (HTTP ${traLoiCong.status})`);
 
-const { than: gdSau } = await api(`/cafes/${quanId}/subscriptions/payments`, { token });
+const { than: gdSau } = await api(`/shops/${quanId}/subscriptions/payments`, { token });
 ok(gdSau.find((p) => p.transaction_code === maGiaoDich)?.payment_status === 'paid',
   'sau khi cổng xác nhận: giao dịch hiện ra trong lịch sử với trạng thái ĐÃ THANH TOÁN');
 
-const { than: goiSauMua } = await api(`/cafes/${quanId}/subscriptions`, { token });
+const { than: goiSauMua } = await api(`/shops/${quanId}/subscriptions`, { token });
 const goiPro = goiSauMua.find((s) => s.status === 'active' && s.package?.type === 'pro');
 ok(!!goiPro, 'gói Pro đã được kích hoạt');
 const soNgayPro = goiPro ? Math.round((new Date(goiPro.end_date) - new Date()) / 86400000) : 0;
@@ -295,7 +295,7 @@ ok(soNgayPro >= 27 && soNgayPro <= 32, `hạn gói cộng đúng khoảng một 
 // Cổng gọi về LẦN HAI (VNPay gửi cả Return lẫn IPN) không được cộng hạn thêm lần nữa.
 const hanTruoc = goiPro.end_date;
 await fetch(`${API}/payments/vnpay/return?${chuoiKy}&vnp_SecureHash=${chuKy}`);
-const { than: goiLanHai } = await api(`/cafes/${quanId}/subscriptions`, { token });
+const { than: goiLanHai } = await api(`/shops/${quanId}/subscriptions`, { token });
 ok(goiLanHai.find((s) => (s._id ?? s.id) === (goiPro._id ?? goiPro.id))?.end_date === hanTruoc,
   'cổng gọi về lần hai KHÔNG cộng hạn thêm lần nữa');
 
@@ -312,19 +312,19 @@ const { execFileSync } = await import('node:child_process');
 execFileSync(
   'php',
   ['artisan', 'tinker', '--execute',
-    `App\\Models\\Subscription::where('cafe_id','${quanId}')->update(['end_date' => now()->subDay()]);`],
+    `App\\Models\\Subscription::where('shop_id','${quanId}')->update(['end_date' => now()->subDay()]);`],
   { cwd: 'C:/FunCafe/backend', env: { ...process.env, MONGODB_DATABASE: 'funcafe_e2e' }, stdio: 'pipe' },
 );
 
-const { ma: maGhiKhiHetHan } = await api(`/cafes/${quanId}/categories`, {
+const { ma: maGhiKhiHetHan } = await api(`/shops/${quanId}/categories`, {
   token, method: 'POST', body: { name: 'Danh mục lẽ ra bị chặn', is_active: true },
 });
 ok(maGhiKhiHetHan === 403, `gói hết hạn thì thao tác ghi bị chặn (nhận ${maGhiKhiHetHan})`);
 
-const { ma: maDocKhiHetHan } = await api(`/cafes/${quanId}/orders?status=paid`, { token });
+const { ma: maDocKhiHetHan } = await api(`/shops/${quanId}/orders?status=paid`, { token });
 ok(maDocKhiHetHan === 200, 'nhưng vẫn ĐỌC được số liệu cũ — dữ liệu của quán không bị giam');
 
-const { than: giaHan } = await api(`/cafes/${quanId}/subscriptions`, {
+const { than: giaHan } = await api(`/shops/${quanId}/subscriptions`, {
   token, method: 'POST',
   body: { package_id: goiTraPhi.id ?? goiTraPhi._id, time_subscription_id: moc1Thang.id ?? moc1Thang._id, payment_method: 'vnpay' },
 });
@@ -340,7 +340,7 @@ const chuoiKy2 = Object.keys(thamSo2).sort().map((k) => `${k}=${encodeURICompone
 const chuKy2 = createHmac('sha512', biMat).update(chuoiKy2).digest('hex');
 await fetch(`${API}/payments/vnpay/return?${chuoiKy2}&vnp_SecureHash=${chuKy2}`);
 
-const { ma: maGhiSauGiaHan } = await api(`/cafes/${quanId}/categories`, {
+const { ma: maGhiSauGiaHan } = await api(`/shops/${quanId}/categories`, {
   token, method: 'POST', body: { name: 'Danh mục sau gia hạn', is_active: true },
 });
 ok(maGhiSauGiaHan === 201, `gia hạn xong là ghi được NGAY, không phải đăng nhập lại (nhận ${maGhiSauGiaHan})`);
@@ -348,19 +348,19 @@ ok(maGhiSauGiaHan === 201, `gia hạn xong là ghi được NGAY, không phải 
 // ═══ 8.6.6 ═══ hai quán → doanh thu tổng khớp tổng hai quán ════════════════════
 batDau('8.6.6', 'Hai quán → doanh thu gộp khớp tổng từng quán');
 
-const { than: quanHai } = await api('/cafes', {
+const { than: quanHai } = await api('/shops', {
   token, method: 'POST', body: { name: `Quán E2E hai ${duy}`, address: '2 Đường Thử, TP.HCM', phone: '0901234568' },
 });
 const quanHaiId = quanHai?.id ?? quanHai?._id;
 ok(!!quanHaiId, 'tạo được quán thứ hai');
 
-const { than: dsQuan } = await api('/cafes', { token });
+const { than: dsQuan } = await api('/shops', { token });
 ok(dsQuan.length === 2, `danh sách quán trả về đúng 2 quán (đọc được ${dsQuan.length})`);
 
 const { than: tongHop } = await api('/revenue/overview', { token });
 const tongGop = Number(tongHop?.total_revenue ?? tongHop?.total ?? 0);
-const { than: hd1 } = await api(`/cafes/${quanId}/orders?status=paid`, { token });
-const { than: hd2 } = await api(`/cafes/${quanHaiId}/orders?status=paid`, { token });
+const { than: hd1 } = await api(`/shops/${quanId}/orders?status=paid`, { token });
+const { than: hd2 } = await api(`/shops/${quanHaiId}/orders?status=paid`, { token });
 const tongTay = [...hd1, ...hd2].reduce((s, h) => s + Number(h.total_amount ?? 0), 0);
 ok(tongGop === tongTay, `doanh thu gộp (${tongGop}) = tổng cộng tay hai quán (${tongTay})`);
 

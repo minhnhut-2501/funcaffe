@@ -1,11 +1,11 @@
 %% FunCafe — ERD phản ánh ĐÚNG 100% schema MongoDB thực tế của dự án
 %% Đầy đủ mọi field (kể cả created_at/updated_at, reset_token...) và đầy đủ mọi khóa phụ.
-%% Các khóa denormalize (orders.cafe_id, package_payments.cafe_id/user_id...) là cố ý -
+%% Các khóa denormalize (orders.shop_id, package_payments.shop_id/user_id...) là cố ý -
 %% giữ trong DB để truy vấn nhanh, nên ERD cũng vẽ đúng như vậy.
 %% Cách dùng: dán trọn khối vào https://mermaid.live, hoặc draw.io: + (Insert) ▸ Advanced ▸ Mermaid...
 erDiagram
     %% ===== Quan hệ (đầy đủ mọi khóa phụ theo DB thật) =====
-    users ||--o{ cafes : "sở hữu"
+    users ||--o{ shops : "sở hữu"
     users ||--o{ subscriptions : "đăng ký"
     users ||--o{ package_payments : "thanh toán"
     users ||--o{ reviews : "viết"
@@ -21,25 +21,25 @@ erDiagram
     subscriptions ||--o{ package_payments : "thanh toán (subscription_id)"
     subscriptions ||--o{ package_payments : "gói bị thay thế (previous_subscription_id)"
 
-    cafes ||--o{ subscriptions : "gói của quán"
-    cafes ||--o{ package_payments : "giao dịch của quán"
-    cafes ||--o{ reviews : "thuộc về"
-    cafes ||--o{ tables : "có bàn"
-    cafes ||--o{ categories : "có danh mục"
-    cafes ||--o{ items : "có món"
-    cafes ||--o{ toppings : "có topping"
-    cafes ||--o{ orders : "phát sinh đơn"
+    shops ||--o{ subscriptions : "gói của quán"
+    shops ||--o{ package_payments : "giao dịch của quán"
+    shops ||--o{ reviews : "thuộc về"
+    shops ||--o{ tables : "có bàn"
+    shops ||--o{ categories : "có danh mục"
+    shops ||--o{ products : "có món"
+    shops ||--o{ toppings : "có topping"
+    shops ||--o{ orders : "phát sinh đơn"
 
-    categories ||--o{ items : "phân loại"
-    items ||--o{ item_prices : "giá theo size"
-    items ||--o{ item_toppings : "cho phép topping"
-    toppings ||--o{ item_toppings : "được gắn"
+    categories ||--o{ products : "phân loại"
+    products ||--o{ product_sizes : "giá theo size"
+    products ||--o{ product_toppings : "cho phép topping"
+    toppings ||--o{ product_toppings : "được gắn"
 
     tables ||--o{ orders : "phục vụ tại (table_id)"
     tables ||--o| orders : "đơn đang mở (current_order_id)"
     orders ||--|{ order_details : "gồm"
-    items ||--o{ order_details : "được bán"
-    item_prices ||--o{ order_details : "size đã chọn"
+    products ||--o{ order_details : "được bán"
+    product_sizes ||--o{ order_details : "size đã chọn"
     order_details ||--o{ order_detail_toppings : "kèm"
     toppings ||--o{ order_detail_toppings : "được chọn"
 
@@ -88,7 +88,7 @@ erDiagram
     subscriptions {
         ObjectId _id PK
         ObjectId user_id FK
-        ObjectId cafe_id FK
+        ObjectId shop_id FK
         ObjectId package_id FK
         ObjectId time_subscription_id FK
         string package_name_snapshot
@@ -103,7 +103,7 @@ erDiagram
     package_payments {
         ObjectId _id PK
         ObjectId user_id FK
-        ObjectId cafe_id FK
+        ObjectId shop_id FK
         ObjectId package_id FK
         ObjectId time_subscription_id FK
         ObjectId subscription_id FK
@@ -126,7 +126,7 @@ erDiagram
         date created_at
         date updated_at
     }
-    cafes {
+    shops {
         ObjectId _id PK
         ObjectId user_id FK
         string name
@@ -144,7 +144,7 @@ erDiagram
     }
     tables {
         ObjectId _id PK
-        ObjectId cafe_id FK
+        ObjectId shop_id FK
         string name
         int capacity
         int display_order
@@ -155,31 +155,31 @@ erDiagram
     }
     categories {
         ObjectId _id PK
-        ObjectId cafe_id FK
+        ObjectId shop_id FK
         string name
         string description
         bool is_active
         date created_at
         date updated_at
     }
-    items {
+    products {
         ObjectId _id PK
-        ObjectId cafe_id FK
+        ObjectId shop_id FK
         ObjectId category_id FK
         string name
         string description
         string image
         int base_price
         bool has_size
-        bool allow_topping
+        bool has_topping
         bool is_available
         int display_order
         date created_at
         date updated_at
     }
-    item_prices {
+    product_sizes {
         ObjectId _id PK
-        ObjectId item_id FK
+        ObjectId product_id FK
         string size_name
         int price
         bool is_active
@@ -188,7 +188,7 @@ erDiagram
     }
     toppings {
         ObjectId _id PK
-        ObjectId cafe_id FK
+        ObjectId shop_id FK
         string name
         number price
         string image
@@ -196,16 +196,16 @@ erDiagram
         date created_at
         date updated_at
     }
-    item_toppings {
+    product_toppings {
         ObjectId _id PK
-        ObjectId item_id FK
+        ObjectId product_id FK
         ObjectId topping_id FK
         date created_at
         date updated_at
     }
     orders {
         ObjectId _id PK
-        ObjectId cafe_id FK
+        ObjectId shop_id FK
         ObjectId table_id FK
         string code UK
         string status
@@ -227,9 +227,9 @@ erDiagram
     order_details {
         ObjectId _id PK
         ObjectId order_id FK
-        ObjectId item_id FK
-        ObjectId item_price_id FK
-        string item_name_snapshot
+        ObjectId product_id FK
+        ObjectId product_size_id FK
+        string product_name_snapshot
         string size_name_snapshot
         int quantity
         number unit_price
@@ -254,7 +254,7 @@ erDiagram
     reviews {
         ObjectId _id PK
         ObjectId user_id FK
-        ObjectId cafe_id FK
+        ObjectId shop_id FK
         ObjectId package_id FK
         int rating
         string title
@@ -268,7 +268,7 @@ erDiagram
         string full_name
         string email
         string phone
-        string cafe_name
+        string shop_name
         string content
         bool is_read
         string reply

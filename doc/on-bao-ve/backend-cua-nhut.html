@@ -1,0 +1,702 @@
+<title>Backend của Nhựt</title>
+<style>
+  :root {
+    --ground: #FAF8F7; --surface: #FFFFFF; --surface-2: #F3EFEE;
+    --ink: #1A1614; --ink-2: #453C39; --muted: #6C625E;
+    --line: #E5DEDC; --line-2: #CEC5C2;
+    --brick: #963226; --brick-tint: #F8EAE7;
+    --amber: #8A5A0D; --amber-tint: #FAF0DD;
+    --green: #1F5D42; --green-tint: #E6F0EB;
+    --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", "Roboto Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #151211; --surface: #1E1A19; --surface-2: #262120;
+      --ink: #EFEAE8; --ink-2: #D2C9C6; --muted: #978C88;
+      --line: #302A29; --line-2: #453D3B;
+      --brick: #E08872; --brick-tint: #2C1815;
+      --amber: #E0A445; --amber-tint: #2A2113;
+      --green: #6FC49E; --green-tint: #16281F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #151211; --surface: #1E1A19; --surface-2: #262120;
+    --ink: #EFEAE8; --ink-2: #D2C9C6; --muted: #978C88;
+    --line: #302A29; --line-2: #453D3B;
+    --brick: #E08872; --brick-tint: #2C1815;
+    --amber: #E0A445; --amber-tint: #2A2113;
+    --green: #6FC49E; --green-tint: #16281F;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground); color: var(--ink);
+    font-family: var(--serif); font-size: 16.5px; line-height: 1.63;
+    margin: 0; padding: 0 20px 96px; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+
+  .masthead { padding: 56px 0 26px; border-bottom: 2px solid var(--ink); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--brick); margin: 0 0 10px;
+  }
+  h1 {
+    font-family: var(--sans); font-size: clamp(30px, 5.2vw, 44px);
+    line-height: 1.07; letter-spacing: -0.025em; font-weight: 800;
+    margin: 0; text-wrap: balance;
+  }
+  .lede { margin: 14px 0 0; color: var(--muted); max-width: 64ch; }
+
+  h2 {
+    font-family: var(--sans); font-size: 12.5px; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+    margin: 56px 0 16px; padding-bottom: 9px; border-bottom: 1px solid var(--line-2);
+  }
+  h4 { font-family: var(--sans); font-size: 15.5px; font-weight: 700; margin: 26px 0 6px; }
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+  a { color: var(--brick); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--brick); outline-offset: 3px; border-radius: 3px; }
+
+  code {
+    font-family: var(--mono); font-size: .845em;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 4px; padding: .1em .36em; color: var(--ink-2);
+    overflow-wrap: anywhere;
+  }
+  pre {
+    margin: 14px 0 0; padding: 13px 15px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 9px; overflow-x: auto;
+    font-family: var(--mono); font-size: 12.8px; line-height: 1.65; color: var(--ink-2);
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  /* khái niệm */
+  .concept {
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--surface); margin-top: 16px; overflow: hidden;
+  }
+  .concept-head {
+    padding: 12px 18px; background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+    display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;
+  }
+  .concept-head b { font-family: var(--sans); font-size: 16px; }
+  .concept-head span {
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  }
+  .concept-body { padding: 15px 18px 17px; }
+
+  /* việc */
+  .item {
+    border: 1px solid var(--line); border-radius: 14px;
+    background: var(--surface); padding: 24px 26px 26px; margin-top: 20px;
+  }
+  .item-head { display: flex; gap: 13px; align-items: baseline; flex-wrap: wrap; margin-bottom: 6px; }
+  .item-no {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--brick);
+    background: var(--brick-tint); border-radius: 999px; padding: 4px 11px; white-space: nowrap;
+  }
+  .item-head h3 {
+    font-family: var(--sans); font-size: 20px; font-weight: 700;
+    letter-spacing: -0.015em; margin: 0; flex: 1; min-width: 0; text-wrap: balance;
+  }
+
+  .say {
+    margin: 16px 0 0; padding: 2px 0 2px 20px;
+    border-left: 1px solid var(--green); color: var(--ink-2);
+  }
+  .say::before {
+    content: "Nói với thầy"; display: block;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--green); margin-bottom: 5px;
+  }
+
+  .qa {
+    margin: 16px 0 0; padding: 13px 16px;
+    border: 1px solid var(--brick); background: var(--brick-tint);
+    border-radius: 8px; font-size: 15px; color: var(--ink-2);
+  }
+  .qa::before {
+    content: "Thầy hỏi"; display: block;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--brick); margin-bottom: 5px;
+  }
+  .qa p { margin: 0 0 10px; }
+  .qa p:last-child { margin: 0; }
+  .qa b { font-family: var(--sans); font-size: 14.5px; }
+
+  .note {
+    margin: 16px 0 0; padding: 13px 16px;
+    border: 1px solid var(--amber); background: var(--amber-tint);
+    border-radius: 8px; font-size: 15px; color: var(--ink-2);
+  }
+  .note::before {
+    content: "Đừng nói nhầm"; display: block;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--amber); margin-bottom: 5px;
+  }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 16px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 560px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: var(--sans); font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted); font-weight: 700;
+    background: var(--surface-2); white-space: nowrap;
+  }
+  td.mono { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+
+  ul.plain { margin: 12px 0 0; padding-left: 21px; }
+  ul.plain > li { margin-bottom: 8px; }
+
+  footer {
+    margin-top: 58px; padding-top: 18px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; padding: 0 15px 72px; }
+    .masthead { padding-top: 36px; }
+    .item { padding: 18px 16px 20px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">FunCafe · Khối D · dành cho người không chuyên Laravel</p>
+    <h1>Backend của Nhựt</h1>
+    <p class="lede">Năm đầu việc backend bạn đứng tên nhưng bảng phân công không gọi là “Backend”. Mỗi phần: nó làm gì, dùng cơ chế Laravel nào, câu nói sẵn cho hội đồng, và câu hỏi ngược thầy hay bồi thêm.</p>
+  </header>
+
+  <h2>Phần 0 · Laravel trong mười phút, đọc bằng code của chính bạn</h2>
+
+  <p>Không cần học Laravel tổng quát. Chỉ cần hiểu <strong>bảy cơ chế</strong> dưới đây, vì code của bạn chỉ dùng đúng bảy cái đó.</p>
+
+  <div class="note" style="border-color: var(--green); background: var(--green-tint);">
+    <span style="display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);margin-bottom:5px;">Cách đọc phần này</span>
+    Mỗi cơ chế được giải thích theo ba nhịp: <strong>bạn đã biết nó rồi ở React/Next</strong> → <strong>ở Laravel nó tên là gì</strong> → <strong>nó sinh ra để giải quyết chuyện gì</strong>. Đừng học thuộc cú pháp — nắm được nhịp thứ ba là trả lời được mọi câu hỏi về nó.
+  </div>
+
+  <h4>Một request đi qua đâu</h4>
+  <pre><code>POST /api/cafes/68a1.../subscriptions
+        │
+   1 ── bootstrap/app.php      đăng ký middleware toàn cục
+   2 ── routes/api.php         khớp tuyến, gắn middleware riêng
+   3 ── middleware             throttle → auth:sanctum → EnsureAccountActive → subscription
+   4 ── Controller             SubscriptionController::store()
+   5 ── validate()             sai kiểu → tự ném 422, không chạy tiếp
+   6 ── Model (Eloquent)       Subscription::create([...])
+   7 ── MongoDB
+        │
+        └─ response()->json([...])  đi ngược ra, qua middleware theo chiều ngược lại</code></pre>
+
+  <div class="concept">
+    <div class="concept-head"><b>1 · Route</b><span>routes/api.php</span></div>
+    <div class="concept-body">
+      <p><strong>Bạn đã biết rồi.</strong> Trong Next.js, bạn tạo tệp <code>src/app/user/sales/page.tsx</code> và tự nhiên có đường dẫn <code>/user/sales</code>. Đó chính là routing — chỉ khác là Next.js suy ra đường dẫn <em>từ cấu trúc thư mục</em>.</p>
+
+      <p><strong>Laravel làm ngược lại:</strong> khai tất cả trong <em>một tệp danh sách</em>. Không có thư mục nào tự thành URL. Muốn có đường dẫn thì phải viết ra:</p>
+      <pre><code>Route::post('cafes/{cafe}/subscriptions', [SubscriptionController::class, 'store']);
+//            └── đường dẫn ──┘             └── lớp xử lý ──┘        └─ tên hàm ─┘</code></pre>
+
+      <p>Đọc dòng này thành lời: <em>“ai gọi POST tới <code>/api/cafes/&lt;gì đó&gt;/subscriptions</code> thì chạy hàm <code>store()</code> trong lớp <code>SubscriptionController</code>.”</em></p>
+
+      <p>Hai chi tiết cần biết:</p>
+      <ul class="plain">
+        <li><code>{cafe}</code> trong ngoặc nhọn là <strong>chỗ trống</strong>, khớp với bất cứ giá trị nào. Giống <code>[cafeId]</code> trong tên thư mục Next.js.</li>
+        <li>Mọi tuyến trong tệp <code>api.php</code> <strong>tự động</strong> được thêm tiền tố <code>/api</code>. Nên viết <code>'cafes/...'</code> mà URL thật là <code>/api/cafes/...</code>. Chỗ này hay làm người mới bối rối khi tra route không thấy.</li>
+      </ul>
+
+      <p><strong>Vì sao Laravel chọn một tệp danh sách?</strong> Vì bạn nhìn <em>một chỗ</em> là thấy toàn bộ API và ai gác cửa nào. Trong dự án của bạn, mở <code>routes/api.php</code> là đọc được ngay “tuyến nào cần đăng nhập, tuyến nào cần gói, tuyến nào công khai” — thứ mà cấu trúc thư mục không nói được.</p>
+      <pre><code>Route::post('cafes/{cafe}/orders', [OrderController::class,'store'])
+     ->middleware('subscription');   // ← gắn thêm chốt chặn RIÊNG cho tuyến này</code></pre>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><b>2 · Route Model Binding</b><span>thứ trông như phép thuật</span></div>
+    <div class="concept-body">
+      <p><strong>Bạn đã biết một nửa.</strong> Ở Next.js, thư mục <code>[cafeId]</code> cho bạn <code>params.cafeId</code> — tức là <em>chuỗi id</em>. Muốn có dữ liệu quán thì bạn phải tự đi gọi API lấy về.</p>
+
+      <p><strong>Laravel đi thêm một bước:</strong> nó không đưa bạn cái id, nó đưa luôn <strong>bản ghi đã lấy sẵn từ CSDL</strong>.</p>
+
+      <pre><code>// routes/api.php  — chỗ trống tên là {cafe}
+Route::get('cafes/{cafe}/orders', [OrderController::class, 'index']);
+
+// OrderController.php — tham số khai kiểu Cafe, TÊN trùng với {cafe}
+public function index(Request $request, Cafe $cafe)
+{
+    // Tới đây $cafe ĐÃ là đối tượng quán đầy đủ.
+    // Không có dòng Cafe::find(...) nào cả — Laravel làm hộ rồi.
+    $cafe->name;   // dùng được ngay
+}</code></pre>
+
+      <p><strong>Cơ chế:</strong> Laravel thấy tham số khai kiểu <code>Cafe</code> và tên <code>$cafe</code> trùng với chỗ trống <code>{cafe}</code> trên URL, nên nó tự chạy <code>Cafe::find($giaTriTrenUrl)</code> trước khi gọi hàm của bạn.</p>
+
+      <p><strong>Nếu không tìm thấy?</strong> Laravel trả <code>404</code> ngay, hàm <code>index()</code> <em>không chạy dòng nào</em>. Nghĩa là bên trong hàm bạn không bao giờ phải viết <code>if (!$cafe) return 404</code>.</p>
+
+      <p><strong>Vấn đề nó giải quyết:</strong> dự án có hơn 20 hàm nhận <code>{cafe}</code>. Không có binding thì mỗi hàm phải lặp lại ba dòng tìm-và-kiểm — và chỉ cần một hàm quên là chỗ đó nổ khi gặp id không tồn tại.</p>
+
+      <div class="note">
+        <strong>Đây là chỗ dễ trả lời sai nhất.</strong> Binding chỉ <em>tìm đúng bản ghi</em> — nó <strong>không</strong> hỏi “quán này có phải của người đang đăng nhập không”. Với nó, quán của bạn hay quán người lạ đều là một bản ghi hợp lệ như nhau.<br><br>
+        Việc kiểm quyền sở hữu là của <code>authorizeCafe()</code>, gọi ở <strong>dòng đầu tiên</strong> mỗi hàm. Lẫn hai thứ này chính là lỗ hổng <strong>IDOR</strong> dự án từng dính: hồi đó binding vẫn chạy ngon, URL vẫn trả dữ liệu — chỉ là trả dữ liệu của <em>người khác</em>.
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><b>3 · Middleware</b><span>app/Http/Middleware/</span></div>
+    <div class="concept-body">
+      <p><strong>Bạn đã viết middleware rồi mà không gọi nó là middleware.</strong> Nhìn lại <code>src/lib/api-client.ts</code> của chính bạn:</p>
+      <pre><code>async function guiRequest(endpoint, options) {
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;   // ← việc chung TRƯỚC
+
+  const response = await fetch(url, {...});               // ← việc thật
+
+  if (response.status === 401) {                          // ← việc chung SAU
+    removeToken();
+    window.location.href = '/login';
+  }
+}</code></pre>
+      <p>Mọi lượt gọi API đều chui qua hàm này. Nó làm <em>việc chung</em> — gắn token, bắt 401 — để 15 service không phải lặp lại. <strong>Đó chính xác là ý tưởng middleware</strong>, chỉ là bạn cài nó ở phía trình duyệt.</p>
+
+      <p><strong>Laravel làm y vậy ở phía máy chủ.</strong> Một middleware là một lớp có đúng một hàm, và hàm đó có <em>hai đường ra</em>:</p>
+      <pre><code>public function handle(Request $request, Closure $next): Response
+{
+    if (!$duocPhep) {
+        return response()->json(['message' => '...'], 403);  // ĐƯỜNG A: chặn,
+    }                                                         //   controller KHÔNG chạy
+
+    return $next($request);                                   // ĐƯỜNG B: cho đi tiếp
+}</code></pre>
+
+      <p><code>$next</code> là <strong>phần còn lại của chuỗi</strong> — middleware kế tiếp, và cuối cùng là controller. Gọi <code>$next($request)</code> nghĩa là “tôi xong việc rồi, mời đi tiếp”. <em>Không</em> gọi nó nghĩa là chặn tại đây.</p>
+
+      <p><strong>Chúng xếp thành lớp, như củ hành.</strong> Request đi từ ngoài vào, response đi từ trong ra:</p>
+      <pre><code>request  →  throttle  →  auth:sanctum  →  EnsureAccountActive  →  subscription  →  Controller
+response ←──────────────────────────────────────────────────────────────────────────────┘</code></pre>
+      <p>Rơi ở lớp nào thì dừng ngay lớp đó. Chưa đăng nhập thì <code>auth:sanctum</code> trả <code>401</code>, và ba lớp sau <em>không chạy dòng nào</em>.</p>
+
+      <p><strong>Khai ở đâu.</strong> Đặt tên ngắn một lần trong <code>bootstrap/app.php</code>:</p>
+      <pre><code>$middleware->alias([
+    'admin'        => AdminMiddleware::class,
+    'subscription' => CheckSubscription::class,
+    'ai'           => RequiresAI::class,
+]);</code></pre>
+      <p>rồi dùng tên đó ở route: <code>-&gt;middleware('subscription')</code>.</p>
+
+      <p><strong>Vấn đề nó giải quyết:</strong> luật “quán phải có gói còn hạn mới được ghi dữ liệu” áp cho khoảng 15 tuyến. Không có middleware thì phải chép đoạn kiểm đó vào 15 hàm — và quên một chỗ là chỗ đó thành cửa sau. Có middleware thì luật viết <em>một lần</em>, gắn bằng một chữ.</p>
+
+      <div class="note">
+        Laravel 11 trở lên <strong>không còn</strong> tệp <code>app/Http/Kernel.php</code> — mọi thứ dồn về <code>bootstrap/app.php</code>. Thầy quen Laravel 8–10 có thể hỏi “Kernel đâu”, cứ trả lời như vậy.
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><b>4 · Model &amp; Eloquent</b><span>app/Models/</span></div>
+    <div class="concept-body">
+      <p><strong>Bạn đã biết rồi.</strong> Ở frontend, <code>src/services/orders.ts</code> là <em>nơi duy nhất</em> biết URL API và biết cách đổi <code>item_price_id</code> thành <code>sizeId</code>. Trang không bao giờ tự gọi <code>fetch</code>.</p>
+
+      <p><strong>Model là đúng vai đó ở backend:</strong> nơi duy nhất biết collection tên gì và có trường nào. Controller không bao giờ tự viết câu lệnh truy vấn CSDL.</p>
+
+      <p><strong>ORM là gì.</strong> Object–Relational Mapping: <em>một lớp PHP ứng với một collection, một đối tượng ứng với một bản ghi</em>. Bạn thao tác bằng đối tượng, thư viện tự dịch sang câu lệnh CSDL.</p>
+      <pre><code>Subscription::where('cafe_id', $id)->effective()->latest()->first();
+//     ↑ lớp          ↑ lọc           ↑ lọc thêm    ↑ sắp    ↑ lấy 1</code></pre>
+      <p>Cách nối đuôi này bạn quen rồi — nó giống hệt <code>arr.filter(...).sort(...)[0]</code> trong JavaScript. Mỗi lời gọi trả về <em>câu truy vấn đang dựng dở</em>, và chỉ tới <code>first()</code> / <code>get()</code> / <code>exists()</code> thì nó mới thật sự chạy xuống CSDL.</p>
+
+      <h4>Ba thứ khai trong một model</h4>
+      <ul class="plain">
+        <li><strong><code>$fillable</code> — danh sách trắng.</strong> Chỉ những trường có tên ở đây mới được gán hàng loạt qua <code>create()</code> / <code>update()</code>. Đây <em>không phải</em> chuyện dọn dẹp — nó là chốt chặn bảo mật: người dùng gửi kèm <code>"role": "admin"</code> vào request thì trường đó bị <strong>lặng lẽ bỏ qua</strong> vì <code>role</code> không nằm trong <code>$fillable</code>.</li>
+        <li><strong><code>$casts</code> — ép kiểu khi đọc.</strong> Mongo có thể trả về <code>"1"</code> hoặc <code>true</code>; khai <code>'is_trial' =&gt; 'boolean'</code> thì đọc ra luôn là boolean thật, khỏi phải đoán.</li>
+        <li><strong>Quan hệ</strong> — khai <code>hasMany</code> / <code>belongsTo</code> một lần rồi viết <code>$cafe-&gt;orders</code> như một thuộc tính. Laravel tự đi lấy.</li>
+      </ul>
+
+      <h4>Scope — đặt tên cho một điều kiện lọc</h4>
+      <p>Đây là thứ đáng khoe nhất trong model của bạn. Scope là <strong>một mẩu điều kiện được đặt tên</strong> để nhiều nơi dùng lại:</p>
+      <pre><code>// Models/Subscription.php — khai MỘT lần
+public function scopeEffective($query) {
+    return $query->where('status','active')->where('end_date','>',now());
+}
+
+// dùng ở mọi nơi, BỎ chữ "scope" khi gọi:
+Subscription::where('cafe_id',$id)->effective()->exists();</code></pre>
+      <p>Nó giống hệt việc bạn tách <code>calcItemTopping()</code> ra <code>lib/cart.ts</code> thay vì viết lại công thức trong từng component.</p>
+
+      <p class="say">“Em gom định nghĩa <em>gói còn hiệu lực</em> vào một scope để bốn nơi dùng chung một định nghĩa. Trước đó mỗi nơi tự viết lại điều kiện, và có nơi chỉ kiểm <code>status</code> mà quên <code>end_date</code> — nên gói đã quá hạn vẫn được coi là còn, và quán đó vẫn bán hàng được.”</p>
+
+      <div class="note">
+        Laravel gốc chỉ nói chuyện với CSDL quan hệ. Dự án chạy được với MongoDB nhờ gói <code>mongodb/laravel-mongodb</code>: model kế thừa <code>MongoDB\Laravel\Eloquent\Model</code> thay vì lớp mặc định, và khai <code>$connection = 'mongodb'</code>. Cú pháp truy vấn giữ nguyên hoàn toàn.
+      </div>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><b>5 · Service &amp; Dependency Injection</b><span>app/Services/</span></div>
+    <div class="concept-body">
+      <p><strong>Service — phần dễ.</strong> Logic phức tạp tách khỏi controller thành lớp riêng, giống hệt việc bạn tách <code>lib/cart.ts</code> ra khỏi <code>sales/page.tsx</code>. Controller lo nhận request và trả response; service lo phần tính toán.</p>
+
+      <p><strong>Dependency Injection — phần trông lạ.</strong> Bình thường muốn dùng một lớp thì phải tự tạo nó:</p>
+      <pre><code>$gemini = new GeminiService($apiKey, $model, $timeout);   // phải tự lo mọi tham số</code></pre>
+      <p>Laravel không bắt làm vậy. Bạn chỉ <strong>khai mình cần cái gì</strong> ở hàm khởi tạo, framework tự dựng rồi đưa vào tay:</p>
+      <pre><code>class AiController extends Controller
+{
+    public function __construct(
+        private GeminiService $gemini,        // ← chỉ khai kiểu
+        private RevenueStats $revenueStats,   // ← Laravel tự tạo và truyền vào
+    ) {}
+
+    public function chat(Request $request, Cafe $cafe) {
+        $this->gemini->chat(...);             // dùng được ngay
+    }
+}</code></pre>
+
+      <p><strong>Bạn đã quen mô hình này.</strong> Trong React bạn viết <code>const { user } = useAuth()</code> — bạn <em>không</em> tự tạo đối tượng user, không tự đọc token, không tự gọi API. Bạn chỉ nói “tôi cần user”, và Context đưa cho bạn. DI là đúng ý đó: <strong>khai nhu cầu, framework lo phần cung cấp</strong>.</p>
+
+      <p>Bộ phận làm việc này gọi là <strong>service container</strong>. Nó nhìn kiểu dữ liệu bạn khai (<code>GeminiService</code>), tự dựng đối tượng đó, và nếu <code>GeminiService</code> lại cần thứ khác nữa thì nó dựng luôn cả chuỗi.</p>
+
+      <p><strong>Vấn đề nó giải quyết:</strong> <code>GeminiService</code> cần khoá API, tên mô hình, hạn chờ, đường dẫn chứng chỉ. Có bốn nơi dùng tới nó. Không có DI thì bốn nơi phải cùng biết cách dựng nó — đổi một tham số là phải sửa bốn chỗ, quên một chỗ thì chỗ đó chạy sai lặng lẽ.</p>
+
+      <p class="say">“Em tách <code>RevenueStats</code> ra service vì cả trang Doanh thu lẫn trợ lý AI đều cần cùng một phép cộng. Để trong controller thì phải chép sang chỗ thứ hai, và hai bản chép sẽ lệch nhau ở lần sửa tiếp theo — lúc đó hai màn hình cùng nói về một quán mà ra hai con số.”</p>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><b>6 · Validation</b><span>$request-&gt;validate()</span></div>
+    <div class="concept-body">
+      <p><strong>Bạn đã làm việc này ở form.</strong> Ô email phải đúng định dạng, mật khẩu tối thiểu 8 ký tự — nhưng đó là kiểm ở <em>trình duyệt</em>, và ai gọi thẳng API thì không đi qua form nào cả. Máy chủ buộc phải kiểm lại.</p>
+
+      <p>Laravel cho khai luật thành <em>bảng</em> thay vì viết một dãy <code>if</code>:</p>
+      <pre><code>$validated = $request->validate([
+    'package_id'     => 'required|string',
+    'payment_method' => ['required','string','in:vnpay,momo'],
+    'note'           => 'nullable|string|max:500',
+]);
+// Chạy tới được dòng này = dữ liệu ĐÃ hợp lệ. Khỏi if.</code></pre>
+
+      <p>Đọc luật: <code>required</code> bắt buộc có · <code>nullable</code> cho phép trống · <code>in:vnpay,momo</code> chỉ nhận đúng hai giá trị đó · <code>max:500</code> tối đa 500 ký tự.</p>
+
+      <p><strong>Sai luật thì sao?</strong> Laravel <em>ném ngoại lệ và tự chuyển thành phản hồi <code>422</code></em> kèm chi tiết sai ở trường nào. Dòng lệnh sau <code>validate()</code> không chạy. Bạn không viết <code>if</code>, không viết <code>return</code> — nó tự thoát.</p>
+
+      <p><strong>Và đây là phần quan trọng nhất, hay bị bỏ qua:</strong> <code>$validated</code> <em>chỉ chứa những trường bạn đã khai</em>. Client gửi kèm trường lạ thì nó không có mặt trong biến đó.</p>
+      <pre><code>// Client gửi:  { package_id: "...", payment_method: "vnpay", amount: 0 }
+// $validated:  { package_id: "...", payment_method: "vnpay" }
+//                                            ↑ "amount" bị bỏ, không cách nào lọt vào CSDL</code></pre>
+      <p>Đúng cơ chế này là thứ chặn đường sửa giá trong dự án của bạn: <code>unit_price</code> và <code>subtotal</code> <strong>cố ý không khai</strong> trong luật của <code>OrderController</code>, nên gửi lên cũng không ai đọc — máy chủ luôn tự tra giá từ CSDL.</p>
+
+      <p class="say">“Em không tin bất cứ con số nào client gửi lên. Các trường giá bị loại khỏi luật kiểm tra, nghĩa là dù có gửi cũng không đi tới đâu — máy chủ tự tra giá từ cơ sở dữ liệu rồi mới tính.”</p>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="concept-head"><b>7 · Config, Facade, Trait</b><span>ba thứ nhỏ hay gặp</span></div>
+    <div class="concept-body">
+      <h4>Config — giống <code>process.env</code> nhưng có thêm một tầng</h4>
+      <p>Ở Next.js bạn đọc <code>process.env.NEXT_PUBLIC_API_URL</code>. Laravel cũng có <code>env()</code>, nhưng <strong>không đọc thẳng</strong> — luôn đi qua một tệp config ở giữa:</p>
+      <pre><code>.env                  VAT_RATE=10
+config/funcafe.php    'vat_rate' => (float) env('VAT_RATE', 10),
+mã ứng dụng           config('funcafe.vat_rate')</code></pre>
+      <p><strong>Vì sao phải vòng qua tầng giữa?</strong> Lúc triển khai người ta chạy <code>php artisan config:cache</code> để gộp toàn bộ config thành một tệp cho nhanh. Sau lệnh đó, <strong><code>env()</code> gọi ở bất cứ đâu ngoài tệp config đều trả về rỗng</strong>. Gọi thẳng <code>env()</code> trong controller là chạy tốt ở máy mình rồi hỏng lặng lẽ trên bản triển khai — VAT thành 0, khoá API thành chuỗi rỗng.</p>
+
+      <h4>Facade — lối gọi tắt cho một dịch vụ dùng sẵn</h4>
+      <pre><code>Cache::remember('key', now()->addMinutes(10), fn() => ...);
+Log::warning('[tu-van] Gọi Gemini hỏng', [...]);
+Http::withHeaders([...])->post($url, $body);</code></pre>
+      <p>Trông như hàm tĩnh nhưng thật ra Laravel chuyển tiếp lời gọi tới một đối tượng đã dựng sẵn trong container. Với bạn thì cứ hiểu như <code>import { toast } from '@/hooks/use-toast'</code> — một tiện ích chung, gọi ở đâu cũng được, không phải tự tạo.</p>
+
+      <h4>Trait — vì PHP không cho kế thừa nhiều lớp</h4>
+      <p>Một lớp PHP chỉ được <code>extends</code> <strong>đúng một</strong> lớp cha. Nhưng <code>OrderController</code> cần ba mẩu chức năng dùng chung. Trait là cách gỡ: một mẩu mã được “dán” vào lớp lúc biên dịch.</p>
+      <pre><code>class OrderController extends Controller
+{
+    use ChecksCafeOwnership;   // cho hàm authorizeCafe()
+    use ChecksCafeStatus;      // cho guardBanHang(), guardSuaDoi()
+    use RunsAtomically;        // cho atomic()
+
+    public function store(...) {
+        $this->authorizeCafe($cafe);   // dùng như thể hàm của chính lớp này
+    }
+}</code></pre>
+      <p><strong>Gần nhất với thứ bạn quen: custom hook.</strong> <code>useToast()</code> được nhiều component dùng mà không component nào “sở hữu” nó. Trait cũng vậy — logic dùng chung, không phải quan hệ cha–con.</p>
+      <p>Dự án có bốn trait, và đều sinh ra từ một bài học: <code>ChecksCafeOwnership</code> ra đời sau khi phát hiện mỗi hàm tự kiểm quyền một kiểu và vài hàm quên hẳn.</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <p><b>“Laravel dùng Eloquent cho SQL, sao chạy được với MongoDB?”</b></p>
+    <p>Nhờ gói <code>mongodb/laravel-mongodb</code> — nó viết một driver Mongo cho Eloquent. Model kế thừa <code>MongoDB\Laravel\Eloquent\Model</code> thay vì lớp mặc định, và khai <code>$connection = 'mongodb'</code>, <code>$collection = '...'</code>. Cú pháp truy vấn giữ nguyên. Đổi lại phải tự lo hai thứ mà quan hệ cho sẵn: <strong>chỉ mục</strong> (khai bằng lệnh riêng <code>php artisan db:indexes</code> vì Mongo không đi qua migration) và <strong>ràng buộc khoá ngoại</strong> (Mongo không cascade, nên hệ thống không xoá cứng mà chỉ ẩn).</p>
+  </div>
+
+  <h2>Việc 17 · Gói dịch vụ</h2>
+
+  <div class="item">
+    <div class="item-head"><span class="item-no">Nặng nhất</span><h3>API mua – gia hạn – nâng cấp có cấn trừ</h3></div>
+
+    <p><strong>Làm gì:</strong> chủ quán chọn gói và thời hạn, hệ thống tự nhận ra đây là mua mới, nâng cấp, gia hạn hay hạ gói, tính đúng số tiền phải trả rồi tạo giao dịch.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Tệp</th><th>Vai trò</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">SubscriptionController.php</td><td>Bốn nhánh + công thức cấn trừ + xem trước</td></tr>
+          <tr><td class="mono">Models/Subscription.php</td><td>Hai scope <code>effective()</code> và <code>latestForCafe()</code></td></tr>
+          <tr><td class="mono">Middleware/CheckSubscription.php</td><td>Chặn ghi dữ liệu khi quán không có gói</td></tr>
+          <tr><td class="mono">Middleware/RequiresAI.php</td><td>Chặn tuyến AI theo cờ <code>can_use_ai</code></td></tr>
+          <tr><td class="mono">Concerns/EnforcesPackageLimits.php</td><td>Trần số bàn và số món</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Cơ chế Laravel dùng ở đây</h4>
+    <ul class="plain">
+      <li><strong>Middleware</strong> — ba chốt chặn <code>subscription</code>, <code>ai</code>, và trait hạn mức</li>
+      <li><strong>Scope</strong> — <code>effective()</code> / <code>latestForCafe()</code>, hai khái niệm khác nhau</li>
+      <li><strong>Trait</strong> — <code>EnforcesPackageLimits</code> dán vào <code>ItemController</code> và <code>TableController</code></li>
+      <li><strong>Validation</strong> — danh sách hợp lệ dựng thẳng từ hằng <code>PackagePayment::ONLINE_GATEWAYS</code></li>
+    </ul>
+
+    <h4>Công thức phải thuộc</h4>
+    <pre><code>credit = total_amount × (giây còn lại / tổng giây của chu kỳ)
+payable = max(0, giá gói mới − credit)</code></pre>
+    <p>Con số demo: <code>548.900 − 218.875 = 330.025</code>. Hụt 25đ so với 218.900 đã trả vì gói cũ đã chạy được vài phút.</p>
+
+    <p class="say">“Phần này em làm cả API lẫn giao diện. Khó nhất là nâng cấp giữa kỳ: phải quy phần chưa dùng của gói cũ ra tiền rồi trừ vào gói mới. Em chia theo <em>giây</em> chứ không theo ngày, vì gói ngắn nhất là 7 ngày — làm tròn lên ngày là lệch tới 14% giá trị. Và em thêm một API <code>preview</code> chỉ đọc, không ghi gì, để khách thấy trước số tiền thực trả rồi mới quyết định.”</p>
+
+    <div class="qa">
+      <p><b>“Sao không cho hạ gói?”</b> Vì chưa có câu trả lời nghiệp vụ cho khoản tiền thừa: hoàn lại, giữ làm credit, hay mất? Nhóm chọn chặn hẳn thay vì cài một cách xử lý tuỳ tiện. Muốn hạ thì chờ hết hạn rồi mua gói thấp hơn.</p>
+      <p><b>“Khách bấm mua rồi tắt trang thì sao?”</b> Không được cấp gì. Với cổng online, ở bước tạo đơn hệ thống chỉ ghi bản ghi trạng thái <code>pending</code> — chưa huỷ gói cũ, chưa cộng ngày. Mọi hệ quả bị <em>hoãn</em> tới khi cổng xác nhận đã thu tiền.</p>
+    </div>
+  </div>
+
+  <h2>Việc 18 · Cổng thanh toán VNPay</h2>
+
+  <div class="item">
+    <div class="item-head"><span class="item-no">Backend thuần</span><h3>Ký HMAC và hai đường cổng gọi về</h3></div>
+
+    <p><strong>Làm gì:</strong> dựng URL chuyển sang cổng VNPay, rồi nhận kết quả trả về và kích hoạt gói — nhưng chỉ khi chắc chắn tiền đã vào.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Tệp</th><th>Vai trò</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">Services/VnpayService.php</td><td>Dựng URL + xác thực chữ ký · <strong>81 dòng</strong></td></tr>
+          <tr><td class="mono">PaymentGatewayController.php</td><td>Nhận Return và IPN, quyết định kích hoạt hay từ chối</td></tr>
+          <tr><td class="mono">Services/SubscriptionActivator.php</td><td>Nơi thật sự cấp gói, dùng chung cho cả hai đường</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Bốn bước ký, đối xứng nhau</h4>
+    <pre><code>ksort($data);                                    // sắp khoá theo bảng chữ cái
+$hashData = "k1=urlencode(v1)&k2=urlencode(v2)"; // nối thành chuỗi
+$hash = hash_hmac('sha512', $hashData, $secret); // ký bằng khoá bí mật
+hash_equals($tinhRa, $nhanVe);                   // so khi nhận về</code></pre>
+
+    <p class="say">“HMAC là chữ ký dựa trên một khoá bí mật chỉ hai bên biết. Em <code>ksort</code> trước khi nối chuỗi vì hai bên phải nối theo cùng thứ tự, mà thứ tự tham số trên URL không đảm bảo. Và em so bằng <code>hash_equals</code> chứ không dùng <code>===</code>: nó so trong thời gian không đổi, còn <code>===</code> dừng ngay khi gặp ký tự khác nhau — độ chênh thời gian đó đủ để dò từng ký tự chữ ký.”</p>
+
+    <h4>Vì sao có hai đường về</h4>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Đường</th><th>Ai gọi</th><th>Vai trò</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Return</strong></td><td>Trình duyệt khách</td><td>Đưa khách về trang kết quả. Có thể <em>không bao giờ tới</em> — khách tắt tab ngay sau khi trả tiền.</td></tr>
+          <tr><td><strong>IPN</strong></td><td>Máy chủ VNPay</td><td>Nguồn tin cậy về dòng tiền, đi được cả khi khách đã đóng trình duyệt.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Hai đường cùng gọi <code>markPaidAndActivate()</code>, thường cách nhau vài phần nghìn giây. Chống cộng hạn hai lần bằng <strong>ghi có điều kiện</strong>:</p>
+    <pre><code>$daGianh = PackagePayment::where('_id', $payment->id)
+    ->whereIn('payment_status', ['pending','failed'])
+    ->update(['payment_status' => 'paid', 'paid_at' => now()]);
+
+if ($daGianh === 0) return false;   // bên kia vừa thắng, dừng ngay</code></pre>
+
+    <div class="qa">
+      <p><b>“Sao không dùng transaction?”</b> MongoDB chỉ hỗ trợ transaction khi chạy replica set; máy phát triển chạy máy đơn nên không có. Vì vậy điều kiện phải nằm <em>trong chính câu lệnh ghi</em> — cập nhật một tài liệu trong Mongo là thao tác nguyên tử, nên chỉ một bên đổi được trạng thái, bên kia nhận về 0 dòng. Trait <code>RunsAtomically</code> bọc sẵn: có replica set thì dùng transaction thật, không thì chạy thẳng.</p>
+      <p><b>“Có thể giả callback để được gói miễn phí không?”</b> Không. Chữ ký cần khoá bí mật chỉ hai bên biết, và số tiền phải khớp đơn trong CSDL. Nhóm đã thử đủ ba trường hợp trên bản chạy thật: chữ ký sai bị từ chối, chữ ký đúng nhưng lệch tiền cũng bị từ chối, chỉ lượt hợp lệ mới kích hoạt.</p>
+    </div>
+  </div>
+
+  <h2>Việc 20 · Doanh thu và trợ lý AI</h2>
+
+  <div class="item">
+    <div class="item-head"><span class="item-no">Nửa backend nặng</span><h3>Tổng hợp ở máy chủ, AI chỉ diễn giải</h3></div>
+
+    <p><strong>Làm gì:</strong> gộp doanh thu nhiều quán trong một khoảng ngày, và cho AI đọc số liệu đó để đưa nhận xét.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Tệp</th><th>Vai trò</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">Services/RevenueStats.php</td><td>Một vòng quét trả sáu kết quả</td></tr>
+          <tr><td class="mono">UserRevenueController.php</td><td>Hai endpoint <code>summary</code> và <code>overview</code></td></tr>
+          <tr><td class="mono">Services/GeminiService.php</td><td>Gọi Gemini: chat, streaming, JSON có khuôn</td></tr>
+          <tr><td class="mono">AiController.php</td><td>Dựng ngữ cảnh quán rồi mới hỏi AI</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="say">“Toàn bộ số ở trang Doanh thu được cộng ở <em>máy chủ</em> rồi mới trả về, chứ không tải hết hóa đơn về trình duyệt rồi cộng. Một lượt gọi trả vài chục kilobyte thay vì một lượt cho mỗi quán trả vài megabyte — và chi phí đó không lớn dần theo số hóa đơn tích lũy. Quán bán một năm vẫn mở nhanh như quán mới mở.”</p>
+
+    <h4>Ba chi tiết đáng khoe</h4>
+    <ul class="plain">
+      <li><strong>Một vòng lặp, sáu con số.</strong> Sáu vòng riêng sẽ đọc lại cùng tập dữ liệu sáu lần. Quan trọng hơn: gộp về một chỗ nghĩa là <em>một định nghĩa duy nhất</em> cho “doanh thu”.</li>
+      <li><strong>Chỉ nạp bốn trường.</strong> <code>get(['_id','cafe_id','total_amount','paid_at','created_at'])</code> — ghi chú, tiền khách đưa, tiền thối không góp gì vào một con số tổng.</li>
+      <li><strong>Múi giờ.</strong> Hàm <code>toCarbon()</code> luôn đổi sang giờ Việt Nam trước khi cắt chuỗi ngày. Mongo lưu theo UTC; quên đổi thì mọi đơn bán từ 0h–7h sáng bị xếp sang <em>hôm trước</em> — mà quán cà phê mở sớm nên đây không phải trường hợp hiếm.</li>
+    </ul>
+
+    <h4>Nguyên tắc của phần AI</h4>
+    <p>Máy chủ chịu trách nhiệm về <strong>con số</strong>, AI chỉ chịu trách nhiệm về <strong>lời diễn giải</strong>. AI được đưa sẵn một cục JSON số liệu kèm mệnh lệnh “chỉ dựa trên số liệu đưa ra, không bịa thêm số”, và bị ép trả về đúng khuôn bằng <code>responseSchema</code>.</p>
+
+    <div class="qa">
+      <p><b>“Sao không để AI tự truy vấn cơ sở dữ liệu?”</b> Vì nó sẽ <em>bịa</em>. Mô hình ngôn ngữ luôn trả lời trôi chảy kể cả khi không có dữ liệu. Tách đôi thì số sai là lỗi ở code và sửa được; lời văn dở thì cũng chỉ là lời văn.</p>
+      <p><b>“AI có đọc được dữ liệu quán khác không?”</b> Không. Tuyến AI mang <code>cafes/{cafe}</code> trong URL và <code>authorizeCafe()</code> kiểm quyền sở hữu trước mọi thứ khác. Còn hộp chat ở trang giới thiệu đi tuyến riêng, ngữ cảnh chỉ có bảng gói — các hàm nạp số liệu quán <em>không hề chạy</em> ở nhánh đó.</p>
+    </div>
+  </div>
+
+  <h2>Việc 26 · Rà soát và vá lỗi bảo mật</h2>
+
+  <div class="item">
+    <div class="item-head"><span class="item-no">Xuyên hệ thống</span><h3>Năm thứ nguy hiểm vì im lặng</h3></div>
+
+    <p>Đây là việc nhóm trưởng phải ôm, vì nó đòi nhìn <em>toàn</em> hệ thống chứ không nhìn một màn hình.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Vá gì</th><th>Nếu không vá</th></tr></thead>
+        <tbody>
+          <tr><td><strong>IDOR</strong> — gom kiểm quyền sở hữu quán về trait <code>ChecksCafeOwnership</code></td><td>Đổi <code>cafe_id</code> trên URL là thao tác được lên quán người khác</td></tr>
+          <tr><td><strong>Không tin giá client</strong> — bỏ <code>unit_price</code> khỏi validate</td><td>Sửa một con số trong request là mua ly cà phê giá 1đ</td></tr>
+          <tr><td><strong>Giới hạn tần suất</strong> — <code>throttleApi()</code> cho toàn bộ <code>/api</code></td><td>Một script vòng lặp lấp đầy hạn mức 512MB của Atlas, ảnh hưởng <em>mọi</em> quán</td></tr>
+          <tr><td><strong><code>APP_DEBUG=false</code></strong> khi triển khai</td><td>Một lỗi 500 bất kỳ in ra <em>toàn bộ</em> biến môi trường: khoá cổng thanh toán, chuỗi kết nối CSDL</td></tr>
+          <tr><td><strong>CORS</strong> đúng tên miền, không để <code>*</code></td><td>Mọi trang web gọi được API này bằng token của người đang đăng nhập</td></tr>
+          <tr><td><code>reset_token</code> nằm trong <code>$hidden</code></td><td>Ai đọc được là chiếm được tài khoản</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="say">“Phần lớn những thứ này <em>không làm hỏng gì ngay</em> — ứng dụng vẫn chạy, không báo lỗi nào — nên rất dễ lên mạng rồi vẫn còn nguyên. Em cho ứng dụng tự ghi cảnh báo vào log khi phát hiện cấu hình sai, nhưng cách chắc hơn là kiểm bằng danh sách trước mỗi lần triển khai.”</p>
+
+    <div class="qa">
+      <p><b>“IDOR là gì?”</b> Insecure Direct Object Reference — tham chiếu trực tiếp tới đối tượng mà không kiểm quyền. Cụ thể ở đây: URL mang <code>cafe_id</code>, nếu máy chủ chỉ tra bản ghi mà không hỏi “quán này có phải của người đang gọi không” thì đổi số trên URL là xem được dữ liệu người khác. Trước đây chỉ hàm <code>index()</code> kiểm, còn <code>store</code>, <code>update</code>, <code>pay</code> thì không.</p>
+    </div>
+  </div>
+
+  <h2>Việc 32 · Bộ kiểm thử tự động</h2>
+
+  <div class="item">
+    <div class="item-head"><span class="item-no">6.142 dòng</span><h3>PHPUnit ở máy chủ, Vitest ở giao diện</h3></div>
+
+    <p><strong>246 bài máy chủ</strong> và <strong>126 bài giao diện</strong>, không kiểm thử dàn trải mà tập trung vào hai nhóm sai sót <em>không hiện ra trên màn hình</em>: quy tắc về <strong>tiền</strong> và quy tắc về <strong>quyền</strong>.</p>
+
+    <pre><code>public function test_khach_dua_thieu_tien_thi_khong_thanh_toan_duoc(): void
+{
+    Sanctum::actingAs($this->user);              // giả lập đăng nhập
+
+    $this->postJson("/api/cafes/{$id}/orders/{$orderId}/pay", [
+        'payment_method' => 'cash',
+        'cash_received'  => 10_000,              // đơn 60.000
+    ])->assertStatus(422);                       // phải bị từ chối
+}</code></pre>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Khái niệm</th><th>Nghĩa</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">Feature test</td><td>Gọi thật qua HTTP, đi hết chuỗi route → middleware → controller → CSDL</td></tr>
+          <tr><td class="mono">Unit test</td><td>Gọi thẳng một hàm, không dựng HTTP — ví dụ <code>ProratedCreditTest</code></td></tr>
+          <tr><td class="mono">Sanctum::actingAs()</td><td>Giả lập một người đã đăng nhập, khỏi phải gọi API đăng nhập</td></tr>
+          <tr><td class="mono">assertStatus(422)</td><td>Khẳng định máy chủ phải trả đúng mã đó</td></tr>
+          <tr><td class="mono">setUp()</td><td>Chạy trước MỖI bài, dựng lại dữ liệu nền sạch</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="say">“Em không kiểm thử nút bấm — nút hỏng thì nhìn là thấy. Em kiểm những quy tắc mà sai sót <em>không</em> hiện ra: cấn trừ sai 200 đồng, hay một tài khoản đọc được dữ liệu quán khác. Bài kiểm thử ghi vào cơ sở dữ liệu riêng <code>funcafe_testing</code> và tự từ chối chạy nếu bị trỏ nhầm vào dữ liệu thật.”</p>
+
+    <div class="qa">
+      <p><b>“Chạy thử cho thầy xem.”</b> <code>cd backend &amp;&amp; php artisan test</code> — chạy hết chừng 20 giây. Lọc một bộ: <code>php artisan test --filter=ProratedCreditTest</code>.</p>
+      <p><b>“Máy không có MongoDB thì sao?”</b> Các bài Feature tự bỏ qua thay vì báo đỏ — để bộ kiểm thử không thành thứ ai cũng học cách phớt lờ.</p>
+    </div>
+  </div>
+
+  <h2>“Em chuyên ngành hẹp frontend, sao lại biết Laravel?”</h2>
+
+  <div class="item">
+    <div class="item-head"><span class="item-no">Câu chắc chắn bị hỏi</span><h3>Trả lời bằng chuyển giao kiến thức, không bằng nhận vơ</h3></div>
+
+    <p>Đây là câu hỏi hợp lý và thầy có quyền hỏi. Sai lầm duy nhất là <strong>nhận mình rành Laravel</strong> — thầy hỏi thêm một câu sâu là lộ ngay. Câu trả lời mạnh nằm ở chỗ khác.</p>
+
+    <h4>Nền đã có chuyển thẳng sang được</h4>
+    <p>Node.js không phải kiến thức bỏ đi ở đây — nó là <em>chính</em> lý do bạn đọc được Laravel nhanh. Hai framework khác cú pháp nhưng cùng mô hình:</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Node.js / Express — đã học</th><th>Laravel — dự án này</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">app.post('/path', handler)</td><td class="mono">Route::post('path', [Ctrl::class,'store'])</td></tr>
+          <tr><td class="mono">(req, res, next) =&gt; { next() }</td><td class="mono">handle($request, Closure $next) { return $next($request); }</td></tr>
+          <tr><td class="mono">Mongoose: Model.find({...})</td><td class="mono">Eloquent: Model::where(...)-&gt;get()</td></tr>
+          <tr><td class="mono">npm install · package.json</td><td class="mono">composer install · composer.json</td></tr>
+          <tr><td class="mono">process.env.X · dotenv</td><td class="mono">env('X') → config('...')</td></tr>
+          <tr><td class="mono">res.status(422).json({...})</td><td class="mono">response()-&gt;json([...], 422)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>Khái niệm <em>middleware</em> là của Express trước khi là của Laravel.</strong> Ai đã viết <code>next()</code> trong Express thì hiểu ngay <code>$next($request)</code> — chỉ là đổi ngôn ngữ, không phải học lại tư duy.</p>
+
+    <h4>Và dự án chỉ dùng bảy cơ chế</h4>
+    <p>Laravel rất lớn, nhưng backend của bạn <strong>không</strong> dùng queue, event, broadcasting, Blade, Livewire, policy, observer, job. Đúng bảy thứ ở Phần 0 tài liệu này. Học bảy cơ chế cho một dự án là việc bình thường của nghề, không phải chuyện phi thường.</p>
+
+    <div class="note">
+      Đừng nói “Laravel dễ mà thầy”. Nó nghe như xem thường, và mở đường cho một câu hỏi khó ngay sau đó. Nói “em chỉ dùng một phần nhỏ của Laravel, và em nắm chắc phần đó”.
+    </div>
+
+    <h4>Bằng chứng thật: giải thích được <em>vì sao</em></h4>
+    <p>Đây mới là chỗ ăn điểm. Người chép tutorial viết ra code chạy được nhưng <strong>không giải thích nổi các quyết định</strong>. Bạn thì giải thích được — và mỗi câu dưới đây đều là thứ không tutorial nào dạy:</p>
+
+    <ul class="plain">
+      <li><strong>Vì sao <code>hash_equals</code> chứ không <code>===</code>?</strong> Nó so trong thời gian không đổi; <code>===</code> dừng ngay ở ký tự khác nhau đầu tiên, và độ chênh thời gian đó đủ để dò chữ ký.</li>
+      <li><strong>Vì sao <code>ksort</code> trước khi ký?</strong> Hai bên phải nối chuỗi theo cùng thứ tự, mà thứ tự tham số trên URL không đảm bảo.</li>
+      <li><strong>Vì sao ghi có điều kiện thay vì transaction?</strong> Mongo máy đơn không có transaction, nên điều kiện phải nằm trong chính câu lệnh <code>update</code>.</li>
+      <li><strong>Vì sao hai scope <code>effective()</code> và <code>latestForCafe()</code>?</strong> Một cái trả lời “được phép làm gì”, cái kia trả lời “đang ở tình trạng nào” — gói hết hạn phải bị loại ở cái đầu nhưng phải được giữ ở cái sau.</li>
+      <li><strong>Vì sao cấn trừ chia theo giây?</strong> Gói ngắn nhất 7 ngày, làm tròn lên ngày là lệch tới 14% giá trị.</li>
+      <li><strong>Vì sao <code>'failed'</code> vẫn kích hoạt được?</strong> Trạng thái đó do hệ thống <em>phỏng đoán</em> khi dọn đơn quá hạn, còn callback đã ký là <em>sự thật</em> về dòng tiền — sự thật phải thắng phỏng đoán.</li>
+    </ul>
+
+    <p class="say">“Dạ đúng, chuyên ngành hẹp của em là frontend và trước đồ án em mới học PHP cơ bản với Node.js. Nhưng khái niệm thì chuyển được: middleware, route, ORM, biến môi trường — Express và Laravel cùng mô hình, chỉ khác cú pháp. Em tự học Laravel trong quá trình làm, và dự án cũng chỉ dùng một phần nhỏ của nó: route, middleware, Eloquent, service, validation, config và testing. Em không dám nói mình rành Laravel, nhưng phần em viết thì em giải thích được từng quyết định — vì sao dùng ghi có điều kiện thay cho transaction, vì sao so chữ ký bằng <code>hash_equals</code> chứ không phải dấu bằng ba. Thầy hỏi chỗ nào em xin trình bày chỗ đó.”</p>
+
+    <div class="qa">
+      <p><b>“Vậy sao không làm frontend cho đúng chuyên ngành?”</b></p>
+      <p>“Em có làm — màn hình bán hàng POS là phần frontend lớn nhất dự án, khoảng 1.100 dòng, và giao diện trang Doanh thu cũng của em. Em nhận thêm phần backend liên quan tới tiền và quyền vì em là nhóm trưởng, mà mấy phần đó phải nhìn xuyên hệ thống thì mới nhất quán — để một người làm sẽ chắc hơn chia nhỏ.”</p>
+    </div>
+  </div>
+
+  <h2>Nếu bị hỏi một thứ Laravel bạn chưa nắm</h2>
+
+  <p>Đừng đoán. Câu an toàn và trung thực:</p>
+
+  <p class="say">“Chỗ đó em chưa nắm sâu, phần đó bạn Duy phụ trách. Nhưng em biết nó nằm ở <em>[tên tệp]</em> và nó giải quyết <em>[vấn đề gì]</em> — em xin phép mở code ra xem lại rồi trả lời thầy.”</p>
+
+  <p>Nói được <strong>tệp nào</strong> và <strong>vấn đề gì</strong> đã chứng minh bạn đọc code của cả nhóm, đúng vai nhóm trưởng. Đoán bừa rồi sai mới là thứ mất điểm.</p>
+
+  <h4>Ba câu chốt dùng được cho mọi tình huống</h4>
+  <ul class="plain">
+    <li><strong>“Chỗ này em kiểm ở cả hai đầu.”</strong> Giao diện kiểm để hiện đúng, máy chủ kiểm để giữ luật.</li>
+    <li><strong>“Mongo không có transaction nên em dùng ghi có điều kiện.”</strong> Đưa điều kiện vào chính câu lệnh <code>update</code>, trả về 0 dòng thì dừng.</li>
+    <li><strong>“Không xoá, chỉ ẩn.”</strong> Vì hóa đơn cũ tham chiếu tới món và danh mục, mà Mongo không cascade.</li>
+  </ul>
+
+  <footer>FunCafe · Khối D · Laravel 13 · PHP 8.3 · mongodb/laravel-mongodb</footer>
+
+</div>

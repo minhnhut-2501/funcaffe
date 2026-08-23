@@ -72,7 +72,7 @@ export default function AdminReviewsPage() {
       return (
         (r.userName?.toLowerCase().includes(q) ?? false) ||
         (r.userEmail?.toLowerCase().includes(q) ?? false) ||
-        (r.cafeName?.toLowerCase().includes(q) ?? false) ||
+        (r.shopName?.toLowerCase().includes(q) ?? false) ||
         (r.title?.toLowerCase().includes(q) ?? false) ||
         (r.comment?.toLowerCase().includes(q) ?? false)
       );
@@ -180,7 +180,7 @@ export default function AdminReviewsPage() {
                       {r.userEmail && <span className="block text-xs text-cafe-400">{r.userEmail}</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="block text-cafe-600">{r.cafeName || '—'}</span>
+                      <span className="block text-cafe-600">{r.shopName || '—'}</span>
                       {r.packageName && <span className="block text-xs text-cafe-400">{r.packageName}</span>}
                     </td>
                     <td className="px-4 py-3"><StarRating rating={r.rating} /></td>
@@ -267,7 +267,7 @@ export default function AdminReviewsPage() {
               {[
                 { label: 'Người đánh giá', value: detail.userName || '—' },
                 { label: 'Email', value: detail.userEmail || '—' },
-                { label: 'Quán', value: detail.cafeName || '—' },
+                { label: 'Quán', value: detail.shopName || '—' },
                 { label: 'Gói lúc đánh giá', value: detail.packageName || '—' },
                 { label: 'Gửi lúc', value: formatDateTime(detail.createdAt) },
                 {

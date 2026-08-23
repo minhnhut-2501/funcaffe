@@ -11,7 +11,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { isSubscriptionExpired, expiryState, daysLeftUntil, EXPIRY_SOON_DAYS, type ExpiryState } from '@/lib/permission';
 import { invoiceService } from '@/services';
-import type { CafeInfo } from '@/types';
+import type { ShopInfo } from '@/types';
 import AiChatWidget from '@/components/ai/AiChatWidget';
 import SidebarNav, { type NavGroup } from '@/components/layouts/SidebarNav';
 
@@ -42,7 +42,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'Tài khoản',
     items: [
-      { href: '/user/cafe', label: 'Quản lý quán', icon: Store },
+      { href: '/user/shop', label: 'Quản lý quán', icon: Store },
       { href: '/user/profile', label: 'Hồ sơ cá nhân', icon: User },
     ],
   },
@@ -65,10 +65,10 @@ function PackageBadge({ type }: { type: string }) {
  * Dùng chung cho chuông và cho chấm cảnh báo ở dropdown chuyển quán, để hai chỗ
  * không bao giờ nói khác nhau.
  */
-function cafesNeedingAttention(cafes: CafeInfo[]) {
-  return cafes
-    .map((c) => ({ cafe: c, state: expiryState(c.packageEndDate) }))
-    .filter((x): x is { cafe: CafeInfo; state: 'soon' | 'expired' } => x.state === 'soon' || x.state === 'expired')
+function shopsNeedingAttention(shops: ShopInfo[]) {
+  return shops
+    .map((c) => ({ shop: c, state: expiryState(c.packageEndDate) }))
+    .filter((x): x is { shop: ShopInfo; state: 'soon' | 'expired' } => x.state === 'soon' || x.state === 'expired')
     .sort((a, b) => (a.state === b.state ? 0 : a.state === 'expired' ? -1 : 1));
 }
 
@@ -148,8 +148,8 @@ function Sidebar({ collapsed, mobileOpen, onClose, onToggle, onLogout }: { colla
 }
 
 // ĐA QUÁN: dropdown chuyển quán đang quản lý + lối tắt thêm quán.
-function CafeSwitcher() {
-  const { cafes, activeCafeId, setActiveCafe } = useAuth();
+function ShopSwitcher() {
+  const { shops, activeShopId, setActiveShop } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -157,11 +157,11 @@ function CafeSwitcher() {
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
-  const active = cafes.find((c) => c.id === activeCafeId);
-  if (cafes.length === 0) return null;
+  const active = shops.find((c) => c.id === activeShopId);
+  if (shops.length === 0) return null;
   // Chấm trên chính nút mở dropdown: cảnh báo phải thấy được KHI ĐANG ĐÓNG, vì
   // quán sắp hết hạn thường là quán người dùng không đứng ở đó nên chẳng bao giờ mở ra.
-  const needAttention = cafesNeedingAttention(cafes);
+  const needAttention = shopsNeedingAttention(shops);
   const worst: ExpiryState = needAttention.some((x) => x.state === 'expired')
     ? 'expired'
     : needAttention.length > 0 ? 'soon' : 'ok';
@@ -177,20 +177,20 @@ function CafeSwitcher() {
         <div className="absolute left-0 top-full mt-2 w-72 bg-white rounded-2xl border border-line shadow-pop z-40 overflow-hidden anim-pop origin-top-left">
           <div className="px-4 py-2.5 border-b border-line text-[11px] font-semibold uppercase tracking-wider text-cafe-400">Quán của bạn</div>
           <div className="max-h-72 overflow-y-auto py-1">
-            {cafes.map((c) => (
+            {shops.map((c) => (
               <button
                 key={c.id}
-                onClick={async () => { await setActiveCafe(c.id); setOpen(false); }}
-                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-sand transition-colors ${c.id === activeCafeId ? 'bg-sand/60' : ''}`}
+                onClick={async () => { await setActiveShop(c.id); setOpen(false); }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-sand transition-colors ${c.id === activeShopId ? 'bg-sand/60' : ''}`}
               >
                 <Store className="w-4 h-4 text-bean shrink-0" />
                 <span className="flex-1 text-sm text-ink truncate">{c.name}</span>
                 <ExpiryDot state={expiryState(c.packageEndDate)} />
-                {c.id === activeCafeId && <Check className="w-4 h-4 text-pine shrink-0" />}
+                {c.id === activeShopId && <Check className="w-4 h-4 text-pine shrink-0" />}
               </button>
             ))}
           </div>
-          <Link href="/user/cafe" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-3 border-t border-line text-sm font-semibold text-bean hover:bg-sand transition-colors">
+          <Link href="/user/shop" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-3 border-t border-line text-sm font-semibold text-bean hover:bg-sand transition-colors">
             <Plus className="w-4 h-4" /> Thêm quán
           </Link>
         </div>
@@ -202,7 +202,7 @@ function CafeSwitcher() {
 type Notif = { id: string; kind: 'invoice' | 'soon' | 'expired'; message: string; href: string };
 
 function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
-  const { user, activeCafeId, cafes } = useAuth();
+  const { user, activeShopId, shops } = useAuth();
   const sub = user?.subscription;
   const pathname = usePathname();
   const current = navGroups
@@ -226,16 +226,16 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         ? [{ id: 'inv-today', kind: 'invoice', message: `Hôm nay có ${count} hóa đơn mới`, href: '/user/invoices' }]
         : []);
     }).catch(() => {});
-  }, [activeCafeId]);
+  }, [activeShopId]);
 
   // Cảnh báo hạn gói của MỌI quán, không riêng quán đang chọn — quán bị bỏ quên
   // mới là quán dễ hết hạn mà không ai hay. Quán đã hết hạn xếp trên quán sắp hết.
-  const expiryNotifs: Notif[] = cafesNeedingAttention(cafes).map(({ cafe, state }) => ({
-    id: `exp-${cafe.id}`,
+  const expiryNotifs: Notif[] = shopsNeedingAttention(shops).map(({ shop, state }) => ({
+    id: `exp-${shop.id}`,
     kind: state,
     message: state === 'expired'
-      ? `Gói của “${cafe.name}” đã hết hạn — quán đang ở chế độ chỉ xem`
-      : `Gói của “${cafe.name}” còn ${daysLeftUntil(cafe.packageEndDate as string)} ngày`,
+      ? `Gói của “${shop.name}” đã hết hạn — quán đang ở chế độ chỉ xem`
+      : `Gói của “${shop.name}” còn ${daysLeftUntil(shop.packageEndDate as string)} ngày`,
     href: '/user/subscription',
   }));
 
@@ -256,7 +256,7 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
       </button>
 
       {/* ĐA QUÁN: chọn quán đang quản lý */}
-      <CafeSwitcher />
+      <ShopSwitcher />
 
       {/* Breadcrumb trang hiện tại — lấp khoảng trống trái topbar + định hướng */}
       {current && (
@@ -374,7 +374,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isLoading, cafes, cafesError, activeCafeId, logout, reloadCafes } = useAuth();
+  const { user, isLoading, shops, shopsError, activeShopId, logout, reloadShops } = useAuth();
   const hasPackage = user?.subscription.packageType !== 'none';
   const expired = isSubscriptionExpired(user?.subscription);
   // Sắp hết hạn của QUÁN ĐANG CHỌN. Các quán khác đã được chuông và chấm ở dropdown
@@ -411,24 +411,24 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
 
   // ĐA QUÁN: nếu user chưa có quán nào -> ép sang trang Quản lý quán để tạo quán đầu tiên.
   //
-  // CHỈ khi danh sách quán tải THÀNH CÔNG mà rỗng. Lượt gọi /cafes hỏng cũng cho ra
+  // CHỈ khi danh sách quán tải THÀNH CÔNG mà rỗng. Lượt gọi /shops hỏng cũng cho ra
   // mảng rỗng, và nếu tính luôn trường hợp đó thì một lần mạng chập là chủ quán đang
   // có hai quán bị đá sang màn hình "tạo quán đầu tiên" — vừa sai vừa đáng sợ.
-  const [cafeReady, setCafeReady] = useState<boolean | null>(null);
+  const [shopReady, setShopReady] = useState<boolean | null>(null);
   useEffect(() => {
     if (isLoading || !user) return;
-    if (pathname === '/user/cafe' || pathname === '/user/subscription') { setCafeReady(true); return; }
-    if (cafesError) { setCafeReady(true); return; }
-    if (cafes.length === 0) { router.replace('/user/cafe'); return; }
-    setCafeReady(true);
-  }, [pathname, router, isLoading, user, cafes, cafesError]);
+    if (pathname === '/user/shop' || pathname === '/user/subscription') { setShopReady(true); return; }
+    if (shopsError) { setShopReady(true); return; }
+    if (shops.length === 0) { router.replace('/user/shop'); return; }
+    setShopReady(true);
+  }, [pathname, router, isLoading, user, shops, shopsError]);
 
   // Đang khôi phục phiên: vẽ khung xương thay vì trả null. Trả null là MÀN HÌNH
   // TRẮNG — trên máy chủ miễn phí vừa ngủ dậy, khoảng trắng đó kéo dài vài giây và
   // người dùng tưởng ứng dụng hỏng.
   if (isLoading) return <KhungChoPhien />;
   if (!user || user.role !== 'user') return null; // đang chuyển hướng
-  if (cafeReady === null) return null;
+  if (shopReady === null) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper">
@@ -438,13 +438,13 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
         <Topbar onMenuClick={() => setMobileOpen(true)} />
         {/* Không tải được danh sách quán: nói thẳng ra và cho đường thử lại. Im lặng
             ở đây nghĩa là người dùng thấy "0 quán" rồi tự kết luận mình mất dữ liệu. */}
-        {cafesError && (
+        {shopsError && (
           <div className="bg-red-50 border-b border-red-200 px-4 sm:px-6 py-2.5 flex items-center justify-between flex-wrap gap-2">
             <p className="text-sm text-red-700 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               Không tải được danh sách quán. Dữ liệu của bạn vẫn còn nguyên — chỉ là máy chủ chưa trả lời.
             </p>
-            <button onClick={() => reloadCafes()} className="text-xs font-semibold bg-red-100 text-red-700 px-3 py-1.5 rounded-full hover:bg-red-200 transition-colors">
+            <button onClick={() => reloadShops()} className="text-xs font-semibold bg-red-100 text-red-700 px-3 py-1.5 rounded-full hover:bg-red-200 transition-colors">
               Thử lại
             </button>
           </div>
@@ -486,7 +486,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
         )}
         {/* ĐA QUÁN: đổi quán -> remount toàn bộ trang để mọi useApi nạp lại dữ liệu quán mới
             (tránh việc trang vẫn hiển thị dữ liệu quán cũ tới khi F5). */}
-        <main key={activeCafeId ?? 'no-cafe'} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main key={activeShopId ?? 'no-shop'} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {/* key={pathname}: đổi trang là React thay key -> .anim-page chạy lại,
               nội dung mới nhô lên thay vì nhảy phắt vào chỗ. */}
           <div key={pathname} className="anim-page">{children}</div>

@@ -126,7 +126,7 @@ function PublicHeader() {
                 <Link href="/login" className="text-sm font-medium text-ink/80 hover:text-bean transition-colors">
                   Đăng nhập
                 </Link>
-                <Link href="/register" className="btn-cafe py-2 px-4">
+                <Link href="/register" className="btn-shop py-2 px-4">
                   Dùng thử miễn phí
                 </Link>
               </>
@@ -182,13 +182,13 @@ function PublicHeader() {
           {user ? (
             <>
               <span className="px-3 pb-1 text-sm text-ink/70 truncate">Xin chào, {user.fullName}</span>
-              <Link href={dashboardHref} onClick={() => setMobileOpen(false)} className="btn-cafe py-3">Vào quản lý</Link>
+              <Link href={dashboardHref} onClick={() => setMobileOpen(false)} className="btn-shop py-3">Vào quản lý</Link>
               <button onClick={() => { setMobileOpen(false); logout(); }} className="btn-cafe-outline py-3">Đăng xuất</button>
             </>
           ) : (
             <>
               <Link href="/login" onClick={() => setMobileOpen(false)} className="btn-cafe-outline py-3">Đăng nhập</Link>
-              <Link href="/register" onClick={() => setMobileOpen(false)} className="btn-cafe py-3">Dùng thử miễn phí</Link>
+              <Link href="/register" onClick={() => setMobileOpen(false)} className="btn-shop py-3">Dùng thử miễn phí</Link>
             </>
           )}
         </div>
@@ -215,7 +215,7 @@ function PublicFooter() {
           <div>
             <Logo light />
             <p className="text-sm leading-relaxed mt-3 text-white/65 max-w-xs">
-              Phần mềm quản lý quán cafe cho chủ quán nhỏ và vừa: quản lý bàn, thực đơn,
+              Phần mềm quản lý quán shop cho chủ quán nhỏ và vừa: quản lý bàn, thực đơn,
               order, hóa đơn và doanh thu trong một nơi.
             </p>
           </div>
@@ -263,7 +263,7 @@ function PublicFooter() {
           </div>
         </div>
 
-        {/* Chỗ bên phải trước đây là "Phần mềm quản lý quán cafe" — lặp lại nguyên ý
+        {/* Chỗ bên phải trước đây là "Phần mềm quản lý quán shop" — lặp lại nguyên ý
             của đoạn giới thiệu ngay phía trên. Nhường chỗ cho hai link pháp lý, vốn
             theo lệ chung vẫn nằm ở hàng cuối footer. */}
         <div className="border-t border-white/15 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-white/55">

@@ -38,9 +38,9 @@ function dayLabel(): string {
 }
 
 export default function DashboardPage() {
-  const { user, cafes, activeCafeId } = useAuth();
+  const { user, shops, activeShopId } = useAuth();
   const sub = user?.subscription;
-  const cafeName = cafes.find(c => c.id === activeCafeId)?.name;
+  const shopName = shops.find(c => c.id === activeShopId)?.name;
   const firstName = user?.fullName?.split(' ').slice(-1)[0] ?? '';
 
   const { data: invoices, loading: loadingInv, error: errorInv } = useApi(() => invoiceService.list());
@@ -135,7 +135,7 @@ export default function DashboardPage() {
               {greeting()}{firstName ? `, ${firstName}` : ''} <span className="inline-block">👋</span>
             </h1>
             <p className="text-white/80 text-sm mt-1.5 flex items-center gap-1.5">
-              {cafeName ? <>Đang quản lý <span className="font-semibold text-white">{cafeName}</span></> : 'Chúc bạn một ngày buôn may bán đắt!'}
+              {shopName ? <>Đang quản lý <span className="font-semibold text-white">{shopName}</span></> : 'Chúc bạn một ngày buôn may bán đắt!'}
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">

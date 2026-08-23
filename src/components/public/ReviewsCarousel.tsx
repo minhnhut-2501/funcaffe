@@ -13,7 +13,7 @@ type Item = {
   title?: string;
   text: string;
   name: string;
-  cafe?: string;
+  shop?: string;
   avatar?: string;
 };
 
@@ -44,7 +44,7 @@ export default function ReviewsCarousel() {
             title: r.title,
             text: r.comment as string,
             name: r.userName || 'Chủ quán',
-            cafe: r.cafeName,
+            shop: r.shopName,
             avatar: r.avatarUrl,
           })));
       })
@@ -153,7 +153,7 @@ export default function ReviewsCarousel() {
               <Avatar name={r.name} src={r.avatar} size={44} />
               <div className="min-w-0">
                 <p className="font-medium text-ink text-sm truncate">{r.name}</p>
-                {r.cafe && <p className="text-ink/70 text-xs truncate">{r.cafe}</p>}
+                {r.shop && <p className="text-ink/70 text-xs truncate">{r.shop}</p>}
               </div>
             </div>
           </article>

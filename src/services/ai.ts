@@ -1,6 +1,6 @@
 /** Trợ lý AI: hỏi đáp và phân tích doanh thu. */
 import { api } from '@/lib/api-client';
-import { getCafeId } from './cafe-id';
+import { getShopId } from './shop-id';
 
 // Trợ lý AI (chat + phân tích doanh thu). Quyền do BE chặn (middleware 'ai');
 // FE khóa nút bằng canUseAI() cho gọn UX.
@@ -34,14 +34,14 @@ async function docLuong(res: Response, onChunk: (text: string) => void): Promise
 
 export const aiService = {
   chat: async (messages: AiMessage[]) => {
-    const cafeId = await getCafeId();
-    const res = await api.postSlow<{ reply: string }>(`/cafes/${cafeId}/ai/chat`, { messages });
+    const shopId = await getShopId();
+    const res = await api.postSlow<{ reply: string }>(`/shops/${shopId}/ai/chat`, { messages });
     return res.reply;
   },
   // Streaming: gọi onChunk(text) cho từng đoạn AI sinh ra (hiệu ứng gõ chữ).
   chatStream: async (messages: AiMessage[], onChunk: (text: string) => void): Promise<void> => {
-    const cafeId = await getCafeId();
-    const res = await api.postStream(`/cafes/${cafeId}/ai/chat/stream`, { messages });
+    const shopId = await getShopId();
+    const res = await api.postStream(`/shops/${shopId}/ai/chat/stream`, { messages });
     await docLuong(res, onChunk);
   },
 
@@ -49,7 +49,7 @@ export const aiService = {
    * Trợ lý TƯ VẤN — tuyến CÔNG KHAI, gọi được khi chưa đăng nhập.
    *
    * Khác `chatStream` ở hai chỗ, và cả hai đều cố ý:
-   *  - KHÔNG đi qua getCafeId(): hàm đó gọi `/cafes` (cần đăng nhập) và ném NO_CAFE
+   *  - KHÔNG đi qua getShopId(): hàm đó gọi `/shops` (cần đăng nhập) và ném NO_SHOP
    *    khi tài khoản chưa có quán. Ở trang giới thiệu thì cả hai đều sai.
    *  - Ngữ cảnh bên máy chủ chỉ có bảng gói và thông tin sản phẩm, không có số liệu
    *    quán nào — nên hỏi doanh thu ở đây sẽ nhận lời mời nâng gói, không nhận số.
@@ -71,8 +71,8 @@ export const aiService = {
    * làm — người dùng đọc được "Máy chủ phản hồi quá lâu" cho một lượt gọi bình thường.
    */
   revenueAnalysis: async (refresh = false) => {
-    const cafeId = await getCafeId();
-    return api.postSlow<AiRevenueResponse>(`/cafes/${cafeId}/ai/revenue-analysis`, { refresh });
+    const shopId = await getShopId();
+    return api.postSlow<AiRevenueResponse>(`/shops/${shopId}/ai/revenue-analysis`, { refresh });
   },
   /**
    * Câu gợi ý mở đầu, chọn theo tình trạng thật của quán.
@@ -83,8 +83,8 @@ export const aiService = {
    * Endpoint này KHÔNG gọi Gemini, chỉ đếm dữ liệu.
    */
   suggestions: async (): Promise<string[]> => {
-    const cafeId = await getCafeId();
-    const res = await api.get<{ suggestions: string[] }>(`/cafes/${cafeId}/ai/suggestions`);
+    const shopId = await getShopId();
+    const res = await api.get<{ suggestions: string[] }>(`/shops/${shopId}/ai/suggestions`);
     return res.suggestions ?? [];
   },
 };

@@ -16,8 +16,8 @@ import { isSubscriptionExpired } from '@/lib/permission';
 import Link from 'next/link';
 
 /**
- * Mọi lệnh gọi API gói đều đi qua `cafes/{cafeId}/subscriptions`, nên chưa tạo quán là
- * getCafeId() ném Error('NO_CAFE') — chuỗi đó lọt thẳng ra giao diện thì người dùng
+ * Mọi lệnh gọi API gói đều đi qua `shops/{shopId}/subscriptions`, nên chưa tạo quán là
+ * getShopId() ném Error('NO_SHOP') — chuỗi đó lọt thẳng ra giao diện thì người dùng
  * không hiểu gì. Chặn trước bằng thông báo tiếng Việt, và vẫn dịch lại ở nhánh catch
  * phòng khi danh sách quán trong context chưa kịp cập nhật.
  */
@@ -53,14 +53,14 @@ type FlowAction = 'new' | 'renew' | 'upgrade' | null;
 type Tab = 'plans' | 'history';
 
 export default function SubscriptionPage() {
-  const { user, refreshUser, cafes, cafesError, activeCafeId } = useAuth();
+  const { user, refreshUser, shops, shopsError, activeShopId } = useAuth();
   const { toast } = useToast();
   const pkg = user?.subscription.packageType ?? 'none';
   const sub = user?.subscription;
-  const activeCafeName = cafes.find(c => c.id === activeCafeId)?.name ?? null;
-  // CHỈ khi danh sách quán tải THÀNH CÔNG mà rỗng — lượt gọi /cafes hỏng cũng cho ra
+  const activeShopName = shops.find(c => c.id === activeShopId)?.name ?? null;
+  // CHỈ khi danh sách quán tải THÀNH CÔNG mà rỗng — lượt gọi /shops hỏng cũng cho ra
   // mảng rỗng, tính luôn trường hợp đó thì chủ quán đang có quán lại bị chặn mua gói.
-  const chuaCoQuan = !cafesError && cafes.length === 0;
+  const chuaCoQuan = !shopsError && shops.length === 0;
   const [tab, setTab] = useState<Tab>('plans');
   const [packages, setPackages] = useState<Package[]>([]);
   const [timeSubsMap, setTimeSubsMap] = useState<Record<string, TimeSubscription[]>>({});
@@ -106,7 +106,7 @@ export default function SubscriptionPage() {
     })();
     loadPayments();
     // Nạp lại lịch sử thanh toán khi đổi quán đang chọn (gói theo từng quán).
-  }, [activeCafeId]);
+  }, [activeShopId]);
 
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
   const [selectedDur, setSelectedDur] = useState<DurationMonths>(1);
@@ -223,8 +223,8 @@ export default function SubscriptionPage() {
       resetSelection();
     } catch (err: any) {
       const raw = err?.message || err?.errors?.message;
-      // 'NO_CAFE' là mã nội bộ của getCafeId(), không phải câu để đọc.
-      const msg = raw === 'NO_CAFE' ? MSG_CHUA_CO_QUAN : (raw || 'Thao tác thất bại, vui lòng thử lại');
+      // 'NO_SHOP' là mã nội bộ của getShopId(), không phải câu để đọc.
+      const msg = raw === 'NO_SHOP' ? MSG_CHUA_CO_QUAN : (raw || 'Thao tác thất bại, vui lòng thử lại');
       setSubmitError(msg); // hiện lỗi NGAY TRONG modal — toast có thể bị bỏ lỡ
       toast({ description: msg, variant: 'destructive' });
     } finally {
@@ -240,7 +240,7 @@ export default function SubscriptionPage() {
       <PageHeader title="Gói dịch vụ" description="Mỗi quán có gói riêng — bạn đang thao tác cho quán đang chọn" />
 
       {/* Chưa có quán: nói trước lý do không mua được gói, kèm lối đi tạo quán.
-          Trang này được MIỄN TRỪ khỏi guard "chưa có quán -> /user/cafe" ở UserLayout
+          Trang này được MIỄN TRỪ khỏi guard "chưa có quán -> /user/shop" ở UserLayout
           (để người dùng còn xem được bảng giá), nên chốt chặn phải nằm ngay tại đây. */}
       {chuaCoQuan && (
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
@@ -248,7 +248,7 @@ export default function SubscriptionPage() {
           <p className="text-sm text-amber-900 flex-1">
             <b>Chưa thể đăng ký gói.</b> {MSG_CHUA_CO_QUAN}
           </p>
-          <Link href="/user/cafe" className="btn-primary inline-flex items-center justify-center gap-2 shrink-0">
+          <Link href="/user/shop" className="btn-primary inline-flex items-center justify-center gap-2 shrink-0">
             <Store className="w-4 h-4" /> Tạo thông tin quán
           </Link>
         </div>
@@ -260,9 +260,9 @@ export default function SubscriptionPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <h2 className="text-base font-bold text-ink">Gói hiện tại</h2>
-              {activeCafeName && (
+              {activeShopName && (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-bean bg-bean-tint px-2 py-0.5 rounded-full">
-                  <Store className="w-3 h-3" />{activeCafeName}
+                  <Store className="w-3 h-3" />{activeShopName}
                 </span>
               )}
             </div>

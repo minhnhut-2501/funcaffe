@@ -17,12 +17,12 @@ interface ChatMsg { role: 'user' | 'assistant'; content: string }
  * không có Pro Max — tức là người đang cân nhắc MUA thì không hỏi được gì, đúng chỗ
  * họ cần hỏi nhất. Nay chia làm hai chế độ:
  *
- *  · CÓ quyền đọc số liệu (gói bật can_use_ai) -> cafes/{cafe}/ai/chat/stream,
+ *  · CÓ quyền đọc số liệu (gói bật can_use_ai) -> shops/{shop}/ai/chat/stream,
  *    ngữ cảnh có doanh thu, bàn, thực đơn của quán.
  *  · KHÔNG có quyền, hoặc chưa đăng nhập      -> ai/consult/stream, ngữ cảnh chỉ có
  *    bảng gói và thông tin sản phẩm.
  *
- * Ranh giới do MÁY CHỦ giữ, không phải chỗ này: tuyến cafes/{cafe}/ai/* vẫn qua
+ * Ranh giới do MÁY CHỦ giữ, không phải chỗ này: tuyến shops/{shop}/ai/* vẫn qua
  * middleware 'ai' và trả 403 nếu gói không cho. Biến `duocDocDuLieu` ở đây chỉ để
  * chọn đúng tuyến ngay từ đầu, tránh cho người dùng ăn một lỗi 403 vô duyên.
  */
@@ -131,9 +131,9 @@ export default function AiChatWidget() {
         try {
           await aiService.chatStream(base.slice(-20), nhan);
         } catch (e) {
-          // Tài khoản có gói nhưng chưa tạo quán nào: getCafeId() ném NO_CAFE. Rơi
+          // Tài khoản có gói nhưng chưa tạo quán nào: getShopId() ném NO_SHOP. Rơi
           // về tuyến tư vấn còn hơn báo lỗi — họ vẫn hỏi được về sản phẩm.
-          if (e instanceof Error && e.message === 'NO_CAFE') {
+          if (e instanceof Error && e.message === 'NO_SHOP') {
             await aiService.consultStream(base.slice(-10), nhan);
           } else {
             throw e;

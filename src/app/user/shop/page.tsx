@@ -4,14 +4,14 @@ import PageHeader from '@/components/ui/PageHeader';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import MediaUploader from '@/components/ui/MediaUploader';
 import { useAuth } from '@/context/AuthContext';
-import { cafeService, createCafe, revenueService, type RevenueOverview, type RevenueSummary } from '@/services';
+import { shopService, createShop, revenueService, type RevenueOverview, type RevenueSummary } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/format';
-import type { CafeInfo } from '@/types';
+import type { ShopInfo } from '@/types';
 import { VN_BANKS } from '@/lib/banks';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import DateRangePicker from '@/components/ui/DateRangePicker';
-import CafeRevenueComparison from '@/components/user/CafeRevenueComparison';
+import ShopRevenueComparison from '@/components/user/ShopRevenueComparison';
 import SectionCard from '@/components/user/SectionCard';
 import {
   MapPin, Store, Pencil, Landmark, RotateCcw, Receipt, BarChart3,
@@ -25,7 +25,7 @@ const STATUS_META: Record<string, { label: string; cls: string; dot: string }> =
 };
 
 /**
- * Ý nghĩa ba trạng thái quán — phải khớp với ChecksCafeStatus ở máy chủ, vì máy chủ
+ * Ý nghĩa ba trạng thái quán — phải khớp với ChecksShopStatus ở máy chủ, vì máy chủ
  * mới là nơi thật sự chặn. Đổi câu chữ ở đây thì đổi cả bên đó.
  */
 const TRANG_THAI_GIAI_THICH: Record<string, string> = {
@@ -34,17 +34,17 @@ const TRANG_THAI_GIAI_THICH: Record<string, string> = {
   inactive: 'Đóng hẳn: chỉ tra cứu số liệu cũ, không bán hàng và không sửa thực đơn. Dữ liệu vẫn giữ nguyên, đổi lại "Đang mở cửa" là chạy tiếp.',
 };
 
-const emptyForm: CafeInfo = { id: '', name: '', address: '', phone: '', description: '', status: 'open' };
+const emptyForm: ShopInfo = { id: '', name: '', address: '', phone: '', description: '', status: 'open' };
 
 type Mode = 'list' | 'edit';
 
-export default function CafePage() {
-  const { cafes, activeCafeId, setActiveCafe, reloadCafes } = useAuth();
+export default function ShopPage() {
+  const { shops, activeShopId, setActiveShop, reloadShops } = useAuth();
   const { toast } = useToast();
 
   const [mode, setMode] = useState<Mode>('list');
   const [creating, setCreating] = useState(false); // edit-mode: đang tạo quán mới?
-  const [form, setForm] = useState<CafeInfo>(emptyForm);
+  const [form, setForm] = useState<ShopInfo>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [overview, setOverview] = useState<RevenueOverview | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export default function CafePage() {
 
   useEffect(() => {
     // Chưa có quán nào -> vào thẳng form tạo quán đầu tiên.
-    if (cafes.length === 0) {
+    if (shops.length === 0) {
       setForm(emptyForm);
       setCreating(true);
       setMode('edit');
@@ -81,14 +81,14 @@ export default function CafePage() {
     }
     loadOverview();
     setLoading(false);
-  }, [cafes.length, loadOverview]);
+  }, [shops.length, loadOverview]);
 
   // /revenue/overview trả về cho TỪNG quán: tên gói, tổng tiền, hôm nay, tháng này
   // và số hóa đơn. Cả phần gói lẫn phần tiền của trang này đều lấy từ đây.
-  const pkgList = useMemo(() => overview?.cafes ?? [], [overview]);
-  const pkgByCafe = useMemo(() => {
-    const m: Record<string, RevenueOverview['cafes'][number]> = {};
-    pkgList.forEach((c) => { m[c.cafeId] = c; });
+  const pkgList = useMemo(() => overview?.shops ?? [], [overview]);
+  const pkgByShop = useMemo(() => {
+    const m: Record<string, RevenueOverview['shops'][number]> = {};
+    pkgList.forEach((c) => { m[c.shopId] = c; });
     return m;
   }, [pkgList]);
 
@@ -107,9 +107,9 @@ export default function CafePage() {
    * duyệt để ra đúng mấy con số này. Đo trên dữ liệu demo: 282 KB xuống 1,7 KB cho
    * một quán 127 hóa đơn, và phần tiết kiệm còn lớn thêm theo mỗi tháng bán hàng.
    */
-  const cafeKey = cafes.map(c => c.id).join(',');
+  const shopKey = shops.map(c => c.id).join(',');
   useEffect(() => {
-    if (!hasRange || cafes.length === 0) {
+    if (!hasRange || shops.length === 0) {
       setRangeStats(null);
       setRangeError(false);
       setRangeLoading(false);
@@ -126,7 +126,7 @@ export default function CafePage() {
       .finally(() => { if (!cancelled) setRangeLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cafeKey, fromDate, toDate, hasRange]);
+  }, [shopKey, fromDate, toDate, hasRange]);
 
   // Chưa lọc -> lấy số toàn thời gian từ overview. Có lọc -> lấy số của khoảng đó.
   const rangeRevenue = hasRange ? rangeStats?.total ?? 0 : overview?.total ?? 0;
@@ -137,8 +137,8 @@ export default function CafePage() {
 
   const comparisonRows = useMemo(() => {
     if (!hasRange) {
-      const m = new Map(pkgList.map(c => [c.cafeId, c]));
-      return cafes.map(c => ({
+      const m = new Map(pkgList.map(c => [c.shopId, c]));
+      return shops.map(c => ({
         id: c.id,
         name: c.name,
         revenue: m.get(c.id)?.total ?? 0,
@@ -146,26 +146,26 @@ export default function CafePage() {
       }));
     }
     // Máy chủ đã tách sẵn theo quán, kể cả quán không bán được gì trong khoảng.
-    const m = new Map((rangeStats?.cafes ?? []).map(c => [c.cafeId, c]));
-    return cafes.map(c => ({
+    const m = new Map((rangeStats?.shops ?? []).map(c => [c.shopId, c]));
+    return shops.map(c => ({
       id: c.id,
       name: c.name,
       revenue: m.get(c.id)?.total ?? 0,
       count: m.get(c.id)?.count ?? 0,
     }));
-  }, [cafes, hasRange, pkgList, rangeStats]);
+  }, [shops, hasRange, pkgList, rangeStats]);
 
   const rangeLabel = hasRange
     ? `${fromDate ? fromDate.split('-').reverse().join('/') : 'đầu kỳ'} → ${toDate ? toDate.split('-').reverse().join('/') : 'nay'}`
     : 'toàn bộ thời gian';
 
   // Bộ lọc chỉ hiện khi có từ 3 quán trở lên; ít hơn thì nhìn là thấy hết rồi.
-  const showFilters = cafes.length > 2;
+  const showFilters = shops.length > 2;
   const q = search.trim().toLowerCase();
-  const visibleCafes = useMemo(() => cafes.filter(c =>
+  const visibleShops = useMemo(() => shops.filter(c =>
     (statusFilter === 'all' || c.status === statusFilter) &&
     (q === '' || c.name.toLowerCase().includes(q) || (c.address ?? '').toLowerCase().includes(q))
-  ), [cafes, statusFilter, q]);
+  ), [shops, statusFilter, q]);
 
   const openCreate = () => {
     setForm(emptyForm);
@@ -173,18 +173,18 @@ export default function CafePage() {
     setMode('edit');
   };
 
-  const openEdit = async (cafe: CafeInfo) => {
-    // Đặt quán đang chọn = quán sửa để cafeService.update trỏ đúng.
-    if (cafe.id !== activeCafeId) await setActiveCafe(cafe.id);
-    setForm(cafe);
+  const openEdit = async (shop: ShopInfo) => {
+    // Đặt quán đang chọn = quán sửa để shopService.update trỏ đúng.
+    if (shop.id !== activeShopId) await setActiveShop(shop.id);
+    setForm(shop);
     setCreating(false);
     setMode('edit');
   };
 
-  const handleSelect = async (cafe: CafeInfo) => {
-    if (cafe.id === activeCafeId) return;
-    await setActiveCafe(cafe.id);
-    toast({ description: `Đang quản lý quán "${cafe.name}"` });
+  const handleSelect = async (shop: ShopInfo) => {
+    if (shop.id === activeShopId) return;
+    await setActiveShop(shop.id);
+    toast({ description: `Đang quản lý quán "${shop.name}"` });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -192,14 +192,14 @@ export default function CafePage() {
     setSaving(true);
     try {
       if (creating) {
-        await createCafe({ name: form.name, address: form.address, phone: form.phone });
-        await reloadCafes();
+        await createShop({ name: form.name, address: form.address, phone: form.phone });
+        await reloadShops();
         loadOverview();
         setMode('list');
         toast({ description: 'Đã tạo quán mới. Hãy mua gói để bắt đầu bán hàng.' });
       } else {
-        await cafeService.update(form);
-        await reloadCafes();
+        await shopService.update(form);
+        await reloadShops();
         setMode('list');
         toast({ description: 'Đã cập nhật thông tin quán' });
       }
@@ -227,12 +227,12 @@ export default function CafePage() {
         <PageHeader
           title={creating ? 'Tạo quán mới' : 'Chỉnh sửa quán'}
           description={creating ? 'Nhập thông tin quán để thêm vào tài khoản của bạn' : 'Cập nhật thông tin cơ bản của quán'}
-          actions={cafes.length > 0 ? (
+          actions={shops.length > 0 ? (
             <button onClick={() => setMode('list')} className="btn-secondary"><ArrowLeft className="w-4 h-4" />Quay lại</button>
           ) : null}
         />
 
-        {creating && cafes.length === 0 && (
+        {creating && shops.length === 0 && (
           <div className="bg-bean-tint border border-line rounded-2xl p-4 mb-6 text-sm text-ink/80">
             <p className="font-semibold text-bean">Chào mừng bạn đến với FunCafe!</p>
             <p className="mt-1">Tạo quán đầu tiên để bắt đầu. Sau khi tạo, hãy mua gói dịch vụ cho quán để mở khóa bán hàng.</p>
@@ -260,7 +260,7 @@ export default function CafePage() {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
                       <label className="label-funcafe">Tên quán <span className="text-red-500">*</span></label>
-                      <input className="input-funcafe" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="VD: Fun Cafe chi nhánh 1" required />
+                      <input className="input-funcafe" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="VD: Fun Shop chi nhánh 1" required />
                     </div>
                     <div>
                       <label className="label-funcafe">Số điện thoại</label>
@@ -293,7 +293,7 @@ export default function CafePage() {
 
                 {/* Nút hành động nằm ngay chân thẻ thông tin — không bị rớt xuống đáy trang */}
                 <div className="flex gap-2 pt-5 mt-5 border-t border-line justify-end">
-                  {cafes.length > 0 && <button type="button" onClick={() => setMode('list')} className="btn-secondary">Hủy</button>}
+                  {shops.length > 0 && <button type="button" onClick={() => setMode('list')} className="btn-secondary">Hủy</button>}
                   {/* Sửa/tạo thông tin quán KHÔNG cần gói (quản lý cấp tài khoản, backend không chặn) */}
                   <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Đang lưu...' : (creating ? 'Tạo quán' : 'Lưu thông tin')}</button>
                 </div>
@@ -407,27 +407,27 @@ export default function CafePage() {
               <>
                 <SummaryStat icon={Receipt} label="Số hóa đơn" value={String(rangeCount)} />
                 <SummaryStat icon={TrendingUp} label="TB/hóa đơn" value={formatCurrency(avgPerInvoice)} />
-                <SummaryStat icon={Store} label="Số quán" value={String(cafes.length)} />
+                <SummaryStat icon={Store} label="Số quán" value={String(shops.length)} />
               </>
             ) : (
               <>
                 <SummaryStat icon={CalendarDays} label="Hôm nay" value={formatCurrency(todayRevenue)} />
                 <SummaryStat icon={TrendingUp} label="Tháng này" value={formatCurrency(monthRevenue)} />
-                <SummaryStat icon={Store} label="Số quán" value={String(cafes.length)} />
+                <SummaryStat icon={Store} label="Số quán" value={String(shops.length)} />
               </>
             )}
           </dl>
         </div>
       </section>
 
-      {cafes.length > 1 && (
+      {shops.length > 1 && (
         <div className="mb-8">
           <SectionCard
             title="So sánh doanh thu các quán"
             subtitle={rangeLabel}
             icon={BarChart3}
           >
-            <CafeRevenueComparison rows={comparisonRows} />
+            <ShopRevenueComparison rows={comparisonRows} />
           </SectionCard>
         </div>
       )}
@@ -437,7 +437,7 @@ export default function CafePage() {
         <Store className="w-4 h-4 text-bean" />
         <h2 className="text-base font-bold text-ink">Quán của bạn</h2>
         <span className="text-sm text-cafe-400">
-          ({showFilters && visibleCafes.length !== cafes.length ? `${visibleCafes.length}/${cafes.length}` : cafes.length})
+          ({showFilters && visibleShops.length !== shops.length ? `${visibleShops.length}/${shops.length}` : shops.length})
         </span>
       </div>
 
@@ -461,7 +461,7 @@ export default function CafePage() {
         </FilterBar>
       )}
 
-      {showFilters && visibleCafes.length === 0 && (
+      {showFilters && visibleShops.length === 0 && (
         <div className="rounded-2xl border border-line bg-white p-8 text-center text-sm text-cafe-500 mb-4">
           Không có quán nào khớp bộ lọc. Thử đổi từ khóa hoặc trạng thái.
         </div>
@@ -470,27 +470,27 @@ export default function CafePage() {
       {/* Danh sách dạng hàng: mỗi quán một dòng, chỉ giữ thông tin nhận diện và
           hành động. Phần tiền đã có băng tổng và bảng so sánh ở trên lo. */}
       <div className="stagger space-y-3">
-        {visibleCafes.map((cafe) => {
-          const pkg = pkgByCafe[cafe.id];
-          const isActive = cafe.id === activeCafeId;
-          const s = STATUS_META[cafe.status] ?? STATUS_META.open;
+        {visibleShops.map((shop) => {
+          const pkg = pkgByShop[shop.id];
+          const isActive = shop.id === activeShopId;
+          const s = STATUS_META[shop.status] ?? STATUS_META.open;
           return (
             <article
-              key={cafe.id}
+              key={shop.id}
               className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl border bg-white shadow-card px-4 py-3.5 transition-colors ${isActive ? 'border-bean ring-1 ring-bean' : 'border-line hover:border-bean/40'}`}
             >
               {/* Nhận diện quán */}
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <span className="w-12 h-12 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-bean-tint">
-                  {cafe.logoUrl ? (
-                    <img src={cafe.logoUrl} alt="" className="w-full h-full object-cover" />
+                  {shop.logoUrl ? (
+                    <img src={shop.logoUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-bean font-bold text-lg">{cafe.name?.charAt(0) || 'C'}</span>
+                    <span className="text-bean font-bold text-lg">{shop.name?.charAt(0) || 'C'}</span>
                   )}
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-ink truncate">{cafe.name}</h3>
+                    <h3 className="font-bold text-ink truncate">{shop.name}</h3>
                     {isActive && (
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-bean px-2 py-0.5 rounded-full shrink-0">
                         <Check className="w-3 h-3" />Đang chọn
@@ -498,7 +498,7 @@ export default function CafePage() {
                     )}
                   </div>
                   <p className="text-xs text-cafe-500 flex items-center gap-1 mt-0.5 truncate">
-                    {cafe.address ? <><MapPin className="w-3 h-3 shrink-0" />{cafe.address}</> : <span className="italic text-cafe-400">Chưa có địa chỉ</span>}
+                    {shop.address ? <><MapPin className="w-3 h-3 shrink-0" />{shop.address}</> : <span className="italic text-cafe-400">Chưa có địa chỉ</span>}
                   </p>
                 </div>
               </div>
@@ -513,7 +513,7 @@ export default function CafePage() {
                   : (
                     <a
                       href="/user/subscription"
-                      onClick={(e) => { e.preventDefault(); handleSelect(cafe).then(() => { window.location.href = '/user/subscription'; }); }}
+                      onClick={(e) => { e.preventDefault(); handleSelect(shop).then(() => { window.location.href = '/user/subscription'; }); }}
                       className="text-[11px] font-semibold text-gold-deep bg-gold/12 border border-gold/25 rounded-full px-2.5 py-1 hover:bg-gold/20 transition-colors"
                     >
                       Chưa có gói · Mua ngay
@@ -524,7 +524,7 @@ export default function CafePage() {
               {/* Hành động */}
               <div className="flex items-center gap-2 shrink-0">
                 {!isActive ? (
-                  <button onClick={() => handleSelect(cafe)} className="btn-secondary justify-center flex-1 sm:flex-none">
+                  <button onClick={() => handleSelect(shop)} className="btn-secondary justify-center flex-1 sm:flex-none">
                     <Check className="w-4 h-4" />Chọn quán
                   </button>
                 ) : (
@@ -532,7 +532,7 @@ export default function CafePage() {
                     Đang quản lý
                   </span>
                 )}
-                <button onClick={() => openEdit(cafe)} className="btn-secondary justify-center !px-3.5" title="Sửa thông tin" aria-label={`Sửa thông tin ${cafe.name}`}>
+                <button onClick={() => openEdit(shop)} className="btn-secondary justify-center !px-3.5" title="Sửa thông tin" aria-label={`Sửa thông tin ${shop.name}`}>
                   <Pencil className="w-4 h-4" />
                 </button>
               </div>

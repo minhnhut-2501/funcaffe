@@ -15,7 +15,7 @@ export const sections: LegalSection[] = [
       <>
         <p>
           Điều khoản dịch vụ (gọi tắt là “Điều khoản”) mô tả các quy tắc khi bạn sử dụng phần mềm
-          quản lý quán cafe FunCafe, bao gồm trang giới thiệu, khu vực dành cho chủ quán và các gói
+          quản lý quán shop FunCafe, bao gồm trang giới thiệu, khu vực dành cho chủ quán và các gói
           dịch vụ đi kèm.
         </p>
         <p>

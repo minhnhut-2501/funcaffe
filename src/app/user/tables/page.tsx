@@ -16,7 +16,7 @@ import { canManage, packageLimits } from '@/lib/permission';
 import { formatTableStatus } from '@/lib/format';
 import { compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { CafeTable, TableStatus } from '@/types';
+import type { ShopTable, TableStatus } from '@/types';
 import { Plus, Pencil, Trash2, Eye, RotateCcw, AlertCircle, Grid3X3 } from 'lucide-react';
 
 const statusOptions: { value: TableStatus | 'all'; label: string }[] = [
@@ -33,15 +33,15 @@ const formStatusOptions: { value: TableStatus; label: string }[] = [
 export default function TablesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [tables, setTables] = useState<CafeTable[]>([]);
+  const [tables, setTables] = useState<ShopTable[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<TableStatus | 'all'>('all');
   const [modalOpen, setModalOpen] = useState(false);
-  const [viewTarget, setViewTarget] = useState<CafeTable | null>(null);
-  const [editTarget, setEditTarget] = useState<CafeTable | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<CafeTable | null>(null);
+  const [viewTarget, setViewTarget] = useState<ShopTable | null>(null);
+  const [editTarget, setEditTarget] = useState<ShopTable | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ShopTable | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<Partial<CafeTable>>({ name: '', capacity: 4, status: 'empty' });
+  const [form, setForm] = useState<Partial<ShopTable>>({ name: '', capacity: 4, status: 'empty' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -74,7 +74,7 @@ export default function TablesPage() {
 
   const resetFilters = () => { setSearch(''); setFilterStatus('all'); };
   const openAdd = () => { setEditTarget(null); setForm({ name: '', capacity: 4, status: 'empty' }); setModalOpen(true); };
-  const openEdit = (t: CafeTable) => { setEditTarget(t); setForm({ ...t }); setModalOpen(true); };
+  const openEdit = (t: ShopTable) => { setEditTarget(t); setForm({ ...t }); setModalOpen(true); };
 
   const handleSave = async () => {
     if (!form.name) return;

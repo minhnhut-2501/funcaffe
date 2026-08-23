@@ -28,15 +28,15 @@ await page.waitForFunction(() => location.pathname.startsWith('/user'), null, { 
 
 const goiApi = (duong) => page.evaluate(async ({ api, duong }) => {
   const token = localStorage.getItem('funcafe_token') || sessionStorage.getItem('funcafe_token');
-  const cafeId = localStorage.getItem('funcafe.activeCafeId');
-  const res = await fetch(`${api}${duong.replace('{cafe}', cafeId)}`, {
+  const shopId = localStorage.getItem('funcafe.activeShopId');
+  const res = await fetch(`${api}${duong.replace('{shop}', shopId)}`, {
     headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
   });
   return res.json();
 }, { api: API, duong });
 
 // Hoa don NHIEU DONG nhat: hoa don ngan khong lo ra loi cat.
-const hoaDon = await goiApi('/cafes/{cafe}/orders?status=paid');
+const hoaDon = await goiApi('/shops/{shop}/orders?status=paid');
 console.log(`Tong so hoa don: ${hoaDon.length}`);
 if (!hoaDon.length) { console.log('BO QUA: quan chua co hoa don nao'); await browser.close(); process.exit(0); }
 
@@ -72,7 +72,7 @@ for (const [ten, gt] of truong) {
   ok(chuTrongPhieu.includes(String(gt)), `${ten}: "${gt}" co tren ban in`);
 }
 for (const d of (hdDai.order_details ?? [])) {
-  ok(chuTrongPhieu.includes(d.item_name_snapshot), `dong mon "${d.item_name_snapshot}"`);
+  ok(chuTrongPhieu.includes(d.product_name_snapshot), `dong mon "${d.product_name_snapshot}"`);
   for (const t of (d.order_detail_toppings ?? [])) {
     ok(chuTrongPhieu.includes(t.topping_name_snapshot), `  topping "${t.topping_name_snapshot}"`);
   }

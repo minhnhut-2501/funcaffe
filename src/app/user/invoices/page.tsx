@@ -20,9 +20,9 @@ import DateRangePicker from '@/components/ui/DateRangePicker';
 import StatusBadge from '@/components/user/StatusBadge';
 
 export default function InvoicesPage() {
-  const { user, cafes, activeCafeId } = useAuth();
+  const { user, shops, activeShopId } = useAuth();
   // Thông tin quán cho phiếu in lấy từ quán đang chọn (bỏ snapshot trong invoices).
-  const activeCafe = cafes.find(c => c.id === activeCafeId);
+  const activeShop = shops.find(c => c.id === activeShopId);
   const pkg = user?.subscription.packageType ?? 'none';
   const { data: invoices, loading, error } = useApi(() => invoiceService.list());
   const [search, setSearch] = useState('');
@@ -234,9 +234,9 @@ export default function InvoicesPage() {
         {viewInvoice && (
           <div className="space-y-4 print-area">
             <div className="text-center pb-4 border-b-2 border-dashed border-cafe-200">
-              <h3 className="text-base font-bold text-cafe-900">{viewInvoice.cafeName || activeCafe?.name || 'FunCafe'}</h3>
-              <p className="text-cafe-500 text-xs mt-0.5">{viewInvoice.cafeAddress || activeCafe?.address || ''}</p>
-              <p className="text-cafe-500 text-xs">{(viewInvoice.cafePhone || activeCafe?.phone) ? `ĐT: ${viewInvoice.cafePhone || activeCafe?.phone}` : ''}</p>
+              <h3 className="text-base font-bold text-cafe-900">{viewInvoice.shopName || activeShop?.name || 'FunCafe'}</h3>
+              <p className="text-cafe-500 text-xs mt-0.5">{viewInvoice.shopAddress || activeShop?.address || ''}</p>
+              <p className="text-cafe-500 text-xs">{(viewInvoice.shopPhone || activeShop?.phone) ? `ĐT: ${viewInvoice.shopPhone || activeShop?.phone}` : ''}</p>
               {/*
                 * "PHIẾU TÍNH TIỀN", KHÔNG phải "HÓA ĐƠN".
                 *
@@ -282,7 +282,7 @@ export default function InvoicesPage() {
                     <Fragment key={idx}>
                       <tr className="text-cafe-800">
                         <td className="py-1.5 pr-2">
-                          <span className="font-medium">{item.itemNameSnapshot}</span>
+                          <span className="font-medium">{item.productNameSnapshot}</span>
                           {item.sizeNameSnapshot && (<span className="text-cafe-400"> ({item.sizeNameSnapshot})</span>)}
                         </td>
                         <td className="py-1.5 text-center">{item.quantity}</td>

@@ -5,8 +5,8 @@
  * nhưng vẫn xuất lại ở đây, nên mọi nơi gọi giữ nguyên `from '@/services'`.
  */
 export * from './ai';
-export * from './cafe-id';
-export * from './cafes';
+export * from './shop-id';
+export * from './shops';
 export * from './contact';
 export * from './menu';
 export * from './orders';

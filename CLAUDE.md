@@ -38,10 +38,10 @@ trong lúc server dev đang chạy sẽ làm hỏng nút Xuất Excel (gói mã 
 - **Tiền là số nguyên VND**. Có `php artisan db:normalize-money` để soát.
 - **Chỉ mục Mongo không đi qua migration**: sau khi xóa/nạp lại collection phải chạy
   `php artisan db:indexes`.
-- **Gói gắn với QUÁN, không gắn với tài khoản**: `subscriptions.cafe_id`, chủ sở hữu suy
-  từ `cafes.user_id`. Không có `subscriptions.user_id`.
-- Mọi API theo quán đi qua `cafes/{cafeId}/...`; phía frontend là `getCafeId()` trong
-  [src/services/cafe-id.ts](src/services/cafe-id.ts), ném `Error('NO_CAFE')` khi tài khoản
+- **Gói gắn với QUÁN, không gắn với tài khoản**: `subscriptions.shop_id`, chủ sở hữu suy
+  từ `shops.user_id`. Không có `subscriptions.user_id`.
+- Mọi API theo quán đi qua `shops/{shopId}/...`; phía frontend là `getShopId()` trong
+  [src/services/shop-id.ts](src/services/shop-id.ts), ném `Error('NO_SHOP')` khi tài khoản
   chưa có quán — chuỗi đó là **mã nội bộ**, không được để lọt ra màn hình.
 
 ## Dữ liệu

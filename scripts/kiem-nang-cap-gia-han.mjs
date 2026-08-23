@@ -58,7 +58,7 @@ async function goi(duong, { token, method = 'GET', body, thuLai = 4 } = {}) {
 
 /** Xem truoc: la GET kem tham so truy van, khong phai POST (routes/api.php:137). */
 const xemTruoc = (cid, goiId, mocId, token) =>
-  goi(`/cafes/${cid}/subscriptions/preview?package_id=${goiId}&time_subscription_id=${mocId}`, { token })
+  goi(`/shops/${cid}/subscriptions/preview?package_id=${goiId}&time_subscription_id=${mocId}`, { token })
     .then((r) => r.body);
 
 /** Cong thuc can tru, viet lai doc lap voi may chu de doi chieu. */
@@ -91,11 +91,11 @@ const gomVat = (gia) => gia + Math.round((gia * VAT) / 100);
 
 // ===== A · XEM TRUOC TREN QUAN THAT (khong ghi gi) ========================
 console.log('\nA · Nang cap / gia han tren cac quan that (chi doc)');
-const quan = (await goi('/cafes', { token })).body;
+const quan = (await goi('/shops', { token })).body;
 
 for (const c of quan) {
   const cid = c.id ?? c._id;
-  const sub = (await goi(`/cafes/${cid}/subscriptions/active`, { token })).body;
+  const sub = (await goi(`/shops/${cid}/subscriptions/active`, { token })).body;
   if (!sub?.package_name_snapshot) { console.log(`\n  ${c.name}: chua co goi nao — bo qua`); continue; }
 
   const conHan = new Date(sub.end_date) > new Date();
@@ -153,24 +153,24 @@ if (!CO_GHI) {
   const tk = dangKy.body?.token;
 
   if (tk) {
-    const quanMoi = await goi('/cafes', { token: tk, method: 'POST', body: { name: 'Quan kiem thu ' + dau, address: 'Khong co that', phone: '0912345678' } });
+    const quanMoi = await goi('/shops', { token: tk, method: 'POST', body: { name: 'Quan kiem thu ' + dau, address: 'Khong co that', phone: '0912345678' } });
     ok(quanMoi.status === 201 || quanMoi.status === 200, 'tao duoc quan', `HTTP ${quanMoi.status}`);
     const cid = quanMoi.body?.id ?? quanMoi.body?._id;
 
     // Goi dung thu: kich hoat NGAY, khong qua cong thanh toan.
     const mocFree = await mocCua(freeGoi);
-    const thu = await goi(`/cafes/${cid}/subscriptions`, {
+    const thu = await goi(`/shops/${cid}/subscriptions`, {
       token: tk, method: 'POST',
       body: { package_id: freeGoi.id, time_subscription_id: mocFree[0]?.id ?? null, payment_method: 'vnpay' },
     });
     ok(thu.status === 201, 'nhan duoc goi dung thu', `HTTP ${thu.status}`);
-    const dangChay = (await goi(`/cafes/${cid}/subscriptions/active`, { token: tk })).body;
+    const dangChay = (await goi(`/shops/${cid}/subscriptions/active`, { token: tk })).body;
     ok(dangChay?.status === 'active', 'goi dung thu co hieu luc NGAY, khong cho cong thanh toan', `trang thai: ${dangChay?.status}`);
 
     // Dung thu lan hai tren quan khac cua CUNG tai khoan -> phai bi chan.
-    const quanHai = await goi('/cafes', { token: tk, method: 'POST', body: { name: 'Quan kiem thu 2 ' + dau } });
+    const quanHai = await goi('/shops', { token: tk, method: 'POST', body: { name: 'Quan kiem thu 2 ' + dau } });
     const cid2 = quanHai.body?.id ?? quanHai.body?._id;
-    const thuLai = await goi(`/cafes/${cid2}/subscriptions`, {
+    const thuLai = await goi(`/shops/${cid2}/subscriptions`, {
       token: tk, method: 'POST',
       body: { package_id: freeGoi.id, time_subscription_id: mocFree[0]?.id ?? null, payment_method: 'vnpay' },
     });
@@ -185,7 +185,7 @@ if (!CO_GHI) {
     console.log('\n8.7.3 · Duong tra ve cua cong thanh toan');
 
     // VNPay: duong tra ve nam NGAY trong duong dan thanh toan, doc thang duoc.
-    const donVnpay = await goi(`/cafes/${cid}/subscriptions`, {
+    const donVnpay = await goi(`/shops/${cid}/subscriptions`, {
       token: tk, method: 'POST',
       body: { package_id: proGoi.id, time_subscription_id: mocPro[0].id, payment_method: 'vnpay' },
     });
@@ -203,7 +203,7 @@ if (!CO_GHI) {
     // tra ve payUrl la bang chung MoMo da nhan va chap nhan bo tham so do. Ca hai
     // cong cung lay goc tu APP_URL (config/services.php), ma goc do vua duoc VNPay
     // chung minh la dung.
-    const donMomo = await goi(`/cafes/${cid}/subscriptions`, {
+    const donMomo = await goi(`/shops/${cid}/subscriptions`, {
       token: tk, method: 'POST',
       body: { package_id: proGoi.id, time_subscription_id: mocPro[0].id, payment_method: 'momo' },
     });

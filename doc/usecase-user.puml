@@ -26,13 +26,13 @@ rectangle "FunCafe — Người dùng" {
   usecase "Xem điều khoản & chính sách" as UC_legal
   usecase "Đăng ký tài khoản" as UC_register
   usecase "Quên & đặt lại mật khẩu" as UC_forgot
-  usecase "Quản lý quán cafe" as UC_cafe
+  usecase "Quản lý quán shop" as UC_shop
   usecase "Chuyển đổi giữa nhiều quán" as UC_multi
   usecase "Quản lý bàn" as UC_table
   usecase "Quản lý danh mục" as UC_cat
   usecase "Quản lý thực đơn" as UC_menu
   usecase "Quản lý size và giá theo size" as UC_size
-  usecase "Cấu hình topping cho món" as UC_itemtopping
+  usecase "Cấu hình topping cho món" as UC_producttopping
   usecase "Quản lý topping" as UC_topping
 
   ' ----- Cot phai: van hanh + goi dich vu -----
@@ -63,7 +63,7 @@ U_L --> UC_legal
 U_L --> UC_register
 U_L --> UC_forgot
 U_L --> UC_login
-U_L --> UC_cafe
+U_L --> UC_shop
 U_L --> UC_multi
 U_L --> UC_table
 U_L --> UC_cat
@@ -84,7 +84,7 @@ U_R --> UC_ai
 U_R --> UC_logout
 
 ' ===== Quan he <<include>> Dang nhap (chuc nang can xac thuc) =====
-UC_cafe ..> UC_login : <<include>>
+UC_shop ..> UC_login : <<include>>
 UC_multi ..> UC_login : <<include>>
 UC_table ..> UC_login : <<include>>
 UC_cat ..> UC_login : <<include>>
@@ -103,7 +103,7 @@ UC_ai ..> UC_login : <<include>>
 
 ' ===== Quan he <<extend>> — hanh vi TUY CHON, lam ngay trong man hinh cha =====
 UC_size ..> UC_menu : <<extend>>
-UC_itemtopping ..> UC_menu : <<extend>>
+UC_producttopping ..> UC_menu : <<extend>>
 UC_vietqr ..> UC_invoice : <<extend>>
 UC_excel ..> UC_revenue : <<extend>>
 UC_expiry ..> UC_sub : <<extend>>
@@ -120,7 +120,7 @@ legend right
   - Đăng ký tài khoản: tạo tài khoản chủ quán mới.
   - Quên & đặt lại mật khẩu: nhận liên kết qua email và đặt mật khẩu mới.
   - Đăng nhập / Đăng xuất: vào và thoát khỏi tài khoản.
-  - Quản lý quán cafe: thêm, sửa thông tin quán và tài khoản nhận VietQR.
+  - Quản lý quán shop: thêm, sửa thông tin quán và tài khoản nhận VietQR.
   - Chuyển đổi giữa nhiều quán: một tài khoản mở nhiều quán, gói tính theo TỪNG quán.
   - Quản lý bàn: thêm, sửa, xóa bàn; theo dõi trạng thái trống / đang phục vụ.
   - Quản lý danh mục: thêm, sửa, ẩn/hiện danh mục món.

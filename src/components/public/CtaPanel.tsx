@@ -59,7 +59,7 @@ export default function CtaPanel({
             />
 
             {/* Lớp phủ xanh: gần như đặc bên trái nơi có chữ, tan dần sang phải để
-                quán cafe thật LỘ RA. Dìm đều tay cả khối thì ảnh chỉ còn là mấy vệt
+                quán shop thật LỘ RA. Dìm đều tay cả khối thì ảnh chỉ còn là mấy vệt
                 màu vô nghĩa — mất hẳn hơi ấm, mà hơi ấm mới là lý do đặt ảnh vào.
                 Chữ trắng chỉ nằm ở nửa trái nên tương phản vẫn đạt AA. */}
             {/* Di động: chữ canh giữa nên trải hết bề ngang — phủ ĐỀU và đậm, không

@@ -186,7 +186,7 @@ clone về cũng có, không phụ thuộc vào máy đã dùng trước đó.
 | `OrderLifecycleTest` · `OrderPricingTest` | Vòng đời đơn, tính tiền, giảm giá, tiền thối, thanh toán hai lần |
 | `AuthFlowTest` | Đăng ký/đăng nhập/đặt lại mật khẩu; token chết đúng lúc; không tự nâng quyền |
 | `AdminPanelTest` · `AdminUserGuardTest` | Ranh giới quyền quản trị; không xóa cứng thứ đã bán |
-| `CatalogRulesTest` · `PackageLimitTest` · `TableGuardTest` · `CafeStatusTest` | Hạn mức gói, trạng thái quán, quy tắc thực đơn |
+| `CatalogRulesTest` · `PackageLimitTest` · `TableGuardTest` · `ShopStatusTest` | Hạn mức gói, trạng thái quán, quy tắc thực đơn |
 | `ReviewRulesTest` · `AiSuggestionsTest` | Đánh giá không lộ thông tin cá nhân; chặn AI theo gói |
 
 Các bài kiểm thử ghi vào cơ sở dữ liệu riêng `funcafe_testing` và **từ chối chạy nếu bị trỏ nhầm vào dữ liệu thật**. Máy không chạy MongoDB thì các bài Feature tự bỏ qua thay vì báo đỏ.

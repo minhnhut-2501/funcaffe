@@ -7,7 +7,7 @@ export interface ContactMessage {
   fullName: string;
   email: string;
   phone?: string;
-  cafeName?: string;
+  shopName?: string;
   content: string;
   isRead: boolean;
   createdAt: string;
@@ -18,7 +18,7 @@ export interface ContactMessage {
 }
 
 export const contactService = {
-  send: async (data: { full_name: string; email: string; phone?: string; cafe_name?: string; content: string }) => {
+  send: async (data: { full_name: string; email: string; phone?: string; shop_name?: string; content: string }) => {
     return api.post<{ message: string }>('/contact', data);
   },
   /**
@@ -66,7 +66,7 @@ function mapContact(raw: any): ContactMessage {
     fullName: raw.full_name ?? '',
     email: raw.email ?? '',
     phone: raw.phone || undefined,
-    cafeName: raw.cafe_name || undefined,
+    shopName: raw.shop_name || undefined,
     content: raw.content ?? '',
     isRead: raw.is_read ?? false,
     createdAt: raw.created_at,

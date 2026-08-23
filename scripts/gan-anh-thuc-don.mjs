@@ -92,11 +92,11 @@ console.log(AP_DUNG ? 'CHE DO GHI THAT\n' : 'CHAY THU — khong ghi gi. Them --a
 
 let daGan = 0, khongKhop = [], hong = 0;
 
-for (const c of (await goi('/cafes', { token })).body) {
+for (const c of (await goi('/shops', { token })).body) {
   const cid = c.id ?? c._id;
   console.log(`\n=== ${c.name}`);
 
-  for (const mon of (await goi(`/cafes/${cid}/items`, { token })).body) {
+  for (const mon of (await goi(`/shops/${cid}/products`, { token })).body) {
     const anh = anhCho(mon.name);
     if (!anh) { khongKhop.push(`mon: ${mon.name}`); continue; }
     if (mon.image === anh) { console.log(`  (da co)  ${mon.name}`); continue; }
@@ -104,19 +104,19 @@ for (const c of (await goi('/cafes', { token })).body) {
       // CHI gui truong `image`. Gui ca doi tuong mon se keo theo `sizes` va
       // `topping_ids` da bi bien dang qua duong doc — tuc la sua anh mot cai lam
       // hong ca bang gia theo size.
-      const kq = await goi(`/cafes/${cid}/items/${mon.id ?? mon._id}`, { token, method: 'PUT', body: { image: anh } });
+      const kq = await goi(`/shops/${cid}/products/${mon.id ?? mon._id}`, { token, method: 'PUT', body: { image: anh } });
       if (kq.status !== 200) { console.log(`  HONG     ${mon.name} — HTTP ${kq.status}`); hong++; continue; }
     }
     console.log(`  ${AP_DUNG ? 'da gan ' : 'se gan '} ${mon.name.padEnd(32)} -> ${anh}`);
     daGan++;
   }
 
-  for (const top of (await goi(`/cafes/${cid}/toppings`, { token })).body) {
+  for (const top of (await goi(`/shops/${cid}/toppings`, { token })).body) {
     const anh = anhCho(top.name);
     if (!anh) { khongKhop.push(`topping: ${top.name}`); continue; }
     if (top.image === anh) { console.log(`  (da co)  ${top.name}`); continue; }
     if (AP_DUNG) {
-      const kq = await goi(`/cafes/${cid}/toppings/${top.id ?? top._id}`, { token, method: 'PUT', body: { image: anh } });
+      const kq = await goi(`/shops/${cid}/toppings/${top.id ?? top._id}`, { token, method: 'PUT', body: { image: anh } });
       if (kq.status !== 200) { console.log(`  HONG     ${top.name} — HTTP ${kq.status}`); hong++; continue; }
     }
     console.log(`  ${AP_DUNG ? 'da gan ' : 'se gan '} ${top.name.padEnd(32)} -> ${anh}`);

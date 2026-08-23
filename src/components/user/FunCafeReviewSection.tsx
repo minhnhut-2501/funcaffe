@@ -15,7 +15,7 @@ import type { Review } from '@/types';
  * 'subscription' của route tạo đánh giá).
  */
 export default function FunCafeReviewSection() {
-  const { user, cafes } = useAuth();
+  const { user, shops } = useAuth();
   const { toast } = useToast();
   const sub = user?.subscription;
   const pkg = sub?.packageType ?? 'none';
@@ -37,19 +37,19 @@ export default function FunCafeReviewSection() {
     });
   };
 
-  // Không phụ thuộc activeCafeId: đánh giá là về FunCafe, mỗi tài khoản một cái,
-  // nên đổi quán không làm đổi đánh giá. Trước đây hook này gọi listByCafe() theo
+  // Không phụ thuộc activeShopId: đánh giá là về FunCafe, mỗi tài khoản một cái,
+  // nên đổi quán không làm đổi đánh giá. Trước đây hook này gọi listByShop() theo
   // quán đang chọn và CHỈ setMyReview khi tìm thấy — nên chuyển sang quán chưa
   // đánh giá thì form vẫn giữ nội dung của quán trước và nút vẫn ghi "Cập nhật".
   // Danh sách quán đã có sẵn trong AuthContext. Trước đây chỗ này gọi thêm
-  // `GET /cafes` chỉ để đếm, và nuốt luôn lỗi: mạng trục trặc là khối đánh giá
+  // `GET /shops` chỉ để đếm, và nuốt luôn lỗi: mạng trục trặc là khối đánh giá
   // lặng lẽ biến mất, không một dòng thông báo nào.
   useEffect(() => {
-    if (!user || cafes.length === 0) return;
+    if (!user || shops.length === 0) return;
     setReviewReady(true);
     reviewService.mine().then(applyMine).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, cafes.length]);
+  }, [user?.id, shops.length]);
 
   // Chặn ngay ở đây thay vì để máy chủ trả 422: người dùng biết còn thiếu gì TRƯỚC khi
   // bấm, chứ không phải sau một vòng đi về mạng.
@@ -85,7 +85,7 @@ export default function FunCafeReviewSection() {
     }
     if (pkg === 'none') return <p className="text-sm text-ink/60">Bạn cần kích hoạt gói dịch vụ trước khi gửi đánh giá.</p>;
     if (isSubscriptionExpired(sub)) return <p className="text-sm text-ink/60">Gói của bạn đã hết hạn — gia hạn để gửi hoặc cập nhật đánh giá.</p>;
-    if (!reviewReady) return <p className="text-sm text-ink/60">Tạo quán cafe của bạn trước khi gửi đánh giá.</p>;
+    if (!reviewReady) return <p className="text-sm text-ink/60">Tạo quán shop của bạn trước khi gửi đánh giá.</p>;
     return (
       <div className="space-y-3 max-w-xl">
         <div>

@@ -2,9 +2,9 @@
 import { api } from '@/lib/api-client';
 
 // Tổng doanh thu gộp tất cả quán của user (đa quán)
-export interface CafeRevenueRow {
-  cafeId: string;
-  cafeName: string;
+export interface ShopRevenueRow {
+  shopId: string;
+  shopName: string;
   status: string;
   packageName: string | null;
   hasPackage: boolean;
@@ -22,7 +22,7 @@ export interface RevenueOverview {
   /** Tổng số hóa đơn gộp mọi quán. */
   count: number;
   revenueByMonth: { month: string; revenue: number }[];
-  cafes: CafeRevenueRow[];
+  shops: ShopRevenueRow[];
 }
 
 /** Một mốc trên biểu đồ: 'YYYY-MM-DD' (hoặc 'YYYY-MM') kèm số tiền. */
@@ -38,7 +38,7 @@ export interface RevenueSummary {
   byDay: RevenueBucket[];
   byMonth: RevenueBucket[];
   topItems: { name: string; count: number; revenue: number }[];
-  cafes: { cafeId: string; cafeName: string; total: number; count: number }[];
+  shops: { shopId: string; shopName: string; total: number; count: number }[];
 }
 
 function docMoc(raw: unknown): RevenueBucket[] {
@@ -56,15 +56,15 @@ export const revenueService = {
    * chi phí thôi lớn dần theo số hóa đơn tích lũy.
    *
    * KHÔNG có danh sách hóa đơn trong kết quả — nút Xuất Excel cần chi tiết thì gọi
-   * `invoiceService.listByCafe` lúc bấm.
+   * `invoiceService.listByShop` lúc bấm.
    */
-  summary: async (params: { from?: string; to?: string; cafeId?: string } = {}): Promise<RevenueSummary> => {
+  summary: async (params: { from?: string; to?: string; shopId?: string } = {}): Promise<RevenueSummary> => {
     const qs = new URLSearchParams();
     if (params.from) qs.set('from', params.from);
     if (params.to) qs.set('to', params.to);
     // 'all' là quy ước của giao diện, không phải mã quán — vắng mặt tham số mới là
     // "gộp mọi quán" đối với máy chủ.
-    if (params.cafeId && params.cafeId !== 'all') qs.set('cafe_id', params.cafeId);
+    if (params.shopId && params.shopId !== 'all') qs.set('shop_id', params.shopId);
 
     const raw = await api.get<any>(`/revenue/summary${qs.toString() ? `?${qs}` : ''}`);
     return {
@@ -77,9 +77,9 @@ export const revenueService = {
         count: r.count ?? 0,
         revenue: r.revenue ?? 0,
       })),
-      cafes: (raw.cafes ?? []).map((c: any) => ({
-        cafeId: c.cafe_id,
-        cafeName: c.cafe_name ?? '',
+      shops: (raw.shops ?? []).map((c: any) => ({
+        shopId: c.shop_id,
+        shopName: c.shop_name ?? '',
         total: c.total ?? 0,
         count: c.count ?? 0,
       })),
@@ -96,9 +96,9 @@ export const revenueService = {
       revenueByMonth: Object.entries(raw.revenue_by_month ?? {}).map(([month, revenue]) => ({
         month, revenue: Number(revenue) || 0,
       })),
-      cafes: (raw.cafes ?? []).map((c: any) => ({
-        cafeId: c.cafe_id,
-        cafeName: c.cafe_name,
+      shops: (raw.shops ?? []).map((c: any) => ({
+        shopId: c.shop_id,
+        shopName: c.shop_name,
         status: c.status,
         packageName: c.package_name ?? null,
         hasPackage: !!c.has_package,

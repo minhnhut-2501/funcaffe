@@ -16,7 +16,7 @@ const THE = {
   // Trang giả lập NAPAS có bảng mã OTP riêng, mỗi mã ép ra một kết cục:
   //   000 SUCCESS · 001 PENDING · 111 OTP sai · 444 không đủ số dư · 888 huỷ
   // Dùng 000 cho tường minh, đừng gõ đại rồi trông vào nhánh mặc định.
-  otp: '000',
+  otp: process.env.OTP || '000000',
 };
 
 const url = process.argv[2];

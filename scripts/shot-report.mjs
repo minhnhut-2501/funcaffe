@@ -134,7 +134,7 @@ console.log('— User Portal');
   const page = await ctx.newPage();
 
   await capture(page, '/user/dashboard', 'user-dashboard');
-  await capture(page, '/user/cafe', 'user-cafe-multi');
+  await capture(page, '/user/shop', 'user-cafe-multi');
   await capture(page, '/user/tables', 'user-tables');
 
   // Thực đơn — tab Món ăn

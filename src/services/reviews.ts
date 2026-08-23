@@ -1,7 +1,7 @@
 /** Đánh giá phần mềm FunCafe. */
 import type { PublicReview, Review } from '@/types';
 import { api } from '@/lib/api-client';
-import { getCafeId } from './cafe-id';
+import { getShopId } from './shop-id';
 
 // Reviews
 export const reviewService = {
@@ -12,8 +12,8 @@ export const reviewService = {
     title: string;
     comment: string;
   }) => {
-    const cafeId = await getCafeId();
-    return api.post(`/cafes/${cafeId}/reviews`, data);
+    const shopId = await getShopId();
+    return api.post(`/shops/${shopId}/reviews`, data);
   },
   adminList: async () => {
     const items = await api.get<any[]>('/admin/reviews');
@@ -22,8 +22,8 @@ export const reviewService = {
       userId: raw.user_id,
       userName: raw.user_name ?? '',
       userEmail: raw.user_email ?? undefined,
-      cafeId: raw.cafe_id,
-      cafeName: raw.cafe_name ?? raw.cafe?.name ?? '',
+      shopId: raw.shop_id,
+      shopName: raw.shop_name ?? raw.shop?.name ?? '',
       packageId: raw.package_id,
       packageName: raw.package_name ?? raw.package?.name ?? '',
       rating: raw.rating,
@@ -49,8 +49,8 @@ export const reviewService = {
       userId: raw.user_id,
       userName: raw.user_name ?? raw.user?.full_name ?? '',
       avatarUrl: raw.avatar ?? undefined,
-      cafeId: raw.cafe_id,
-      cafeName: raw.cafe_name ?? raw.cafe?.name ?? '',
+      shopId: raw.shop_id,
+      shopName: raw.shop_name ?? raw.shop?.name ?? '',
       packageId: raw.package_id,
       packageName: raw.package_name ?? raw.package?.name ?? '',
       rating: raw.rating,
@@ -72,8 +72,8 @@ export const reviewService = {
       id: raw.id ?? raw._id,
       userId: raw.user_id,
       userName: raw.user_name ?? '',
-      cafeId: raw.cafe_id,
-      cafeName: raw.cafe_name ?? '',
+      shopId: raw.shop_id,
+      shopName: raw.shop_name ?? '',
       packageId: raw.package_id,
       packageName: raw.package_name ?? '',
       rating: raw.rating,
@@ -91,15 +91,15 @@ export const reviewService = {
       })),
     } as Review;
   },
-  listByCafe: async () => {
-    const cafeId = await getCafeId();
-    const items = await api.get<any[]>(`/cafes/${cafeId}/reviews`);
+  listByShop: async () => {
+    const shopId = await getShopId();
+    const items = await api.get<any[]>(`/shops/${shopId}/reviews`);
     return items.map((raw: any) => ({
       id: raw.id ?? raw._id,
       userId: raw.user_id,
       userName: raw.user_name ?? raw.user?.full_name ?? '',
-      cafeId: raw.cafe_id,
-      cafeName: raw.cafe?.name ?? '',
+      shopId: raw.shop_id,
+      shopName: raw.shop?.name ?? '',
       packageId: raw.package_id,
       packageName: raw.package_name ?? raw.package?.name ?? '',
       rating: raw.rating,

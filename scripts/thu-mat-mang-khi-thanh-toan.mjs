@@ -27,8 +27,8 @@ await page.waitForFunction(() => location.pathname.startsWith('/user'), null, { 
 
 const goiApi = (duong, tuyChon = {}) => page.evaluate(async ({ api, duong, tuyChon }) => {
   const token = localStorage.getItem('funcafe_token') || sessionStorage.getItem('funcafe_token');
-  const cafeId = localStorage.getItem('funcafe.activeCafeId');
-  const res = await fetch(`${api}${duong.replace('{cafe}', cafeId)}`, {
+  const shopId = localStorage.getItem('funcafe.activeShopId');
+  const res = await fetch(`${api}${duong.replace('{shop}', shopId)}`, {
     ...tuyChon,
     headers: { Authorization: 'Bearer ' + token, Accept: 'application/json', 'Content-Type': 'application/json' },
   });
@@ -36,7 +36,7 @@ const goiApi = (duong, tuyChon = {}) => page.evaluate(async ({ api, duong, tuyCh
   try { return { ma: res.status, than: JSON.parse(chu) }; } catch { return { ma: res.status, than: chu }; }
 }, { api: API, duong, tuyChon });
 
-const dsDon = async () => (await goiApi('/cafes/{cafe}/orders?status=active')).than.map(o => o.id ?? o._id);
+const dsDon = async () => (await goiApi('/shops/{shop}/orders?status=active')).than.map(o => o.id ?? o._id);
 const truoc = await dsDon();
 
 // --- Dung mot don thu nghiem tren bàn trong ---
@@ -111,10 +111,10 @@ console.log('  So ban dang phuc vu tren so do:', (conBanDangPhucVu.match(/Đang 
 // --- Don dep: don that VAN CHUA duoc thanh toan (moi phan hoi deu la gia lap) ---
 await page.unroute('**/orders/*/pay');
 await page.unroute(`**/orders/${donThu}`);
-const trangThaiThat = (await goiApi(`/cafes/{cafe}/orders/${donThu}`)).than.status;
+const trangThaiThat = (await goiApi(`/shops/{shop}/orders/${donThu}`)).than.status;
 ok(trangThaiThat === 'active', `don that trong CSDL VAN chua bi thanh toan (status = ${trangThaiThat})`);
 
-await goiApi(`/cafes/{cafe}/orders/${donThu}/cancel`, { method: 'POST', body: '{}' });
+await goiApi(`/shops/{shop}/orders/${donThu}/cancel`, { method: 'POST', body: '{}' });
 const sau = await dsDon();
 ok(sau.length === truoc.length, `da don don thu nghiem (${truoc.length} -> ${sau.length} don dang mo)`);
 

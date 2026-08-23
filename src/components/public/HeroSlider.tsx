@@ -18,15 +18,15 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     img: 'cafe-interior',
-    alt: 'Không gian quán cafe ấm cúng',
-    chip: 'Dành cho quán cafe, trà sữa, nước ép',
-    title: ['Phần mềm quản lý ', 'quán cafe', ' gọn nhẹ'],
+    alt: 'Không gian quán shop ấm cúng',
+    chip: 'Dành cho quán shop, trà sữa, nước ép',
+    title: ['Phần mềm quản lý ', 'quán shop', ' gọn nhẹ'],
     sub: 'Gom bàn, thực đơn, order, hóa đơn và doanh thu về một màn hình — đơn giản, dễ dùng cho cả người dùng mới.',
     note: 'Miễn phí 7 ngày · Không cần thẻ tín dụng',
   },
   {
     img: 'cafe-busy',
-    alt: 'Quán cafe đông khách vào giờ cao điểm',
+    alt: 'Quán shop đông khách vào giờ cao điểm',
     chip: 'Bán hàng theo bàn',
     title: ['Quán đông vẫn ', 'không rối bàn', ''],
     sub: 'Nhìn sơ đồ là biết bàn nào trống, bàn nào đang phục vụ. Chọn bàn, lên món và thanh toán chỉ trong vài chạm.',
@@ -34,7 +34,7 @@ const SLIDES: Slide[] = [
   },
   {
     img: 'cafe-street',
-    alt: 'Quán cafe mặt phố',
+    alt: 'Quán shop mặt phố',
     chip: 'Nhiều chi nhánh',
     title: ['Một tài khoản, ', 'quản cả chuỗi quán', ''],
     sub: 'Mỗi chi nhánh có bàn, thực đơn và hóa đơn riêng. Đổi quán ngay trên đầu trang, không cần đăng xuất.',
@@ -42,7 +42,7 @@ const SLIDES: Slide[] = [
   },
   {
     img: 'cafe-counter',
-    alt: 'Quầy pha chế của quán cafe',
+    alt: 'Quầy pha chế của quán shop',
     chip: 'Doanh thu & trợ lý AI',
     title: ['Biết ngay quán ', 'bán được bao nhiêu', ''],
     sub: 'Biểu đồ doanh thu theo ngày, tháng, năm và top món bán chạy — không phải ngồi cộng sổ cuối ngày.',
@@ -159,7 +159,7 @@ export default function HeroSlider() {
                       <Link
                         href="/register"
                         tabIndex={active ? 0 : -1}
-                        className="btn-cafe px-6 py-3 text-base shadow-lg shadow-black/20"
+                        className="btn-shop px-6 py-3 text-base shadow-lg shadow-black/20"
                       >
                         Dùng thử miễn phí
                       </Link>

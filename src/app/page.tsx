@@ -140,14 +140,14 @@ export default function HomePage() {
                 </Reveal>
               ))}
             </ul>
-            <Link href="/register" className="btn-cafe px-6 py-3 text-base inline-flex items-center gap-2">
+            <Link href="/register" className="btn-shop px-6 py-3 text-base inline-flex items-center gap-2">
               Dùng thử miễn phí <ArrowRight className="w-4 h-4" aria-hidden />
             </Link>
           </Reveal>
 
           <Reveal delay={120} className="relative">
             <div aria-hidden className="absolute -inset-6 rounded-[2.5rem] blur-3xl bg-bean/10" />
-            <AppShot src="/product/cafes-multi.png" alt="Danh sách nhiều quán trên một tài khoản FunCafe" label="FunCafe · Quản lý quán" className="rotate-[1deg]" />
+            <AppShot src="/product/shops-multi.png" alt="Danh sách nhiều quán trên một tài khoản FunCafe" label="FunCafe · Quản lý quán" className="rotate-[1deg]" />
             <div className="anh-noi-nho absolute -bottom-6 -left-4 z-20 w-[42%] max-w-[210px] rounded-xl border border-line bg-white overflow-hidden rotate-[-5deg] hidden sm:block">
               <img src="/product/cafe-switcher.png" alt="Bộ chọn quán để chuyển nhanh giữa các chi nhánh" className="block w-full object-cover object-left-top h-full max-h-[130px]" loading="lazy" />
             </div>
@@ -315,7 +315,7 @@ export default function HomePage() {
       {/* 4.5 Banner ảnh thật — ngắt nhịp + số liệu trấn an */}
       <Banner
         image="/banners/cafe-busy.jpg"
-        alt="Quán cafe đông khách giờ cao điểm"
+        alt="Quán shop đông khách giờ cao điểm"
         title="Mọi việc trong quán, gọn trên một màn hình"
         subtitle="Từ lúc khách vào bàn đến khi thanh toán và chốt doanh thu cuối ngày, tất cả nằm trong một hệ thống quen tay."
         align="left"
@@ -435,7 +435,7 @@ export default function HomePage() {
 
       {/* 7. CTA — panel bo tròn nổi trên nền sáng, tách bạch hẳn với footer tối */}
       <CtaPanel
-        title="Muốn thử quản lý quán cafe bằng FunCafe?"
+        title="Muốn thử quản lý quán shop bằng FunCafe?"
         subtitle="Tạo tài khoản và dùng thử để xem có hợp với quán của bạn không."
         note="7 ngày miễn phí · Không cần thẻ tín dụng"
       />

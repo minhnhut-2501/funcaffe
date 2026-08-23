@@ -1,8 +1,8 @@
-import type { MenuItem } from '@/types';
+import type { Product } from '@/types';
 import { formatCurrency } from '@/lib/format';
 
 interface Props {
-  item: MenuItem;
+  item: Product;
   onClick?: () => void;
 }
 
@@ -29,10 +29,10 @@ export default function MenuCard({ item, onClick }: Props) {
         ) : (
           <div className="absolute inset-0 grid place-items-center text-3xl text-bean/40 transition-colors group-hover:bg-bean-tint">☕</div>
         )}
-        {(item.hasSize || item.allowTopping) && (
+        {(item.hasSize || item.hasTopping) && (
           <div className="absolute top-2 left-2 flex gap-1">
             {item.hasSize && <span className="text-[10px] font-semibold bg-white/90 text-bean px-1.5 py-0.5 rounded-md shadow-soft">Size</span>}
-            {item.allowTopping && <span className="text-[10px] font-semibold bg-white/90 text-pine px-1.5 py-0.5 rounded-md shadow-soft">Topping</span>}
+            {item.hasTopping && <span className="text-[10px] font-semibold bg-white/90 text-pine px-1.5 py-0.5 rounded-md shadow-soft">Topping</span>}
           </div>
         )}
       </div>

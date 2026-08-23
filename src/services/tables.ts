@@ -1,10 +1,10 @@
 /** Bàn của quán. */
-import type { CafeTable } from '@/types';
+import type { ShopTable } from '@/types';
 import { api } from '@/lib/api-client';
 import type { RawTable } from './raw';
-import { getCafeId } from './cafe-id';
+import { getShopId } from './shop-id';
 
-function mapTable(raw: RawTable): CafeTable {
+function mapTable(raw: RawTable): ShopTable {
   return {
     id: raw.id ?? raw._id ?? '',
     name: raw.name ?? '',
@@ -22,30 +22,30 @@ function mapTable(raw: RawTable): CafeTable {
 // Tables
 export const tableService = {
   list: async () => {
-    const cafeId = await getCafeId();
-    const items = await api.get<RawTable[]>(`/cafes/${cafeId}/tables`);
+    const shopId = await getShopId();
+    const items = await api.get<RawTable[]>(`/shops/${shopId}/tables`);
     return items.map(mapTable);
   },
-  create: async (data: Partial<CafeTable>) => {
-    const cafeId = await getCafeId();
-    const raw = await api.post<RawTable>(`/cafes/${cafeId}/tables`, {
+  create: async (data: Partial<ShopTable>) => {
+    const shopId = await getShopId();
+    const raw = await api.post<RawTable>(`/shops/${shopId}/tables`, {
       name: data.name,
       capacity: data.capacity,
       status: data.status ?? 'empty',
     });
     return mapTable(raw);
   },
-  update: async (id: string, data: Partial<CafeTable>) => {
-    const cafeId = await getCafeId();
+  update: async (id: string, data: Partial<ShopTable>) => {
+    const shopId = await getShopId();
     const body: Record<string, unknown> = {};
     if (data.name !== undefined) body.name = data.name;
     if (data.capacity !== undefined) body.capacity = data.capacity;
     if (data.status !== undefined) body.status = data.status;
-    const raw = await api.put<RawTable>(`/cafes/${cafeId}/tables/${id}`, body);
+    const raw = await api.put<RawTable>(`/shops/${shopId}/tables/${id}`, body);
     return mapTable(raw);
   },
   remove: async (id: string) => {
-    const cafeId = await getCafeId();
-    await api.delete(`/cafes/${cafeId}/tables/${id}`);
+    const shopId = await getShopId();
+    await api.delete(`/shops/${shopId}/tables/${id}`);
   },
 };

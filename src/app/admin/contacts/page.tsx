@@ -100,7 +100,7 @@ export default function AdminContactsPage() {
     (!onlyUnread || !m.isRead) &&
     (m.fullName.toLowerCase().includes(q) ||
       m.email.toLowerCase().includes(q) ||
-      (m.cafeName?.toLowerCase().includes(q) ?? false) ||
+      (m.shopName?.toLowerCase().includes(q) ?? false) ||
       m.content.toLowerCase().includes(q))
   );
 
@@ -156,7 +156,7 @@ export default function AdminContactsPage() {
                       <span className="block">{m.email}</span>
                       {m.phone && <span className="text-xs text-cafe-400">{m.phone}</span>}
                     </td>
-                    <td className="px-4 py-3 text-cafe-600">{m.cafeName ?? '—'}</td>
+                    <td className="px-4 py-3 text-cafe-600">{m.shopName ?? '—'}</td>
                     <td className="px-4 py-3 text-cafe-600 max-w-md">
                       <p className="line-clamp-2 whitespace-pre-wrap">{m.content}</p>
                     </td>
@@ -219,7 +219,7 @@ export default function AdminContactsPage() {
                 { label: 'Người gửi', value: detail.fullName },
                 { label: 'Email', value: detail.email },
                 { label: 'Điện thoại', value: detail.phone ?? '—' },
-                { label: 'Tên quán', value: detail.cafeName ?? '—' },
+                { label: 'Tên quán', value: detail.shopName ?? '—' },
                 { label: 'Thời gian gửi', value: formatDateTime(detail.createdAt) },
               ].map(r => (
                 <div key={r.label} className="min-w-0">

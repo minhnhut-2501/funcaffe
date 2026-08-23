@@ -83,7 +83,7 @@ export function canManage(sub: UserSubscription | null | undefined): boolean {
 //
 // Không có canViewRevenue(): xem doanh thu là quyền CƠ BẢN của mọi người dùng, kể cả
 // khi chưa có gói hoặc gói đã hết hạn — đó là dữ liệu bán hàng của chính chủ quán, và
-// backend cũng cho đọc order không cần gói (GET cafes/{cafe}/orders không gắn
+// backend cũng cho đọc order không cần gói (GET shops/{shop}/orders không gắn
 // middleware subscription). Từng có một hàm luôn trả `true` ở đây; giữ nó chỉ khiến
 // người đọc tưởng chỗ này có phân quyền.
 

@@ -1,10 +1,10 @@
 import { Users } from 'lucide-react';
-import type { CafeTable } from '@/types';
+import type { ShopTable } from '@/types';
 import { formatTableStatus } from '@/lib/format';
 import StatusBadge, { tableStatusTone } from './StatusBadge';
 
 interface Props {
-  table: CafeTable;
+  table: ShopTable;
   selected?: boolean;
   onClick?: () => void;
 }

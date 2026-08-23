@@ -11,7 +11,7 @@ import { MAT_KHAU_TOI_THIEU, HO_TEN_TOI_DA, soDienThoaiHopLe, LOI_SO_DIEN_THOAI 
 const aside = {
   image: '/banners/cafe-counter.jpg',
   title: 'Bắt đầu quản lý quán chỉ trong 5 phút',
-  subtitle: 'Đăng ký nhanh và bắt đầu quản lý quán cafe của bạn ngay hôm nay.',
+  subtitle: 'Đăng ký nhanh và bắt đầu quản lý quán shop của bạn ngay hôm nay.',
   points: [
     'Dùng thử miễn phí 7 ngày, không cần thẻ tín dụng',
     'Dễ dùng cho quán nhỏ, làm quen nhanh',
@@ -26,7 +26,7 @@ export default function RegisterPage() {
 
   // Một lệnh chuyển trang duy nhất cho cả hai lối ra khỏi form. Không có cờ
   // này thì đăng ký xong sẽ có hai đích đánh nhau: handleSubmit đưa sang
-  // /user/cafe (tạo quán đầu tiên) còn effect bên dưới lại thấy `user` vừa có
+  // /user/shop (tạo quán đầu tiên) còn effect bên dưới lại thấy `user` vừa có
   // và đẩy về /user/dashboard.
   const navigated = useRef(false);
   const goTo = useCallback((href: string) => {
@@ -76,7 +76,7 @@ export default function RegisterPage() {
       });
       toast({ title: 'Thành công', description: 'Đăng ký tài khoản thành công!' });
       // Tài khoản mới chưa có quán nào -> vào thẳng bước tạo quán đầu tiên.
-      goTo('/user/cafe');
+      goTo('/user/shop');
     } catch (err: any) {
       const msg = err?.errors?.email?.[0] || err?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
       setError(msg);
@@ -215,7 +215,7 @@ export default function RegisterPage() {
       <button
         type="submit"
         disabled={loading}
-        className="btn-cafe w-full h-11 disabled:opacity-60 disabled:pointer-events-none"
+        className="btn-shop w-full h-11 disabled:opacity-60 disabled:pointer-events-none"
       >
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}
         {loading ? 'Đang xử lý...' : 'Tạo tài khoản'}

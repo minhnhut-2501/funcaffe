@@ -10,7 +10,7 @@ import AuthShell, { AuthField, PasswordToggle } from '@/components/public/AuthSh
 const aside = {
   image: '/banners/coffee-cheers.jpg',
   title: 'Chào mừng bạn quay lại',
-  subtitle: 'Quản lý quán cafe của bạn ngay trên trình duyệt, không cần cài đặt.',
+  subtitle: 'Quản lý quán shop của bạn ngay trên trình duyệt, không cần cài đặt.',
   points: [
     'Theo dõi bàn và order rõ ràng hơn',
     'Quản lý thực đơn, size và topping trong một nơi',
@@ -129,7 +129,7 @@ export default function LoginPage() {
       <button
         type="submit"
         disabled={loading}
-        className="btn-cafe w-full h-11 disabled:opacity-60 disabled:pointer-events-none"
+        className="btn-shop w-full h-11 disabled:opacity-60 disabled:pointer-events-none"
       >
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}
         {phase === 'checking' ? 'Đang kiểm tra...' : phase === 'entering' ? 'Đang mở khu vực quản lý...' : 'Đăng nhập'}

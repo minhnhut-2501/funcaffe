@@ -49,7 +49,7 @@ export default function Banner({
         // `anh-troi`: trôi rất chậm để khung hero có sự sống thay vì đứng chết như
         // ảnh dán. Biên độ nhỏ nên chữ đè lên trên không bị xê dịch theo.
         // `.photo-tint` phủ tới 0.86 nên ảnh gốc gần như chìm hẳn — đó mới là lý do
-        // banner nhìn nhạt: KHÔNG PHẢI thiếu lớp phủ, mà là quán cafe không còn nhìn
+        // banner nhìn nhạt: KHÔNG PHẢI thiếu lớp phủ, mà là quán shop không còn nhìn
         // thấy được. Đẩy sáng và tăng độ rực để cảnh quán xuyên qua được lớp phủ,
         // thay vì chồng thêm một lớp tối nữa (đã thử, ra một dải gần như đen).
         className="anh-troi absolute inset-0 w-full h-full object-cover brightness-125 saturate-[1.35] contrast-[1.08]"

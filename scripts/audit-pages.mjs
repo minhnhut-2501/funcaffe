@@ -10,7 +10,7 @@ const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const B = process.env.AUDIT_BASE || 'http://localhost:3100';
 
 const PUBLIC = ['/', '/features', '/pricing', '/support', '/contact', '/login', '/register', '/forgot-password', '/khong-ton-tai'];
-const USER = ['/user/dashboard', '/user/sales', '/user/menu', '/user/toppings', '/user/tables', '/user/invoices', '/user/revenue', '/user/cafe', '/user/profile', '/user/subscription'];
+const USER = ['/user/dashboard', '/user/sales', '/user/menu', '/user/toppings', '/user/tables', '/user/invoices', '/user/revenue', '/user/shop', '/user/profile', '/user/subscription'];
 const ADMIN = ['/admin/dashboard', '/admin/users', '/admin/payments', '/admin/revenue', '/admin/reviews', '/admin/packages', '/admin/contacts'];
 
 const browser = await chromium.launch({ executablePath: EDGE, headless: true });

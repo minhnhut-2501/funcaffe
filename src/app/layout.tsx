@@ -14,8 +14,8 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: 'FunCafe - Nền tảng quản lý quán cafe',
-  description: 'Hệ thống quản lý quán cafe thông minh dành cho chủ quán tại Việt Nam',
+  title: 'FunCafe - Nền tảng quản lý quán shop',
+  description: 'Hệ thống quản lý quán shop thông minh dành cho chủ quán tại Việt Nam',
   // Khai báo SVG thôi là chưa đủ. Cốc Cốc, Zalo, lối tắt trên Desktop và nhiều trình
   // đọc liên kết KHÔNG đọc thẻ <link> — chúng đòi thẳng /favicon.ico ở gốc tên miền.
   // Thiếu tệp đó thì chúng ăn 404 rồi rơi về quả địa cầu mặc định, dù trang vẫn khai

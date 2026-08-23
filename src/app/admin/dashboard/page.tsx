@@ -126,7 +126,7 @@ export default function AdminDashboard() {
         id: `user-${u.id}`,
         icon: UserPlus,
         tone: 'bean',
-        title: <><span className="font-medium">{u.fullName}</span>{u.cafeName ? ` · ${u.cafeName}` : ''}</>,
+        title: <><span className="font-medium">{u.fullName}</span>{u.shopName ? ` · ${u.shopName}` : ''}</>,
         at: u.createdAt,
         trailing: u.packageName,
       })),

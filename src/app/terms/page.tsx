@@ -4,7 +4,7 @@ import { sections, UPDATED_AT } from './content';
 
 export const metadata: Metadata = {
   title: 'Điều khoản dịch vụ — FunCafe',
-  description: 'Quy tắc sử dụng phần mềm quản lý quán cafe FunCafe: tài khoản, gói dịch vụ, thanh toán và trách nhiệm của các bên.',
+  description: 'Quy tắc sử dụng phần mềm quản lý quán shop FunCafe: tài khoản, gói dịch vụ, thanh toán và trách nhiệm của các bên.',
 };
 
 // Server component: trang này không có state nào, nhờ vậy khai báo được `metadata`.

@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { calcItemBase, calcItemTopping, calcCartItem, calcSubtotal, clampDiscount, calcTotal, calcChange, isSameCartLine, type CartItem } from './cart';
-import type { MenuItem, MenuItemSize, Topping } from '@/types';
+import type { Product, ProductSize, Topping } from '@/types';
 
-const mon = (basePrice: number, ten = 'Cà phê sữa'): MenuItem => ({
+const mon = (basePrice: number, ten = 'Cà phê sữa'): Product => ({
   id: 'i1', name: ten, basePrice, categoryId: 'c1',
-  hasSize: false, sizes: [], allowTopping: true, allowedToppingIds: [], isAvailable: true,
+  hasSize: false, sizes: [], hasTopping: true, allowedToppingIds: [], isAvailable: true,
 });
-const size = (price: number, name = 'L'): MenuItemSize => ({ id: 's1', name, price, isActive: true });
+const size = (price: number, name = 'L'): ProductSize => ({ id: 's1', name, price, isActive: true });
 const topping = (price: number, name = 'Trân châu'): Topping => ({ id: 't1', name, price, isAvailable: true });
 
 const dong = (patch: Partial<CartItem> = {}): CartItem => ({

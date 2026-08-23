@@ -19,7 +19,7 @@ const info = [
   { icon: MapPin, label: 'Địa chỉ', value: 'Tòa nhà QTSC9 (toà T), đường Tô Ký, Phường Trung Mỹ Tây, TP. Hồ Chí Minh' },
 ];
 
-const FORM_RONG = { fullName: '', email: '', phone: '', cafeName: '', content: '' };
+const FORM_RONG = { fullName: '', email: '', phone: '', shopName: '', content: '' };
 
 export default function ContactPage() {
   const [form, setForm] = useState(FORM_RONG);
@@ -36,7 +36,7 @@ export default function ContactPage() {
         full_name: form.fullName,
         email: form.email,
         phone: form.phone || undefined,
-        cafe_name: form.cafeName || undefined,
+        shop_name: form.shopName || undefined,
         content: form.content,
       });
       setSent(true);
@@ -59,7 +59,7 @@ export default function ContactPage() {
       {/* Hero banner ảnh thật */}
       <Banner
         image="/banners/cafe-street.jpg"
-        alt="Một quán cafe nhỏ bên đường"
+        alt="Một quán shop nhỏ bên đường"
         title="Liên hệ với FunCafe"
         subtitle="Cần tư vấn thêm cho quán của bạn? Để lại thông tin, đội ngũ của chúng tôi sẽ phản hồi sớm."
         align="center"
@@ -90,7 +90,7 @@ export default function ContactPage() {
             </div>
             <Reveal delay={120} className="rounded-2xl bg-bean/5 border border-bean/15 p-5">
               <p className="text-sm text-ink/80 leading-relaxed">
-                Phù hợp cho quán cafe, trà sữa, nước ép và các quán nhỏ cần quản lý
+                Phù hợp cho quán shop, trà sữa, nước ép và các quán nhỏ cần quản lý
                 bàn, order và hóa đơn gọn gàng hơn.
               </p>
             </Reveal>
@@ -162,15 +162,15 @@ export default function ContactPage() {
                     </div>
                   </div>
                   <div>
-                    <label htmlFor="contact-cafe" className="label-funcafe">Tên quán cafe</label>
+                    <label htmlFor="contact-shop" className="label-funcafe">Tên quán shop</label>
                     <input
-                      id="contact-cafe"
-                      name="cafeName"
+                      id="contact-shop"
+                      name="shopName"
                       autoComplete="organization"
                       className="input-funcafe"
                       placeholder="Tên quán của bạn"
-                      value={form.cafeName}
-                      onChange={e => setForm({ ...form, cafeName: e.target.value })}
+                      value={form.shopName}
+                      onChange={e => setForm({ ...form, shopName: e.target.value })}
                     />
                   </div>
                   <div>
@@ -193,7 +193,7 @@ export default function ContactPage() {
                   </div>
                   {/* Lỗi đọc được bởi trình đọc màn hình ngay khi xuất hiện */}
                   <p role="alert" aria-live="polite" className="text-sm text-red-700 empty:hidden">{error}</p>
-                  <button type="submit" disabled={loading} className="btn-cafe w-full py-3 disabled:opacity-60">
+                  <button type="submit" disabled={loading} className="btn-shop w-full py-3 disabled:opacity-60">
                     {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
                   </button>
                 </form>

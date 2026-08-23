@@ -7,7 +7,7 @@ import { userService } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDate, formatPackageName } from '@/lib/format';
 import { getPackageBadgeClass } from '@/lib/permission';
-import type { User, UserCafeSummary } from '@/types';
+import type { User, UserShopSummary } from '@/types';
 import { Eye, Lock, Unlock, Store, Users as UsersIcon } from 'lucide-react';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import EmptyState from '@/components/ui/EmptyState';
@@ -15,9 +15,9 @@ import Pagination, { usePagination } from '@/components/ui/Pagination';
 import { FilterBar, SearchInput } from '@/components/user/FilterBar';
 import StatusBadge, { type Tone } from '@/components/user/StatusBadge';
 
-type CafeStatus = UserCafeSummary['status'];
-const CAFE_LABEL: Record<CafeStatus, string> = { open: 'Đang mở cửa', closed: 'Đã đóng cửa', inactive: 'Ngừng hoạt động' };
-const CAFE_TONE: Record<CafeStatus, Tone> = { open: 'success', closed: 'neutral', inactive: 'danger' };
+type ShopStatus = UserShopSummary['status'];
+const SHOP_LABEL: Record<ShopStatus, string> = { open: 'Đang mở cửa', closed: 'Đã đóng cửa', inactive: 'Ngừng hoạt động' };
+const SHOP_TONE: Record<ShopStatus, Tone> = { open: 'success', closed: 'neutral', inactive: 'danger' };
 
 export default function AdminUsersPage() {
   const { toast } = useToast();
@@ -107,9 +107,9 @@ export default function AdminUsersPage() {
                 <td className="px-4 py-3 text-cafe-600">{u.email}</td>
                 {/* Cột này trước chỉ hiện quán ĐẦU TIÊN nên người có nhiều quán trông như chỉ có một. */}
                 <td className="px-4 py-3 text-cafe-500">
-                  {u.cafeName ?? '—'}
-                  {(u.cafeCount ?? 0) > 1 && (
-                    <span className="ml-1.5 text-xs text-bean font-semibold">+{(u.cafeCount ?? 1) - 1} quán</span>
+                  {u.shopName ?? '—'}
+                  {(u.shopCount ?? 0) > 1 && (
+                    <span className="ml-1.5 text-xs text-bean font-semibold">+{(u.shopCount ?? 1) - 1} quán</span>
                   )}
                 </td>
                 <td className="px-4 py-3">
@@ -166,7 +166,7 @@ export default function AdminUsersPage() {
             {/* 2 cột: số tiền dài (vd "12.566.800 ₫") cần chỗ, ép 4 cột là bị cắt cụt */}
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'Số quán', value: String(viewUser.cafeCount ?? viewUser.cafes?.length ?? 0) },
+                { label: 'Số quán', value: String(viewUser.shopCount ?? viewUser.shops?.length ?? 0) },
                 { label: 'Quán còn gói', value: String(viewUser.activePackageCount ?? 0) },
                 { label: 'Số giao dịch', value: String(viewUser.paymentCount ?? 0) },
                 { label: 'Tổng đã thanh toán', value: formatCurrency(viewUser.totalPaid ?? 0) },
@@ -197,22 +197,22 @@ export default function AdminUsersPage() {
             <div>
               <p className="label-funcafe flex items-center gap-1.5">
                 <Store className="w-4 h-4 text-bean" />
-                Quán đang quản lý ({viewUser.cafes?.length ?? 0})
+                Quán đang quản lý ({viewUser.shops?.length ?? 0})
               </p>
-              {!viewUser.cafes?.length ? (
+              {!viewUser.shops?.length ? (
                 <p className="text-cafe-500 rounded-xl border border-line bg-sand/50 px-4 py-3">
                   Tài khoản này chưa mở quán nào.
                 </p>
               ) : (
                 <ul className="space-y-2">
-                  {viewUser.cafes.map(c => (
+                  {viewUser.shops.map(c => (
                     <li key={c.id} className="rounded-xl border border-line p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-semibold text-ink truncate">{c.name}</p>
                           {c.address && <p className="text-xs text-cafe-500 truncate">{c.address}</p>}
                         </div>
-                        <StatusBadge tone={CAFE_TONE[c.status]}>{CAFE_LABEL[c.status]}</StatusBadge>
+                        <StatusBadge tone={SHOP_TONE[c.status]}>{SHOP_LABEL[c.status]}</StatusBadge>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         <span className={getPackageBadgeClass(c.packageType)}>{formatPackageName(c.packageType)}</span>

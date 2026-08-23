@@ -7,7 +7,7 @@ import SectionCard from '@/components/user/SectionCard';
 import RevenueAiInsights from '@/components/user/RevenueAiInsights';
 import { FilterBar } from '@/components/user/FilterBar';
 import DateRangePicker from '@/components/ui/DateRangePicker';
-import CafeRevenueComparison from '@/components/user/CafeRevenueComparison';
+import ShopRevenueComparison from '@/components/user/ShopRevenueComparison';
 import { useAuth } from '@/context/AuthContext';
 import { invoiceService, revenueService } from '@/services';
 import { useApi } from '@/hooks/use-api';
@@ -70,14 +70,14 @@ const SO_NGAY_MAC_DINH = 30;
 const tuNgayMacDinh = nhan(new Date(today.getTime() - (SO_NGAY_MAC_DINH - 1) * 86_400_000));
 
 export default function RevenuePage() {
-  const { cafes, activeCafeId } = useAuth();
+  const { shops, activeShopId } = useAuth();
   const { toast } = useToast();
   // null = người dùng CHƯA tự chọn quán -> bám theo quán đang quản lý. Đã chọn rồi
   // (kể cả chọn "Tất cả quán") thì giữ nguyên lựa chọn đó.
-  // Không dùng useState(activeCafeId): lần render đầu AuthProvider chưa hydrate xong
-  // nên activeCafeId còn null, mà giá trị khởi tạo của useState chỉ dùng đúng một lần.
+  // Không dùng useState(activeShopId): lần render đầu AuthProvider chưa hydrate xong
+  // nên activeShopId còn null, mà giá trị khởi tạo của useState chỉ dùng đúng một lần.
   const [scope, setScope] = useState<string | null>(null);
-  const effectiveScope = scope ?? activeCafeId ?? 'all';
+  const effectiveScope = scope ?? activeShopId ?? 'all';
   const [fromDate, setFromDate] = useState(tuNgayMacDinh);
   const [toDate, setToDate] = useState(todayStr);
   // Cùng mẫu ba trạng thái với `scope` ở trên: null = chưa tự chọn mốc -> bám theo
@@ -89,8 +89,8 @@ export default function RevenuePage() {
 
   /** Các quán nằm trong phạm vi đang xem — dùng cho nhãn và cho lượt xuất Excel. */
   const canTai = useMemo(
-    () => (effectiveScope === 'all' ? cafes : cafes.filter(c => c.id === effectiveScope)),
-    [cafes, effectiveScope],
+    () => (effectiveScope === 'all' ? shops : shops.filter(c => c.id === effectiveScope)),
+    [shops, effectiveScope],
   );
 
   /**
@@ -111,7 +111,7 @@ export default function RevenuePage() {
     () => revenueService.summary({
       from: fromDate || undefined,
       to: toDate || undefined,
-      cafeId: effectiveScope,
+      shopId: effectiveScope,
     }),
     [effectiveScope, fromDate, toDate],
   );
@@ -132,7 +132,7 @@ export default function RevenuePage() {
   const todayRevenue = useMemo(() => {
     if (!tongQuan) return 0;
     if (effectiveScope === 'all') return tongQuan.today;
-    return tongQuan.cafes.find(c => c.cafeId === effectiveScope)?.today ?? 0;
+    return tongQuan.shops.find(c => c.shopId === effectiveScope)?.today ?? 0;
   }, [tongQuan, effectiveScope]);
   const chartData = useMemo(
     () => groupBuckets(soLieu?.byDay ?? [], effectiveMode, fromDate, toDate),
@@ -142,21 +142,21 @@ export default function RevenuePage() {
   const topItems = useMemo(() => (soLieu?.topItems ?? []).slice(0, 5), [soLieu]);
 
   // Xếp hạng doanh thu từng quán trong khoảng đang lọc.
-  const cafeRanking = useMemo(() => {
-    const rows = (soLieu?.cafes ?? []).map(c => ({
-      id: c.cafeId,
-      name: c.cafeName,
+  const shopRanking = useMemo(() => {
+    const rows = (soLieu?.shops ?? []).map(c => ({
+      id: c.shopId,
+      name: c.shopName,
       revenue: c.total,
       count: c.count,
     }));
     return rows.sort((a, b) => b.revenue - a.revenue);
   }, [soLieu]);
-  const showComparison = effectiveScope === 'all' && cafes.length > 1;
+  const showComparison = effectiveScope === 'all' && shops.length > 1;
 
   const rangeLabel = fromDate || toDate
     ? `${fromDate || 'đầu kỳ'} → ${toDate || 'nay'}`
     : 'toàn bộ thời gian';
-  const scopeLabel = effectiveScope === 'all' ? 'tất cả quán' : cafes.find(c => c.id === effectiveScope)?.name ?? '';
+  const scopeLabel = effectiveScope === 'all' ? 'tất cả quán' : shops.find(c => c.id === effectiveScope)?.name ?? '';
 
   const handleExport = async () => {
     if (soHoaDon === 0) {
@@ -182,7 +182,7 @@ export default function RevenuePage() {
       const quanHong: string[] = [];
       for (const c of canTai) {
         try {
-          hoaDon.push(...await invoiceService.listByCafe(c.id, c.name, {
+          hoaDon.push(...await invoiceService.listByShop(c.id, c.name, {
             from: fromDate || undefined,
             to: toDate || undefined,
           }));
@@ -205,7 +205,7 @@ export default function RevenuePage() {
 
       // Cột "Quán" chỉ có nghĩa khi file gộp nhiều quán; đang xem riêng một quán mà
       // vẫn xuất thì cả cột lặp lại đúng một cái tên.
-      const multi = effectiveScope === 'all' && cafes.length > 1;
+      const multi = effectiveScope === 'all' && shops.length > 1;
       // Tên tệp mang theo ĐÚNG khoảng đã xuất. Trang mặc định xem 30 ngày gần nhất
       // chứ không phải toàn bộ thời gian, nên một cái tên chỉ có ngày xuất sẽ khiến
       // người nhận tưởng đây là số liệu từ đầu tới giờ.
@@ -221,7 +221,7 @@ export default function RevenuePage() {
           { header: 'Ngày thanh toán', width: 20, numFmt: 'dd/mm/yyyy hh:mm' },
         ],
         hoaDon.map(inv => [
-          ...(multi ? [inv.cafeName ?? ''] : []),
+          ...(multi ? [inv.shopName ?? ''] : []),
           inv.invoiceCode,
           inv.tableName,
           formatPaymentMethod(inv.paymentMethod),
@@ -288,7 +288,7 @@ export default function RevenuePage() {
     <div>
       <PageHeader
         title="Doanh thu"
-        description={cafes.length > 1 ? 'Thống kê quán đang quản lý, có thể xem gộp mọi quán' : 'Thống kê doanh thu chi tiết'}
+        description={shops.length > 1 ? 'Thống kê quán đang quản lý, có thể xem gộp mọi quán' : 'Thống kê doanh thu chi tiết'}
         actions={
           <button onClick={handleExport} disabled={exporting} className="btn-secondary flex items-center gap-2 text-sm">
             <Download className="w-4 h-4" />{exporting ? 'Đang xuất...' : 'Xuất Excel'}
@@ -301,15 +301,15 @@ export default function RevenuePage() {
           Hỏng thì rơi vào nhánh `error` ở trên, kèm nút Thử lại. */}
 
       <FilterBar>
-        {cafes.length > 1 && (
+        {shops.length > 1 && (
           <select
             className="input-funcafe !w-auto min-w-[170px]"
             value={effectiveScope}
             onChange={e => setScope(e.target.value)}
             aria-label="Chọn quán"
           >
-            <option value="all">Tất cả quán ({cafes.length})</option>
-            {cafes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <option value="all">Tất cả quán ({shops.length})</option>
+            {shops.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
         <DateRangePicker from={fromDate} to={toDate} onChange={(f, t) => { setFromDate(f); setToDate(t); }} />
@@ -333,13 +333,13 @@ export default function RevenuePage() {
         <StatCard label="Doanh thu" value={formatCurrency(revenue)} icon={DollarSign} featured hint={`${soHoaDon} hóa đơn`} />
         <StatCard label="Doanh thu hôm nay" value={formatCurrency(todayRevenue)} icon={TrendingUp} color="green" />
         <StatCard label="Trung bình/hóa đơn" value={formatCurrency(avgPerInvoice)} icon={BarChart3} color="blue" />
-        {showComparison && cafeRanking[0]?.revenue > 0 ? (
+        {showComparison && shopRanking[0]?.revenue > 0 ? (
           <StatCard
             label="Quán dẫn đầu"
-            value={cafeRanking[0].name}
+            value={shopRanking[0].name}
             icon={Trophy}
             color="yellow"
-            hint={formatCurrency(cafeRanking[0].revenue)}
+            hint={formatCurrency(shopRanking[0].revenue)}
           />
         ) : (
           <StatCard label="Tổng hóa đơn" value={soHoaDon} icon={Receipt} color="yellow" />
@@ -391,7 +391,7 @@ export default function RevenuePage() {
             subtitle={`Trong khoảng đang lọc · ${rangeLabel}`}
             icon={Store}
           >
-            <CafeRevenueComparison rows={cafeRanking} />
+            <ShopRevenueComparison rows={shopRanking} />
           </SectionCard>
         )}
       </div>

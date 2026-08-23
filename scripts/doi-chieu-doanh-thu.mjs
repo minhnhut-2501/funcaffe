@@ -38,21 +38,21 @@ await page.waitForFunction(() => location.pathname.startsWith('/user'), null, { 
 
 const goiApi = (duong) => page.evaluate(async ({ api, duong }) => {
   const token = localStorage.getItem('funcafe_token') || sessionStorage.getItem('funcafe_token');
-  const cafeId = localStorage.getItem('funcafe.activeCafeId');
-  const res = await fetch(`${api}${duong.replace('{cafe}', cafeId)}`, {
+  const shopId = localStorage.getItem('funcafe.activeShopId');
+  const res = await fetch(`${api}${duong.replace('{shop}', shopId)}`, {
     headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
   });
   return res.json();
 }, { api: API, duong });
 
 // ===== NGUON CHAN LY: hoa don doc thang tu may chu =====
-const quan = await goiApi('/cafes');
+const quan = await goiApi('/shops');
 const donTheoQuan = {};
 for (const c of quan) {
   const cid = c.id ?? c._id;
-  donTheoQuan[cid] = { ten: c.name, don: await goiApi(`/cafes/${cid}/orders?status=paid`) };
+  donTheoQuan[cid] = { ten: c.name, don: await goiApi(`/shops/${cid}/orders?status=paid`) };
 }
-const moiDon = Object.entries(donTheoQuan).flatMap(([cid, v]) => v.don.map(o => ({ cafeId: cid, ...o })));
+const moiDon = Object.entries(donTheoQuan).flatMap(([cid, v]) => v.don.map(o => ({ shopId: cid, ...o })));
 const tongCua = (ds) => ds.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
 
 console.log(`Quan: ${quan.length}. Tong hoa don da thanh toan: ${moiDon.length}\n`);
@@ -75,9 +75,9 @@ const tayThangNay = tongCua(moiDon.filter(o => ngayVN(o.paid_at ?? o.created_at)
 ok(Number(ov.today) === tayHomNay, `overview.today = ${tien(ov.today)} = cong tay hom nay (${homNayVN})`);
 ok(Number(ov.this_month) === tayThangNay, `overview.this_month = ${tien(ov.this_month)} = cong tay thang ${thangNayVN}`);
 
-for (const hang of ov.cafes ?? []) {
-  const that = tongCua(donTheoQuan[hang.cafe_id]?.don ?? []);
-  ok(Number(hang.total) === that, `  tung quan: "${hang.cafe_name}" ${tien(hang.total)} = ${tien(that)}`);
+for (const hang of ov.shops ?? []) {
+  const that = tongCua(donTheoQuan[hang.shop_id]?.don ?? []);
+  ok(Number(hang.total) === that, `  tung quan: "${hang.shop_name}" ${tien(hang.total)} = ${tien(that)}`);
 }
 
 let thangLech = 0;
@@ -96,7 +96,7 @@ ok(thangLech === 0, `bang theo thang khong lech thang nao (${Object.keys(ov.reve
 
 // ===== 2. TRANG QUAN LY QUAN =====
 console.log('\n2) TRANG QUAN LY QUAN (tat ca quan, toan bo thoi gian)');
-await page.goto(BASE + '/user/cafe', { waitUntil: 'domcontentloaded' });
+await page.goto(BASE + '/user/shop', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => /Tổng doanh thu/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});
 await page.waitForTimeout(2000);
 const chuQuan = await page.locator('main').innerText();
@@ -167,7 +167,7 @@ ok(uiHomNayDT === tayHomNay, `"Doanh thu hôm nay" = cong tay theo gio VN (${tie
 
 // ===== 4. TRANG HOA DON =====
 console.log('\n4) TRANG HOA DON (quan dang chon)');
-const quanDangChon = await page.evaluate(() => localStorage.getItem('funcafe.activeCafeId'));
+const quanDangChon = await page.evaluate(() => localStorage.getItem('funcafe.activeShopId'));
 const donQuanDangChon = donTheoQuan[quanDangChon]?.don ?? [];
 await page.goto(BASE + '/user/invoices', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => /INV-/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});

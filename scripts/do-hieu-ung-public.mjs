@@ -2,7 +2,7 @@
  * ĐO hiệu ứng chuyển động trên các trang public — trước và sau khi sửa.
  *
  * Vì sao phải đo trong trình duyệt chứ không đếm chuỗi "hover:" trong mã nguồn:
- * hiệu ứng có thể tới từ class CSS gộp (`lift`, `btn-cafe`, `card-interactive`)
+ * hiệu ứng có thể tới từ class CSS gộp (`lift`, `btn-shop`, `card-interactive`)
  * chứ không phải class Tailwind viết thẳng ra. Đếm chuỗi trong .tsx cho ra con số
  * THẤP HƠN thực tế — tôi đã tự lừa mình đúng kiểu đó một lần: báo trang liên hệ
  * "0 hiệu ứng" trong khi nó đang dùng `lift`.

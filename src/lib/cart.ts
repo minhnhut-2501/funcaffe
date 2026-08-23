@@ -1,4 +1,4 @@
-import type { MenuItem, MenuItemSize, Topping } from '@/types';
+import type { Product, ProductSize, Topping } from '@/types';
 
 /**
  * Phép tính tiền của giỏ hàng tại quầy.
@@ -16,8 +16,8 @@ import type { MenuItem, MenuItemSize, Topping } from '@/types';
 
 export interface CartItem {
   id: string;
-  item: MenuItem;
-  size?: MenuItemSize;
+  item: Product;
+  size?: ProductSize;
   quantity: number;
   toppings: { topping: Topping; quantity: number }[];
   note: string;

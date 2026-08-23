@@ -15,7 +15,7 @@ export type ActionType = 'new' | 'renew' | 'upgrade';
 // Không có luồng hoàn tiền mặt chờ duyệt -> chỉ 2 trạng thái.
 export type CreditStatus = 'none' | 'applied';
 
-export interface MenuItemSize {
+export interface ProductSize {
   id: string;
   sizeId?: string;
   name: string;
@@ -23,7 +23,7 @@ export interface MenuItemSize {
   isActive: boolean;
 }
 
-export interface MenuItem {
+export interface Product {
   id: string;
   name: string;
   basePrice: number;
@@ -31,8 +31,8 @@ export interface MenuItem {
   imageUrl?: string;
   description?: string;
   hasSize: boolean;
-  sizes: MenuItemSize[];
-  allowTopping: boolean;
+  sizes: ProductSize[];
+  hasTopping: boolean;
   allowedToppingIds: string[];
   isAvailable: boolean;
 }
@@ -54,7 +54,7 @@ export interface Topping {
   isAvailable: boolean;
 }
 
-export interface CafeTable {
+export interface ShopTable {
   id: string;
   name: string;
   capacity: number;
@@ -72,8 +72,8 @@ export interface OrderItemTopping {
 
 export interface OrderItem {
   id: string;
-  itemId: string;
-  itemNameSnapshot: string;
+  productId: string;
+  productNameSnapshot: string;
   sizeId?: string;
   sizeNameSnapshot?: string;
   quantity: number;
@@ -107,13 +107,13 @@ export interface Invoice {
   id: string;
   invoiceCode: string;
   orderId: string;
-  cafeId?: string;
+  shopId?: string;
   tableId?: string;
   orderCode: string;
   tableName: string;
-  cafeName?: string;
-  cafeAddress?: string;
-  cafePhone?: string;
+  shopName?: string;
+  shopAddress?: string;
+  shopPhone?: string;
   items: OrderItem[];
   subtotal: number;
   discountAmount: number;
@@ -126,7 +126,7 @@ export interface Invoice {
   changeAmount?: number;
 }
 
-export interface CafeInfo {
+export interface ShopInfo {
   id: string;
   name: string;
   address: string;
@@ -139,7 +139,7 @@ export interface CafeInfo {
   bankAccountNumber?: string;
   bankAccountName?: string;
   /**
-   * Gói còn hiệu lực của CHÍNH quán này — chỉ có ở danh sách GET /cafes.
+   * Gói còn hiệu lực của CHÍNH quán này — chỉ có ở danh sách GET /shops.
    * Dùng để cảnh báo sắp hết hạn cho cả những quán người dùng không đang đứng.
    * undefined = endpoint không trả (không phải "chưa có gói"; 'none' mới là vậy).
    */
@@ -184,7 +184,7 @@ export interface UserSubscription {
   creditAmount?: number;
   creditStatus?: CreditStatus;
   // ĐA QUÁN: gói này thuộc quán nào (id). Undefined nếu chưa có gói.
-  cafeId?: string;
+  shopId?: string;
   // Giới hạn & quyền lấy từ gói (Infinity = không giới hạn). Do admin cấu hình.
   maxTables?: number;
   maxMenuItems?: number;
@@ -192,7 +192,7 @@ export interface UserSubscription {
 }
 
 /** Một quán của người dùng, kèm gói đang chạy — dùng ở màn chi tiết người dùng (admin). */
-export interface UserCafeSummary {
+export interface UserShopSummary {
   id: string;
   name: string;
   address: string;
@@ -212,7 +212,7 @@ export interface User {
   status: UserStatus;
   packageType: UserPackageType;
   packageName: string;
-  cafeName?: string;
+  shopName?: string;
   hasUsedFreeTrial?: boolean;
   createdAt: string;
   /**
@@ -221,8 +221,8 @@ export interface User {
    */
   role?: 'user' | 'admin';
   // Chỉ có ở API quản trị (/admin/users)
-  cafes?: UserCafeSummary[];
-  cafeCount?: number;
+  shops?: UserShopSummary[];
+  shopCount?: number;
   /** Số quán đang có gói còn hạn. */
   activePackageCount?: number;
   /** Số giao dịch mua gói ĐÃ THANH TOÁN (không tính pending/failed). */
@@ -288,8 +288,8 @@ export interface Review {
   userId: string;
   userName?: string;
   userEmail?: string;
-  cafeId: string;
-  cafeName?: string;
+  shopId: string;
+  shopName?: string;
   packageId?: string;
   packageName?: string;
   rating: number;
@@ -304,7 +304,7 @@ export interface Review {
 }
 
 export interface PublicReview extends Review {
-  cafeName: string;
+  shopName: string;
   userName: string;
   /** Ảnh đại diện chủ quán tự tải lên; chỉ API công khai trả field này. */
   avatarUrl?: string;

@@ -1,15 +1,15 @@
 /** Đăng ký gói của từng quán. */
 import type { MyPayment } from '@/types';
 import { api } from '@/lib/api-client';
-import { getCafeId } from './cafe-id';
+import { getShopId } from './shop-id';
 import { mapPackage } from './packages';
 import { trangThaiCanTru } from './payments';
 
-// Subscriptions — ĐA QUÁN: gói theo quán đang chọn (cafes/{cafeId}/subscriptions)
+// Subscriptions — ĐA QUÁN: gói theo quán đang chọn (shops/{shopId}/subscriptions)
 export const subscriptionService = {
   list: async () => {
-    const cafeId = await getCafeId();
-    const items = await api.get<any[]>(`/cafes/${cafeId}/subscriptions`);
+    const shopId = await getShopId();
+    const items = await api.get<any[]>(`/shops/${shopId}/subscriptions`);
     return items.map((raw: any) => ({
       id: raw.id ?? raw._id,
       packageId: raw.package_id,
@@ -27,8 +27,8 @@ export const subscriptionService = {
     }));
   },
   active: async () => {
-    const cafeId = await getCafeId();
-    const raw = await api.get<any>(`/cafes/${cafeId}/subscriptions/active`);
+    const shopId = await getShopId();
+    const raw = await api.get<any>(`/shops/${shopId}/subscriptions/active`);
     return raw ? {
       id: raw.id ?? raw._id,
       packageId: raw.package_id,
@@ -52,14 +52,14 @@ export const subscriptionService = {
    * màn hình hứa một con số còn cổng thanh toán thu một con số khác.
    */
   preview: async (packageId: string, timeSubscriptionId?: string) => {
-    const cafeId = await getCafeId();
+    const shopId = await getShopId();
     const q = new URLSearchParams({ package_id: packageId });
     if (timeSubscriptionId) q.set('time_subscription_id', timeSubscriptionId);
     const raw = await api.get<{
       action_type: 'new' | 'renew' | 'upgrade' | 'downgrade';
       subtotal: number; vat_rate: number; vat_amount: number;
       gross: number; credit: number; payable: number; needs_gateway: boolean;
-    }>(`/cafes/${cafeId}/subscriptions/preview?${q.toString()}`);
+    }>(`/shops/${shopId}/subscriptions/preview?${q.toString()}`);
     return {
       actionType: raw.action_type,
       subtotal: raw.subtotal,
@@ -72,14 +72,14 @@ export const subscriptionService = {
     };
   },
   create: async (data: { package_id: string; time_subscription_id?: string; payment_method: string; note?: string }) => {
-    const cafeId = await getCafeId();
-    const raw = await api.post<any>(`/cafes/${cafeId}/subscriptions`, data);
+    const shopId = await getShopId();
+    const raw = await api.post<any>(`/shops/${shopId}/subscriptions`, data);
     return raw;
   },
   // Lịch sử thanh toán gói của quán đang chọn
   payments: async (): Promise<MyPayment[]> => {
-    const cafeId = await getCafeId();
-    const items = await api.get<any[]>(`/cafes/${cafeId}/subscriptions/payments`);
+    const shopId = await getShopId();
+    const items = await api.get<any[]>(`/shops/${shopId}/subscriptions/payments`);
     return items.map((raw: any) => ({
       id: raw.id ?? raw._id,
       transactionCode: raw.transaction_code ?? '',

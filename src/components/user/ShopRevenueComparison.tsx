@@ -1,7 +1,7 @@
 'use client';
 import { formatCurrency } from '@/lib/format';
 
-export type CafeRevenueRowView = {
+export type ShopRevenueRowView = {
   id: string;
   name: string;
   revenue: number;
@@ -13,11 +13,11 @@ export type CafeRevenueRowView = {
  * Quán chưa phát sinh doanh thu vẫn được giữ trong danh sách với số 0 — biến mất
  * khỏi bảng sẽ khiến chủ quán tưởng thiếu quán chứ không phải quán đó ế.
  */
-export default function CafeRevenueComparison({
+export default function ShopRevenueComparison({
   rows,
   emptyText = 'Chưa quán nào có doanh thu trong khoảng này.',
 }: {
-  rows: CafeRevenueRowView[];
+  rows: ShopRevenueRowView[];
   emptyText?: string;
 }) {
   const sorted = [...rows].sort((a, b) => b.revenue - a.revenue);
