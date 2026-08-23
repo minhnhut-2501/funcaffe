@@ -308,16 +308,31 @@ class PaymentGatewayController extends Controller
     // =========================================================================
 
     /**
-     * Khách quay về sau khi trả tiền trên điện thoại của họ.
+     * Khách quay về sau khi trả tiền trên điện thoại của họ — VÀ CHỐT ĐƠN TẠI ĐÂY.
      *
-     * KHÔNG chốt đơn ở đây. Return URL do TRÌNH DUYỆT KHÁCH gọi nên có thể không bao
-     * giờ tới (khách tắt tab, mất mạng), và ai cũng gọi được nó. Việc chốt đơn nằm ở
-     * IPN — đường server-to-server có chữ ký. Chỗ này chỉ hiện một trang cảm ơn.
+     * Ban đầu chỗ này cố tình KHÔNG chốt, với lý do "return do trình duyệt khách gọi
+     * nên ai cũng gọi được". Vế đó SAI: ai cũng gọi được, nhưng không ai dựng nổi
+     * `vnp_SecureHash` hợp lệ nếu không có khóa bí mật. Kiểm chữ ký ở đây chắc chắn
+     * y như ở IPN — và luồng MUA GÓI vốn đã chốt theo đúng cách này từ đầu
+     * (`vnpayReturn` gọi markPaidAndActivate), đó là lý do nó chạy được.
+     *
+     * Vì sao phải chốt cả ở đây: IPN chỉ tới nếu địa chỉ của nó được khai trong cổng
+     * thương nhân VNPay. Thử thật trên bản deploy ngày 24/08: khách trả tiền sandbox
+     * thành công, thấy trang cảm ơn, mà IPN không bao giờ tới — đơn nằm im ở
+     * 'active/pending'. Dựa vào MỘT đường là dựa vào một thứ mình không kiểm soát.
+     *
+     * Hai đường cùng chốt KHÔNG gây chốt hai lần: `chotDon()` ghi có điều kiện
+     * `status='active'`, đường tới sau nhận 0 dòng đổi và bỏ qua.
      */
     public function vnpayOrderReturn(Request $request)
     {
         $query = $request->query();
         $ok = $this->vnpay->validateSignature($query) && ($query['vnp_ResponseCode'] ?? null) === '00';
+
+        if ($ok) {
+            // Dùng lại đúng hàm của IPN để hai đường không thể xử lý khác nhau.
+            $this->vnpayOrderIpn($request);
+        }
 
         $tieuDe = $ok ? 'Thanh toán thành công' : 'Thanh toán chưa hoàn tất';
         $loi    = $ok

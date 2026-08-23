@@ -331,7 +331,17 @@ class OrderVnpayTest extends MongoTestCase
 
     // --- Trang khách quay về ----------------------------------------------------
 
-    public function test_trang_quay_ve_khong_chot_don(): void
+    /**
+     * Trang quay về CŨNG chốt đơn — và đó là đường duy nhất chắc chắn chạy.
+     *
+     * IPN chỉ tới nếu địa chỉ của nó được khai trong cổng thương nhân VNPay. Thử thật
+     * trên bản deploy 24/08: khách trả tiền sandbox xong, thấy trang cảm ơn, mà IPN
+     * không bao giờ tới. Dựa vào một mình IPN là dựa vào thứ mình không kiểm soát.
+     *
+     * An toàn vì chữ ký: ai cũng GỌI được đường này, nhưng không ai dựng nổi
+     * `vnp_SecureHash` hợp lệ nếu không có khóa bí mật.
+     */
+    public function test_trang_quay_ve_cung_chot_don(): void
     {
         $id = $this->taoDon();
         $ref = $this->xinLienKet($id)->json('txn_ref');
@@ -341,8 +351,40 @@ class OrderVnpayTest extends MongoTestCase
             ->assertStatus(200)
             ->assertSee('Thanh toán thành công');
 
-        // Return URL do TRÌNH DUYỆT KHÁCH gọi — ai cũng gọi được. Chốt đơn ở đó là
-        // mở đường chốt khống. Việc chốt chỉ nằm ở IPN.
+        $don = Order::find($id);
+        $this->assertSame('paid', $don->status);
+        $this->assertNotEmpty($don->invoice_code);
+    }
+
+    /** Chữ ký sai thì trang quay về KHÔNG chốt gì cả — đó là chốt chặn thật sự. */
+    public function test_trang_quay_ve_sai_chu_ky_khong_chot_don(): void
+    {
+        $id = $this->taoDon();
+        $ref = $this->xinLienKet($id)->json('txn_ref');
+        $du = $this->callbackVnpay(['vnp_TxnRef' => $ref]);
+        $du['vnp_SecureHash'] = str_repeat('0', 128);
+
+        $this->get('/api/payments/vnpay/order/return?' . http_build_query($du))
+            ->assertStatus(200)
+            ->assertSee('Thanh toán chưa hoàn tất');
+
         $this->assertSame('active', Order::find($id)->status);
+    }
+
+    /** Return tới trước rồi IPN tới sau: chỉ MỘT mã phiếu, không chốt hai lần. */
+    public function test_return_roi_IPN_van_chi_mot_ma_phieu(): void
+    {
+        $id = $this->taoDon();
+        $ref = $this->xinLienKet($id)->json('txn_ref');
+        $du = $this->callbackVnpay(['vnp_TxnRef' => $ref]);
+
+        $this->get('/api/payments/vnpay/order/return?' . http_build_query($du));
+        $maLan1 = Order::find($id)->invoice_code;
+
+        $this->getJson('/api/payments/vnpay/ipn?' . http_build_query($du))
+            ->assertJsonPath('RspCode', '00');
+
+        $this->assertSame($maLan1, Order::find($id)->invoice_code);
+        $this->assertSame(1, $this->shop->orders()->where('status', 'paid')->count());
     }
 }
