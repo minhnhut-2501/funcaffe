@@ -55,10 +55,18 @@ class RevenueStats
             $perShop[$cid] = ['total' => 0, 'count' => 0];
         }
 
+        // Hai hình thức bán LUÔN có mặt, kể cả khi chưa bán được cái nào. Thiếu khóa
+        // thì thẻ "Mang về" bên trình duyệt hiện trống thay vì hiện 0 — hai chuyện khác hẳn.
+        $theoHinhThuc = [
+            'dine_in'  => ['total' => 0, 'count' => 0],
+            'takeaway' => ['total' => 0, 'count' => 0],
+        ];
+
         if ($shopIds === []) {
             return [
                 'total' => 0, 'count' => 0,
                 'by_day' => [], 'by_month' => [], 'top_items' => [], 'by_shop' => [],
+                'by_order_type' => $theoHinhThuc,
             ];
         }
 
@@ -74,7 +82,7 @@ class RevenueStats
         if ($topItems > 0) {
             $query->with('orderDetails');
         }
-        $orders = $query->get(['_id', 'shop_id', 'total_amount', 'paid_at', 'created_at']);
+        $orders = $query->get(['_id', 'shop_id', 'total_amount', 'paid_at', 'created_at', 'order_type']);
 
         $byDay = [];
         $byMonth = [];
@@ -92,6 +100,12 @@ class RevenueStats
                 $perShop[$cid]['total'] += $tien;
                 $perShop[$cid]['count'] += 1;
             }
+
+            // Đơn CŨ (có trước khi hệ thống bán mang về) không mang trường này — tính
+            // là bán tại quán. Đúng với thực tế: lúc đó chưa bán mang về được.
+            $hinhThuc = $order->order_type === 'takeaway' ? 'takeaway' : 'dine_in';
+            $theoHinhThuc[$hinhThuc]['total'] += $tien;
+            $theoHinhThuc[$hinhThuc]['count'] += 1;
 
             $moc = $this->toCarbon($order->paid_at ?? $order->created_at);
             if ($moc) {
@@ -132,6 +146,7 @@ class RevenueStats
             'by_month' => $byMonth,
             'top_items' => array_slice($monMua, 0, max(0, $topItems)),
             'by_shop' => $perShop,
+            'by_order_type' => $theoHinhThuc,
         ];
     }
 

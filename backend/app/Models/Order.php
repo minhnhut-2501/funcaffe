@@ -11,7 +11,16 @@ class Order extends Model
     protected $fillable = ['shop_id', 'table_id', 'code', 'status', 'note', 'subtotal', 'discount_amount', 'total_amount', 'paid_at',
         // Thanh toán gộp thẳng vào order (bỏ bảng invoices): mã phiếu + phương thức +
         // trạng thái thanh toán + tiền mặt/thối.
-        'invoice_code', 'payment_method', 'payment_status', 'cash_received', 'change_amount'];
+        'invoice_code', 'payment_method', 'payment_status', 'cash_received', 'change_amount',
+        // Bán tại quán ('dine_in') hay mang về ('takeaway'). Đơn mang về KHÔNG có
+        // table_id — quán hết bàn vẫn bán được, đó là lý do trường này ra đời.
+        'order_type',
+        // Ai mở đơn / ai thu tiền. Dùng để in dòng "Thu ngân" lên hóa đơn và để đối
+        // ca khi quán có nhiều nhân viên.
+        'created_by', 'paid_by',
+        // Mã giao dịch cổng thanh toán, để callback tra ngược về đúng đơn. Chỉ có ở
+        // đơn trả qua cổng, không có ở đơn tiền mặt.
+        'gateway_txn_ref'];
 
     /**
      * MỌI trường tiền là SỐ NGUYÊN. Đồng Việt Nam không có đơn vị nhỏ hơn đồng, nên

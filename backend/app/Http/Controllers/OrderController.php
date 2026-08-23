@@ -12,6 +12,7 @@ use App\Http\Controllers\Concerns\ChecksShopAccess;
 use App\Http\Controllers\Concerns\ChecksShopStatus;
 use App\Http\Controllers\Concerns\RunsAtomically;
 use Carbon\Carbon;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
@@ -123,13 +124,25 @@ class OrderController extends Controller
         // vẫn gọi thêm và thanh toán được — update()/pay()/cancel() không bị chặn.
         $this->guardBanHang($shop);
 
+        /*
+         * ĐẶT MẶC ĐỊNH TRƯỚC KHI VALIDATE, không phải sau.
+         *
+         * `required_if:order_type,dine_in` chỉ có hiệu lực khi `order_type` THỰC SỰ có
+         * mặt trong request. Client cũ (hoặc ai gọi tay) không gửi trường đó thì luật
+         * so sánh với một giá trị vắng mặt, không khớp, và `table_id` hoá ra không bắt
+         * buộc — tạo được đơn tại quán KHÔNG có bàn. Gộp giá trị mặc định vào request
+         * trước khi validate là cách khép chỗ hở đó.
+         */
+        $request->merge(['order_type' => $request->input('order_type', 'dine_in')]);
+
         $validated = $request->validate([
-            'table_id'                              => 'required|string',
+            'order_type'                            => 'required|string|in:dine_in,takeaway',
+            'table_id'                              => 'required_if:order_type,dine_in|nullable|string',
             'note'                                  => 'nullable|string',
             'items'                                 => 'required|array|min:1',
-            'items.*.product_id'                       => 'required|string',
-            'items.*.product_name_snapshot'            => 'required|string',
-            'items.*.product_size_id'                 => 'nullable|string',
+            'items.*.product_id'                    => 'required|string',
+            'items.*.product_name_snapshot'         => 'required|string',
+            'items.*.product_size_id'               => 'nullable|string',
             'items.*.size_name_snapshot'            => 'nullable|string',
             'items.*.quantity'                      => 'required|integer|min:1',
             'items.*.note'                          => 'nullable|string',
@@ -137,32 +150,76 @@ class OrderController extends Controller
             'items.*.toppings.*.topping_id'         => 'required|string',
             'items.*.toppings.*.topping_name_snapshot' => 'nullable|string',
             'items.*.toppings.*.quantity'           => 'required|integer|min:1',
+            // Bán MANG VỀ trả tiền mặt/VietQR thì tạo và chốt trong CÙNG một lượt gọi
+            // (xem chú thích ở dưới). Gửi kèm `payment_method` là bật đường đó.
+            'payment_method'                        => 'nullable|string|in:cash,vietqr',
+            'cash_received'                         => 'nullable|numeric|min:0',
+        ], [
+            'table_id.required_if' => 'Bán tại quán thì phải chọn bàn.',
         ]);
 
-        // Bàn phải thuộc quán này
-        if (!$shop->tables()->where('_id', $validated['table_id'])->exists()) {
-            return response()->json(['message' => 'Bàn không hợp lệ hoặc không thuộc quán của bạn.'], 422);
-        }
+        $mangVe = $validated['order_type'] === 'takeaway';
 
-        // Chống tạo order trùng: nếu bàn đã có order active thì không tạo mới,
-        // trả về order hiện tại để client tiếp tục cập nhật vào đó.
-        $existing = $shop->orders()
-            ->where('table_id', $validated['table_id'])
-            ->where('status', 'active')
-            ->first();
-        if ($existing) {
-            $existing->load(['orderDetails.orderDetailToppings.topping', 'table']);
-            return response()->json($existing, 200);
+        if ($mangVe) {
+            // Đơn mang về KHÔNG gắn bàn. Client lỡ gửi table_id thì bỏ đi chứ không
+            // báo lỗi — bàn nào cũng vô nghĩa với một ly mang đi.
+            $validated['table_id'] = null;
+        } else {
+            if (!$shop->tables()->where('_id', $validated['table_id'])->exists()) {
+                return response()->json(['message' => 'Bàn không hợp lệ hoặc không thuộc quán của bạn.'], 422);
+            }
+
+            // Chống tạo order trùng: nếu bàn đã có order active thì không tạo mới,
+            // trả về order hiện tại để client tiếp tục cập nhật vào đó.
+            //
+            // KHÔNG áp dụng cho mang về: nhiều khách mua mang đi cùng lúc là chuyện
+            // bình thường, gộp chung một đơn là thu nhầm tiền người này cho người kia.
+            $existing = $shop->orders()
+                ->where('table_id', $validated['table_id'])
+                ->where('status', 'active')
+                ->first();
+            if ($existing) {
+                $existing->load(['orderDetails.orderDetailToppings.topping', 'table']);
+                return response()->json($existing, 200);
+            }
         }
 
         // Kiểm hết mọi dòng TRƯỚC khi tạo đơn: dòng nào hỏng thì 422 bay ra từ đây,
         // lúc CSDL còn chưa có gì mới. Không còn cảnh đơn rỗng nằm lại làm kẹt bàn.
         $cacDong = $this->chuanBiCacDong($shop, $validated['items']);
 
-        $order = $this->atomic(function () use ($shop, $validated, $cacDong) {
+        /*
+         * TẠO VÀ CHỐT TRONG MỘT LƯỢT GỌI (chỉ mang về, chỉ tiền mặt/VietQR).
+         *
+         * Vì sao không để client gọi hai lượt (store rồi pay): lượt thứ hai hỏng —
+         * mạng rớt, trình duyệt đóng — sẽ để lại một đơn `active` KHÔNG gắn bàn nào.
+         * Giao diện bán hàng dẫn xuất mọi thứ theo bàn nên đơn đó không hiện ở đâu cả:
+         * một đơn ma nằm im trong sổ, không ai thu tiền và cũng không ai thấy để hủy.
+         *
+         * Tiền khách đưa được kiểm TRƯỚC khi tạo đơn — tổng tiền đã tính xong từ
+         * `chuanBiCacDong` rồi. Nhờ vậy không cần lùi gì cả: thiếu tiền thì 422 bay ra
+         * lúc CSDL còn chưa có gì. Mongo máy đơn không có transaction để lùi hộ.
+         */
+        $chotLuon = $mangVe && !empty($validated['payment_method']);
+        $tamTinh  = (int) round(array_sum(array_column($cacDong, 'total')));
+        $tienMat  = null;
+
+        if ($chotLuon) {
+            $tienMat = $this->kiemTienKhachDua(
+                $validated['payment_method'],
+                $validated['cash_received'] ?? null,
+                $tamTinh,
+            );
+        }
+
+        $order = $this->atomic(function () use ($shop, $validated, $cacDong, $request) {
             $todayStr = now()->format('Ymd');
             // B7: count()+1 có thể trùng khi 2 request chạy song song — dò tiếp
             // tới số chưa dùng trước khi chốt mã.
+            //
+            // Đơn mang về dùng CHUNG dãy mã với đơn tại quán, không tách dãy riêng:
+            // chỉ mục duy nhất {shop_id, code} không phải đụng tới, và việc đối chiếu
+            // sổ sách vẫn là một dãy liên tục. Phân biệt hai loại bằng `order_type`.
             $orderCount = $shop->orders()->where('code', 'like', "ORD-{$todayStr}-%")->count() + 1;
             do {
                 $orderCode = 'ORD-' . $todayStr . '-' . str_pad($orderCount++, 4, '0', STR_PAD_LEFT);
@@ -170,11 +227,13 @@ class OrderController extends Controller
 
             $order = $shop->orders()->create([
                 'table_id'     => $validated['table_id'],
+                'order_type'   => $validated['order_type'],
                 'code'         => $orderCode,
                 'status'       => 'active',
                 'note'         => $validated['note'] ?? '',
                 'subtotal'     => 0,
                 'total_amount' => 0,
+                'created_by'   => (string) $request->user()->id,
             ]);
 
             $orderSubtotal = 0;
@@ -189,13 +248,34 @@ class OrderController extends Controller
                 'total_amount' => $orderSubtotal,
             ]);
 
-            $shop->tables()->where('_id', $order->table_id)->update([
-                'status'           => 'serving',
-                'current_order_id' => $order->id,
-            ]);
+            // Chỉ đơn TẠI QUÁN mới đụng tới bàn.
+            if ($order->table_id) {
+                $shop->tables()->where('_id', $order->table_id)->update([
+                    'status'           => 'serving',
+                    'current_order_id' => $order->id,
+                ]);
+            }
 
             return $order;
         });
+
+        if ($chotLuon) {
+            $maPhieu = $this->chotDon($shop, $order, [
+                'payment_method' => $validated['payment_method'],
+                'discount'       => 0,
+                'total'          => $tamTinh,
+                'cash_received'  => $tienMat['cash_received'],
+                'change_amount'  => $tienMat['change_amount'],
+                'paid_by'        => (string) $request->user()->id,
+            ]);
+
+            if ($maPhieu === null) {
+                // Không thể xảy ra ở đường này (đơn vừa tạo xong, chưa ai chạm tới),
+                // nhưng nếu có thì phải nói ra chứ không trả về đơn như đã trả tiền.
+                return response()->json(['message' => 'Không chốt được đơn mang về, vui lòng thử lại.'], 409);
+            }
+            $order->refresh();
+        }
 
         $order->load(['orderDetails.orderDetailToppings.topping', 'table']);
         return response()->json($order, 201);
@@ -315,19 +395,10 @@ class OrderController extends Controller
             return response()->json(['message' => 'Đơn chưa có món nào, không thể thanh toán.'], 422);
         }
 
-        // `cash_received` BẮT BUỘC khi trả tiền mặt.
-        //
-        // Trước đây nó `nullable`, và cái chốt "đưa thiếu thì không cho thanh toán" ở
-        // dưới lại nằm TRONG một điều kiện `isset()`. Nghĩa là bỏ trống ô tiền khách
-        // đưa là thoát được chốt: đơn chốt bình thường, `cash_received` và
-        // `change_amount` cùng null, biên lai in ra không có tiền thối để đối chiếu.
-        // Ràng buộc chỉ sống ở trình duyệt thì không phải ràng buộc.
         $validated = $request->validate([
             'payment_method'  => 'required|string|in:cash,vietqr',
             'discount_amount' => 'nullable|numeric|min:0',
-            'cash_received'   => 'required_if:payment_method,cash|numeric|min:0',
-        ], [
-            'cash_received.required_if' => 'Trả tiền mặt thì phải ghi số tiền khách đưa.',
+            'cash_received'   => 'nullable|numeric|min:0',
         ]);
 
         // Giảm giá: ưu tiên số gửi kèm lệnh thanh toán, nếu không có thì DÙNG LẠI số đã
@@ -338,23 +409,83 @@ class OrderController extends Controller
             (float) ($validated['discount_amount'] ?? $order->discount_amount ?? 0),
             (float) $order->subtotal,
         );
-        $total    = max(0.0, (float) $order->subtotal - $discount);
+        $total = (int) round(max(0.0, (float) $order->subtotal - $discount));
 
-        // Tiền khách đưa + tiền thối (chỉ áp dụng cho tiền mặt) — lưu để đối chứng.
-        $cashReceived = null;
-        $changeAmount = null;
-        if ($validated['payment_method'] === 'cash') {
-            $cashReceived = (int) round((float) $validated['cash_received']);
-            // BUG-FIX (B2): khách đưa thiếu tiền thì không được xác nhận thanh toán
-            if ($cashReceived < (int) round($total)) {
-                return response()->json([
-                    'message' => 'Tiền khách đưa chưa đủ. Cần tối thiểu ' . number_format($total, 0, ',', '.') . 'đ.',
-                ], 422);
-            }
-            $changeAmount = max(0, $cashReceived - (int) round($total));
+        $tienMat = $this->kiemTienKhachDua(
+            $validated['payment_method'],
+            $validated['cash_received'] ?? null,
+            $total,
+        );
+
+        $maPhieu = $this->chotDon($shop, $order, [
+            'payment_method' => $validated['payment_method'],
+            'discount'       => (int) round($discount),
+            'total'          => $total,
+            'cash_received'  => $tienMat['cash_received'],
+            'change_amount'  => $tienMat['change_amount'],
+            'paid_by'        => (string) $request->user()->id,
+        ]);
+
+        if ($maPhieu === null) {
+            return response()->json(['message' => 'Order này đã được thanh toán.'], 400);
         }
 
-        $todayStr     = now()->format('Ymd');
+        $order->refresh();
+        return response()->json($order->load(['table', 'orderDetails.orderDetailToppings.topping']));
+    }
+
+    /**
+     * Kiểm tiền khách đưa và tính tiền thối. Ném 422 nếu đưa thiếu.
+     *
+     * `cash_received` BẮT BUỘC khi trả tiền mặt — nhưng luật đó KHÔNG đặt được ở
+     * `validate()` của store(), vì ở đó `payment_method` là tuỳ chọn (chỉ đơn mang về
+     * mới gửi). Gom vào một chỗ để pay() và store() không thể lệch nhau.
+     *
+     * Trước đây `cash_received` là `nullable` và cái chốt "đưa thiếu thì không cho
+     * thanh toán" lại nằm TRONG một điều kiện `isset()`. Nghĩa là bỏ trống ô tiền
+     * khách đưa là thoát được chốt: đơn chốt bình thường, `cash_received` và
+     * `change_amount` cùng null, biên lai in ra không có tiền thối để đối chiếu.
+     * Ràng buộc chỉ sống ở trình duyệt thì không phải ràng buộc.
+     *
+     * @return array{cash_received: ?int, change_amount: ?int}
+     */
+    private function kiemTienKhachDua(string $phuongThuc, $cashReceived, int $total): array
+    {
+        if ($phuongThuc !== 'cash') {
+            return ['cash_received' => null, 'change_amount' => null];
+        }
+
+        if ($cashReceived === null || $cashReceived === '') {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Trả tiền mặt thì phải ghi số tiền khách đưa.',
+                'errors'  => ['cash_received' => ['Trả tiền mặt thì phải ghi số tiền khách đưa.']],
+            ], 422));
+        }
+
+        $daDua = (int) round((float) $cashReceived);
+        if ($daDua < $total) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Tiền khách đưa chưa đủ. Cần tối thiểu ' . number_format($total, 0, ',', '.') . 'đ.',
+            ], 422));
+        }
+
+        return ['cash_received' => $daDua, 'change_amount' => max(0, $daDua - $total)];
+    }
+
+    /**
+     * Chốt một đơn thành ĐÃ THANH TOÁN: sinh mã phiếu, ghi có điều kiện, trả bàn.
+     *
+     * Dùng chung cho ba đường: pay() (tại quán), store() (mang về trả ngay), và
+     * callback của cổng thanh toán. Ba đường đó phải sinh mã phiếu và chốt đơn y hệt
+     * nhau — tách ra đây để không có đường nào lỡ quên một bước.
+     *
+     * Trả về mã phiếu, hoặc NULL khi đơn đã bị request khác chốt trước.
+     *
+     * @param array{payment_method: string, discount: int, total: int, cash_received: ?int, change_amount: ?int, paid_by: ?string} $tt
+     */
+    private function chotDon(Shop $shop, Order $order, array $tt): ?string
+    {
+        $todayStr = now()->format('Ymd');
         // B7: dò tiếp tới số chưa dùng để tránh trùng mã khi request song song.
         // Mã phiếu (invoice_code) nay lưu thẳng trên order — không còn bảng invoices.
         $invoiceCount = $shop->orders()
@@ -364,11 +495,9 @@ class OrderController extends Controller
             $invoiceCode = 'INV-' . $todayStr . '-' . str_pad($invoiceCount++, 4, '0', STR_PAD_LEFT);
         } while ($shop->orders()->where('invoice_code', $invoiceCode)->exists());
 
-        $now = now();
-
         // CHỐT ĐƠN BẰNG MỘT PHÉP GHI CÓ ĐIỀU KIỆN (4.6.10).
         //
-        // Kiểm `status !== 'active'` ở đầu hàm không đủ: hai request song song (bấm
+        // Kiểm `status !== 'active'` ở nơi gọi không đủ: hai request song song (bấm
         // đúp, mở hai tab, mạng chập chờn nên trình duyệt gửi lại) đều đọc thấy
         // 'active' rồi cùng đi tiếp, ra HAI mã phiếu cho một đơn. Mongo standalone
         // không có transaction nên `atomic()` chạy thẳng, không cứu được chỗ này.
@@ -382,27 +511,30 @@ class OrderController extends Controller
             ->update([
                 'status'          => 'paid',
                 'invoice_code'    => $invoiceCode,
-                'payment_method'  => $validated['payment_method'],
+                'payment_method'  => $tt['payment_method'],
                 'payment_status'  => 'paid',
-                'paid_at'         => $now,
-                'discount_amount' => $discount,
-                'total_amount'    => $total,
-                'cash_received'   => $cashReceived,
-                'change_amount'   => $changeAmount,
+                'paid_at'         => now(),
+                'discount_amount' => $tt['discount'],
+                'total_amount'    => $tt['total'],
+                'cash_received'   => $tt['cash_received'],
+                'change_amount'   => $tt['change_amount'],
+                'paid_by'         => $tt['paid_by'],
             ]);
 
         if ($daChot === 0) {
-            return response()->json(['message' => 'Order này đã được thanh toán.'], 400);
+            return null;
         }
 
         // Thanh toán xong -> bàn về TRỐNG luôn (bỏ trạng thái 'cleaning').
-        $shop->tables()->where('_id', $order->table_id)->update([
-            'status'           => 'empty',
-            'current_order_id' => null,
-        ]);
+        // Đơn mang về không gắn bàn nào nên bỏ qua bước này.
+        if ($order->table_id) {
+            $shop->tables()->where('_id', $order->table_id)->update([
+                'status'           => 'empty',
+                'current_order_id' => null,
+            ]);
+        }
 
-        $order->refresh();
-        return response()->json($order->load(['table', 'orderDetails.orderDetailToppings.topping']));
+        return $invoiceCode;
     }
 
     /**
@@ -438,10 +570,13 @@ class OrderController extends Controller
             // lại lệnh hủy sau khi mất mạng là chuyện bình thường), vẫn dọn bàn.
         }
 
-        $shop->tables()->where('_id', $order->table_id)->update([
-            'status'           => 'empty',
-            'current_order_id' => null,
-        ]);
+        // Đơn mang về không gắn bàn nào — không có gì để dọn.
+        if ($order->table_id) {
+            $shop->tables()->where('_id', $order->table_id)->update([
+                'status'           => 'empty',
+                'current_order_id' => null,
+            ]);
+        }
 
         $order->refresh();
         return response()->json($order->load(['table']));

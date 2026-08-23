@@ -189,6 +189,9 @@ class UserRevenueController extends Controller
             'by_day'    => (object) $so['by_day'],
             'by_month'  => (object) $so['by_month'],
             'top_items' => $so['top_items'],
+            // Tách doanh thu theo hình thức bán (tại quán / mang về). Luôn có đủ hai
+            // khóa kể cả khi một bên chưa bán được gì — xem RevenueStats::forShops().
+            'by_order_type' => $so['by_order_type'],
             'shops'     => collect($so['by_shop'])->map(fn ($row, $cid) => [
                 'shop_id'   => $cid,
                 'shop_name' => $tenQuan[$cid] ?? '',
