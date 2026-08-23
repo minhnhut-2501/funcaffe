@@ -236,7 +236,9 @@ type Notif = { id: string; kind: 'invoice' | 'soon' | 'expired'; message: string
 
 function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, activeShopId, shops } = useAuth();
-  const sub = user?.subscription;
+  // Nhân viên không mua gói, không gia hạn, và không vào được trang Gói dịch vụ —
+  // hiện huy hiệu gói cho họ chỉ tạo lo lắng về một việc không phải của họ.
+  const sub = user?.role === 'staff' ? null : user?.subscription;
   const pathname = usePathname();
   const current = [...navGroups, ...navNhanVien]
     .flatMap((g) => g.items.map((it) => ({ ...it, group: g.title })))
@@ -408,12 +410,20 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoading, shops, shopsError, activeShopId, logout, reloadShops } = useAuth();
-  const hasPackage = user?.subscription.packageType !== 'none';
-  const expired = isSubscriptionExpired(user?.subscription);
+  /*
+   * Mọi lời nhắc về GÓI DỊCH VỤ đều tắt với nhân viên.
+   *
+   * Ba banner bên dưới ("kích hoạt gói", "sắp hết hạn", "đã hết hạn") đều dẫn tới
+   * /user/subscription — trang nhân viên bị chặn cả ở giao diện lẫn ở máy chủ. Hiện
+   * cho họ là mời họ bấm vào một cánh cửa khoá, để lo một việc họ không làm được.
+   */
+  const laNhanVien = user?.role === 'staff';
+  const hasPackage = laNhanVien || user?.subscription.packageType !== 'none';
+  const expired = !laNhanVien && isSubscriptionExpired(user?.subscription);
   // Sắp hết hạn của QUÁN ĐANG CHỌN. Các quán khác đã được chuông và chấm ở dropdown
   // lo — banner chiếm cả bề ngang nên chỉ dành cho quán người dùng đang làm việc.
   const activeExpiry = expiryState(user?.subscription?.endDate);
-  const soon = hasPackage && activeExpiry === 'soon';
+  const soon = !laNhanVien && hasPackage && activeExpiry === 'soon';
 
   // Đăng xuất phải nằm ở ĐÂY, cùng chỗ với route guard bên dưới. logout() xoá
   // `user`, guard thấy vậy liền bắn router.replace('/login') — tranh chấp với
