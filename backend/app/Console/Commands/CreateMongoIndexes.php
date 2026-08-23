@@ -20,7 +20,7 @@ use Throwable;
  *     THU HẸP khe hở chứ không đóng được: hai request song song cùng đọc count, cùng
  *     thấy mã chưa tồn tại, rồi cùng ghi. Chỉ có ràng buộc ở tầng CSDL mới chặn thật.
  *
- *  2. TRA CỨU — các truy vấn chạy liên tục đều lọc theo cafe_id kèm status hoặc
+ *  2. TRA CỨU — các truy vấn chạy liên tục đều lọc theo shop_id kèm status hoặc
  *     khoảng ngày. Thiếu chỉ mục thì mỗi lần là một lượt quét toàn bộ collection.
  *
  * Chạy được nhiều lần: createIndex bỏ qua chỉ mục đã tồn tại y hệt.
@@ -37,18 +37,18 @@ class CreateMongoIndexes extends Command
     private const INDEXES = [
         'orders' => [
             // Màn hình Bán hàng hỏi đơn đang phục vụ; trang Hóa đơn hỏi đơn đã trả tiền.
-            ['keys' => ['cafe_id' => 1, 'status' => 1]],
+            ['keys' => ['shop_id' => 1, 'status' => 1]],
             // Doanh thu và biểu đồ lọc theo ngày thanh toán, mới nhất trước.
-            ['keys' => ['cafe_id' => 1, 'paid_at' => -1]],
+            ['keys' => ['shop_id' => 1, 'paid_at' => -1]],
             [
-                'keys' => ['cafe_id' => 1, 'code' => 1],
-                'options' => ['unique' => true, 'name' => 'uniq_cafe_order_code'],
+                'keys' => ['shop_id' => 1, 'code' => 1],
+                'options' => ['unique' => true, 'name' => 'uniq_shop_order_code'],
             ],
             [
-                'keys' => ['cafe_id' => 1, 'invoice_code' => 1],
+                'keys' => ['shop_id' => 1, 'invoice_code' => 1],
                 'options' => [
                     'unique' => true,
-                    'name' => 'uniq_cafe_invoice_code',
+                    'name' => 'uniq_shop_invoice_code',
                     // partialFilterExpression là BẮT BUỘC ở đây: đơn chưa thanh toán
                     // không có invoice_code, mà Mongo coi "thiếu trường" là một giá
                     // trị — unique thường sẽ chỉ cho phép ĐÚNG MỘT đơn chưa thanh toán
@@ -70,24 +70,24 @@ class CreateMongoIndexes extends Command
             ],
             // Callback của cổng tra đơn theo mã đã gửi đi (MoMo dùng đuôi ngẫu nhiên).
             ['keys' => ['gateway_order_id' => 1]],
-            ['keys' => ['cafe_id' => 1, 'payment_status' => 1]],
+            ['keys' => ['shop_id' => 1, 'payment_status' => 1]],
             ['keys' => ['user_id' => 1, 'payment_status' => 1]],
         ],
         'subscriptions' => [
             // Mọi chốt chặn gói (CheckSubscription, EnforcesPackageLimits, RequiresAI)
             // đều lọc đúng bộ ba này.
-            ['keys' => ['cafe_id' => 1, 'status' => 1, 'end_date' => -1]],
+            ['keys' => ['shop_id' => 1, 'status' => 1, 'end_date' => -1]],
         ],
-        'cafes' => [
+        'shops' => [
             ['keys' => ['user_id' => 1]],
         ],
-        'items'      => [['keys' => ['cafe_id' => 1]]],
-        'categories' => [['keys' => ['cafe_id' => 1]]],
-        'toppings'   => [['keys' => ['cafe_id' => 1]]],
-        // LƯU Ý: collection của model CafeTable tên là 'tables', không phải 'cafe_tables'.
-        'tables'     => [['keys' => ['cafe_id' => 1]]],
-        'item_prices'   => [['keys' => ['item_id' => 1]]],
-        'item_toppings' => [['keys' => ['item_id' => 1]]],
+        'products'   => [['keys' => ['shop_id' => 1]]],
+        'categories' => [['keys' => ['shop_id' => 1]]],
+        'toppings'   => [['keys' => ['shop_id' => 1]]],
+        // LƯU Ý: collection của model ShopTable tên là 'tables', không phải 'shop_tables'.
+        'tables'     => [['keys' => ['shop_id' => 1]]],
+        'product_sizes'   => [['keys' => ['product_id' => 1]]],
+        'product_toppings' => [['keys' => ['product_id' => 1]]],
         'reviews' => [
             ['keys' => ['user_id' => 1]],
             // Băng đánh giá trang chủ lọc status rồi xếp theo LẦN SỬA gần nhất
@@ -124,7 +124,7 @@ class CreateMongoIndexes extends Command
                 //
                 // Không thể chỉ dựa vào createIndex để tự bỏ qua: Mongo coi hai chỉ mục
                 // cùng khóa nhưng khác TÊN là xung đột và ném lỗi. Các chỉ mục duy nhất
-                // được tạo tay ở những phiên trước mang tên khác (uniq_cafe_code,
+                // được tạo tay ở những phiên trước mang tên khác (uniq_shop_code,
                 // uniq_txn), nên nếu không đối chiếu theo khóa thì lệnh này báo lỗi ở
                 // mọi lần chạy và không bao giờ trở nên vô hại khi gọi lại.
                 if (isset($existing[$keySpec])) {

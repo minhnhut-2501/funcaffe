@@ -19,10 +19,10 @@ class Subscription extends Model
      * gian còn lại. Nó PHẢI được cập nhật đúng theo cặp với `end_date` ở mọi nhánh gia hạn.
      */
     protected $fillable = [
-        // KHÔNG có user_id: chủ sở hữu suy từ cafe_id -> cafes.user_id. Mọi truy vấn
-        // gói đều lọc theo cafe_id, nên bản sao user_id ở đây chỉ tạo thêm một nguồn
+        // KHÔNG có user_id: chủ sở hữu suy từ shop_id -> shops.user_id. Mọi truy vấn
+        // gói đều lọc theo shop_id, nên bản sao user_id ở đây chỉ tạo thêm một nguồn
         // sự thật thứ hai mà không ai đọc.
-        'cafe_id', 'package_id', 'time_subscription_id',
+        'shop_id', 'package_id', 'time_subscription_id',
         'package_name_snapshot',
         'start_date', 'end_date', 'status',
         'total_amount',
@@ -45,7 +45,7 @@ class Subscription extends Model
      * Khác hẳn effective() và đừng lẫn hai cái:
      *  - effective()    : dùng khi hỏi "được PHÉP làm gì" (ghi dữ liệu, dùng AI, giới
      *                     hạn số bàn/món). Gói hết hạn phải bị loại.
-     *  - latestForCafe(): dùng khi hỏi "quán này ĐANG Ở TÌNH TRẠNG NÀO" (hiện tên gói,
+     *  - latestForShop(): dùng khi hỏi "quán này ĐANG Ở TÌNH TRẠNG NÀO" (hiện tên gói,
      *                     cảnh báo sắp hết / đã hết hạn, mời gia hạn). Gói hết hạn mới
      *                     chính là thứ cần hiện, loại nó đi thì không cảnh báo được ai.
      *
@@ -57,16 +57,16 @@ class Subscription extends Model
      * nhau (sort giảm dần lấy đầu / sort tăng dần + keyBy lấy cuối / latest() theo
      * created_at). Gom về đây để chúng không lệch nhau ở lần sửa tiếp theo.
      */
-    public function scopeLatestForCafe($query, string $cafeId)
+    public function scopeLatestForShop($query, string $shopId)
     {
-        return $query->where('cafe_id', $cafeId)
+        return $query->where('shop_id', $shopId)
             ->where('status', 'active')
             ->orderBy('end_date', 'desc');
     }
 
-    public function cafe()
+    public function shop()
     {
-        return $this->belongsTo(Cafe::class, 'cafe_id');
+        return $this->belongsTo(Shop::class, 'shop_id');
     }
 
     public function package()

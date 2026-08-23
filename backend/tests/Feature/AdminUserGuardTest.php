@@ -24,7 +24,7 @@ class AdminUserGuardTest extends MongoTestCase
     // Không dựng lược đồ SQLite thì lệnh xóa token báo "no such table".
     use RefreshDatabase;
 
-    protected array $collections = ['users', 'cafes', 'subscriptions', 'package_payments'];
+    protected array $collections = ['users', 'shops', 'subscriptions', 'package_payments'];
 
     private User $admin;
     private User $owner;

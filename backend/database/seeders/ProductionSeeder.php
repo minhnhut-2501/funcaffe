@@ -26,7 +26,7 @@ class ProductionSeeder extends Seeder
         $this->call(TestUserSeeder::class);
 
         // KHÔNG nạp quán/thực đơn/bàn demo ở đây nữa. Bộ JSON cũ ghi khóa ngoại
-        // (cafe_id, item_id...) dưới dạng ObjectId, trong khi ứng dụng ghi và truy
+        // (shop_id, product_id...) dưới dạng ObjectId, trong khi ứng dụng ghi và truy
         // vấn bằng CHUỖI — nạp vào là quan hệ đứt ngầm: dữ liệu nằm đó nhưng
         // không màn hình nào đọc ra. Dữ liệu mẫu nay do DemoSeeder lo (chạy tay).
     }

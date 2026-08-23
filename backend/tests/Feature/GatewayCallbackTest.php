@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Package;
 use App\Models\PackagePayment;
 use App\Models\Subscription;
@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Hash;
 class GatewayCallbackTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'packages', 'time_subscriptions', 'subscriptions', 'package_payments',
+        'users', 'shops', 'packages', 'time_subscriptions', 'subscriptions', 'package_payments',
     ];
 
     private const VNPAY_SECRET = 'TEST_HASH_SECRET_ABC123';
@@ -32,7 +32,7 @@ class GatewayCallbackTest extends MongoTestCase
     private const MOMO_ACCESS  = 'TEST_ACCESS_KEY';
 
     private User $user;
-    private Cafe $cafe;
+    private Shop $shop;
     private Package $goi;
     private TimeSubscription $thoiHan;
 
@@ -59,7 +59,7 @@ class GatewayCallbackTest extends MongoTestCase
             'password' => Hash::make('Password@123'),
             'role' => 'user', 'status' => 'active',
         ]);
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán trả tiền', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán trả tiền', 'status' => 'open']);
 
         $this->goi = Package::create([
             'name' => 'Pro Max', 'type' => 'promax', 'level' => 2,
@@ -77,7 +77,7 @@ class GatewayCallbackTest extends MongoTestCase
     private function goiDangChay(int $conLai = 10): Subscription
     {
         return Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->goi->id,
             'time_subscription_id' => (string) $this->thoiHan->id,
             'package_name_snapshot' => 'Pro Max',
@@ -93,7 +93,7 @@ class GatewayCallbackTest extends MongoTestCase
     {
         return $sub->packagePayments()->create([
             'user_id' => (string) $this->user->id,
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->goi->id,
             'time_subscription_id' => (string) $this->thoiHan->id,
             'subtotal' => 199_000, 'vat_rate' => 10, 'vat_amount' => 19_900, 'amount' => 218_900,

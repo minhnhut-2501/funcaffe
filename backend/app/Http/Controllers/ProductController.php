@@ -2,42 +2,42 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cafe;
-use App\Models\Item;
-use App\Models\ItemTopping;
-use App\Http\Controllers\Concerns\ChecksCafeOwnership;
-use App\Http\Controllers\Concerns\ChecksCafeStatus;
+use App\Models\Shop;
+use App\Models\Product;
+use App\Models\ProductTopping;
+use App\Http\Controllers\Concerns\ChecksShopAccess;
+use App\Http\Controllers\Concerns\ChecksShopStatus;
 use App\Http\Controllers\Concerns\EnforcesPackageLimits;
 use Illuminate\Http\Request;
 
-class ItemController extends Controller
+class ProductController extends Controller
 {
-    use ChecksCafeOwnership, EnforcesPackageLimits, ChecksCafeStatus;
+    use ChecksShopAccess, EnforcesPackageLimits, ChecksShopStatus;
 
     public function __construct()
     {
         $this->middleware('auth:sanctum');
     }
 
-    public function index(Request $request, Cafe $cafe)
+    public function index(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
-        $items = $cafe->items()->with(['category', 'itemPrices', 'itemToppings.topping'])->get();
+        $this->authorizeShop($shop);
+        $items = $shop->products()->with(['category', 'productSizes', 'productToppings.topping'])->get();
         return response()->json($items);
     }
 
-    public function store(Request $request, Cafe $cafe)
+    public function store(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
-        $this->guardSuaDoi($cafe);
-        $this->enforcePackageLimit($cafe, 'items', $cafe->items()->count());
+        $this->authorizeShop($shop);
+        $this->guardSuaDoi($shop);
+        $this->enforcePackageLimit($shop, 'products', $shop->products()->count());
 
         $validated = $request->validate([
             'category_id'        => 'required|string',
             'name'               => 'required|string|max:255',
             'base_price'         => 'required|numeric|min:0',
             'has_size'           => 'boolean',
-            'allow_topping'      => 'boolean',
+            'has_topping'      => 'boolean',
             'is_available'       => 'boolean',
             'description'        => 'nullable|string',
             'image'              => 'nullable|string',
@@ -74,17 +74,17 @@ class ItemController extends Controller
         }
 
         // Topping: chỉ gắn khi món cho phép topping; ngược lại để rỗng.
-        $toppingIds = !empty($validated['allow_topping']) ? ($validated['topping_ids'] ?? []) : [];
+        $toppingIds = !empty($validated['has_topping']) ? ($validated['topping_ids'] ?? []) : [];
         unset($validated['sizes'], $validated['topping_ids']);
         if (isset($validated['base_price'])) {
             $validated['base_price'] = (int) round($validated['base_price']); // VND nguyên
         }
-        $item = $cafe->items()->create($validated);
+        $product = $shop->products()->create($validated);
 
-        // Lưu size_name thẳng vào item_prices — không cần sizes collection
+        // Lưu size_name thẳng vào product_sizes — không cần sizes collection
         if ($hasSize) {
             foreach ($sizesData as $sizeData) {
-                $item->itemPrices()->create([
+                $product->productSizes()->create([
                     'size_name' => trim($sizeData['name']),
                     'price'     => (int) round($sizeData['price'] ?? 0),
                     'is_active' => $sizeData['is_active'] ?? true,
@@ -92,19 +92,19 @@ class ItemController extends Controller
             }
         }
 
-        if (!$this->syncItemToppings($cafe, $item, $toppingIds)) {
+        if (!$this->syncProductToppings($shop, $product, $toppingIds)) {
             return response()->json(['message' => 'Có topping không hợp lệ hoặc không thuộc quán của bạn.'], 422);
         }
 
-        return response()->json($item->load(['category', 'itemPrices', 'itemToppings.topping']), 201);
+        return response()->json($product->load(['category', 'productSizes', 'productToppings.topping']), 201);
     }
 
-    public function update(Request $request, Cafe $cafe, Item $item)
+    public function update(Request $request, Shop $shop, Product $product)
     {
-        $this->authorizeCafe($cafe);
-        $this->guardSuaDoi($cafe);
+        $this->authorizeShop($shop);
+        $this->guardSuaDoi($shop);
 
-        if ((string) $item->cafe_id !== (string) $cafe->id) {
+        if ((string) $product->shop_id !== (string) $shop->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
@@ -113,7 +113,7 @@ class ItemController extends Controller
             'name'               => 'sometimes|string|max:255',
             'base_price'         => 'sometimes|numeric|min:0',
             'has_size'           => 'sometimes|boolean',
-            'allow_topping'      => 'sometimes|boolean',
+            'has_topping'      => 'sometimes|boolean',
             'is_available'       => 'sometimes|boolean',
             'description'        => 'nullable|string',
             'image'              => 'nullable|string',
@@ -132,7 +132,7 @@ class ItemController extends Controller
 
         $newHasSize = array_key_exists('has_size', $validated)
             ? !empty($validated['has_size'])
-            : ($item->has_size ?? false);
+            : ($product->has_size ?? false);
 
         if ($newHasSize && $hasSizesInRequest && empty($sizesData)) {
             return response()->json([
@@ -157,14 +157,14 @@ class ItemController extends Controller
         if (isset($validated['base_price'])) {
             $validated['base_price'] = (int) round($validated['base_price']); // VND nguyên
         }
-        $item->update($validated);
+        $product->update($validated);
 
         if ($hasSizesInRequest) {
-            $item->itemPrices()->delete();
+            $product->productSizes()->delete();
 
             if ($newHasSize) {
                 foreach ($sizesData as $sizeData) {
-                    $item->itemPrices()->create([
+                    $product->productSizes()->create([
                         'size_name' => trim($sizeData['name']),
                         'price'     => (int) round($sizeData['price'] ?? 0),
                         'is_active' => $sizeData['is_active'] ?? true,
@@ -176,35 +176,35 @@ class ItemController extends Controller
         // Đồng bộ topping khi request có gửi topping_ids (form thêm/sửa món).
         // Món không cho phép topping -> xóa hết liên kết.
         if ($hasToppingsInRequest) {
-            $newAllowTopping = array_key_exists('allow_topping', $validated)
-                ? !empty($validated['allow_topping'])
-                : ($item->allow_topping ?? false);
+            $newAllowTopping = array_key_exists('has_topping', $validated)
+                ? !empty($validated['has_topping'])
+                : ($product->has_topping ?? false);
             $ids = $newAllowTopping ? $requestedToppingIds : [];
-            if (!$this->syncItemToppings($cafe, $item, $ids)) {
+            if (!$this->syncProductToppings($shop, $product, $ids)) {
                 return response()->json(['message' => 'Có topping không hợp lệ hoặc không thuộc quán của bạn.'], 422);
             }
         }
 
-        return response()->json($item->load(['category', 'itemPrices', 'itemToppings.topping']));
+        return response()->json($product->load(['category', 'productSizes', 'productToppings.topping']));
     }
 
     /**
      * Đồng bộ danh sách topping của món (xóa cũ, tạo lại). Chỉ nhận topping thuộc quán này.
      * @return bool false nếu có id topping lạ/không thuộc quán.
      */
-    private function syncItemToppings(Cafe $cafe, Item $item, array $requestedIds): bool
+    private function syncProductToppings(Shop $shop, Product $product, array $requestedIds): bool
     {
         $requestedIds = array_values(array_unique(array_filter($requestedIds)));
 
         if (empty($requestedIds)) {
-            $item->itemToppings()->delete();
+            $product->productToppings()->delete();
             return true;
         }
 
         // Lưu ý: pluck('_id') trực tiếp trên query MongoDB trả về chuỗi rỗng
         // (quirk projection _id của mongodb/laravel-mongodb) — phải get() model
         // rồi đọc thuộc tính id để lấy đúng chuỗi ObjectId.
-        $validIds = $cafe->toppings()
+        $validIds = $shop->toppings()
             ->whereIn('_id', $requestedIds)
             ->get()
             ->pluck('id')
@@ -215,9 +215,9 @@ class ItemController extends Controller
             return false;
         }
 
-        $item->itemToppings()->delete();
+        $product->productToppings()->delete();
         foreach ($validIds as $toppingId) {
-            $item->itemToppings()->create(['topping_id' => $toppingId]);
+            $product->productToppings()->create(['topping_id' => $toppingId]);
         }
         return true;
     }
@@ -228,5 +228,5 @@ class ItemController extends Controller
     // toppings() và updateToppings() đã bị GỠ BỎ cùng hai route của chúng.
     // Trang Thực đơn gắn topping cho món bằng trường `topping_ids` gửi kèm ngay
     // trong body của store()/update() — hai endpoint riêng chưa từng được gọi lần
-    // nào. Việc đồng bộ vẫn do syncItemToppings() ở trên đảm nhiệm.
+    // nào. Việc đồng bộ vẫn do syncProductToppings() ở trên đảm nhiệm.
 }

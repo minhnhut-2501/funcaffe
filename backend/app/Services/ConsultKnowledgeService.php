@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Package;
 use App\Models\Subscription;
 use App\Models\TimeSubscription;
@@ -12,13 +12,13 @@ use Illuminate\Support\Facades\Cache;
 /**
  * Kho kiến thức cho trợ lý TƯ VẤN ở trang công khai.
  *
- * Khác hẳn ngữ cảnh của trợ lý trong portal (AiController::cafeContext): ở đây
+ * Khác hẳn ngữ cảnh của trợ lý trong portal (AiController::shopContext): ở đây
  * KHÔNG có một con số nào của quán nào. Toàn bộ nội dung chỉ gồm thông tin sản
  * phẩm — bảng gói, giá, hạn mức, quy tắc dùng thử và cấn trừ — tức là những thứ
  * vốn đã công khai trên trang bảng giá.
  *
  * Ranh giới "AI có thấy dữ liệu quán không" nằm gọn ở chỗ nào gọi hàm nào:
- *   · AiController::cafeContext()  -> có số liệu, chỉ gói bật can_use_ai gọi tới
+ *   · AiController::shopContext()  -> có số liệu, chỉ gói bật can_use_ai gọi tới
  *   · ConsultKnowledgeService      -> không số liệu, ai cũng gọi được
  * Chọn nhánh này thì tableOccupancy/sumPaid/cachedSalesContext không hề chạy,
  * nên không có gì để rò rỉ — đó là chốt chặn thật, không phải lời dặn cho AI.
@@ -57,22 +57,22 @@ class ConsultKnowledgeService
         // Đang có gói trả phí còn hạn thì kích hoạt gói dùng thử (cấp 0) là đi lùi —
         // hệ thống không cho, nên đừng mời.
         // PHẢI get() rồi pluck('id'): pluck('_id') thẳng trên query MongoDB trả về
-        // chuỗi rỗng (xem ItemController::204). Dính bẫy đó thì mọi người đã đăng
+        // chuỗi rỗng (xem ProductController::204). Dính bẫy đó thì mọi người đã đăng
         // nhập đều bị coi như chưa có quán, và ai cũng nhận lời mời dùng thử.
-        $cafeIds = Cafe::where('user_id', (string) $user->id)
+        $shopIds = Shop::where('user_id', (string) $user->id)
             ->get()
             ->pluck('id')
             ->map(fn ($id) => (string) $id)
             ->all();
-        if ($cafeIds !== []) {
-            $dangCoGoi = Subscription::whereIn('cafe_id', $cafeIds)->effective()->exists();
+        if ($shopIds !== []) {
+            $dangCoGoi = Subscription::whereIn('shop_id', $shopIds)->effective()->exists();
             if ($dangCoGoi) {
                 return self::HET_DUNG_THU;
             }
 
             // Cờ dùng thử nằm trên CẢ quán lẫn tài khoản. Tài khoản còn sạch nhưng mọi
             // quán đều đã xài thì mời cũng vô ích.
-            $conQuanSach = Cafe::whereIn('_id', $cafeIds)
+            $conQuanSach = Shop::whereIn('_id', $shopIds)
                 ->get()
                 ->contains(fn ($c) => !($c->has_used_free_trial ?? false));
             if (!$conQuanSach) {

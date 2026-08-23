@@ -7,9 +7,9 @@ use App\Models\Package;
 use App\Models\TimeSubscription;
 use App\Models\PackagePayment;
 use App\Models\User;
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Http\Controllers\Concerns\RunsAtomically;
-use App\Http\Controllers\Concerns\ChecksCafeOwnership;
+use App\Http\Controllers\Concerns\ChecksShopAccess;
 use App\Services\MomoService;
 use App\Services\SubscriptionActivator;
 use App\Services\VnpayService;
@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
 class SubscriptionController extends Controller
 {
     use RunsAtomically;
-    use ChecksCafeOwnership;
+    use ChecksShopAccess;
 
     /**
      * Bao lâu thì coi một đơn cổng thanh toán 'pending' là đã bị bỏ dở.
@@ -144,9 +144,9 @@ class SubscriptionController extends Controller
      *
      * KHÔNG ghi gì vào CSDL.
      */
-    public function preview(Request $request, Cafe $cafe)
+    public function preview(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
         $validated = $request->validate([
             'package_id'           => 'required|string',
@@ -177,7 +177,7 @@ class SubscriptionController extends Controller
         $gross     = $subtotal + $vatAmount;
 
         // Cùng phép so cấp bậc như store(), để nhãn hành động khớp với việc sẽ xảy ra.
-        $activeSub = Subscription::latestForCafe((string) $cafe->id)->first();
+        $activeSub = Subscription::latestForShop((string) $shop->id)->first();
         $oldLevel  = $activeSub ? (Package::find($activeSub->package_id)->level ?? 0) : null;
         $newLevel  = $package->level ?? 0;
 
@@ -221,11 +221,11 @@ class SubscriptionController extends Controller
         return $txnCode;
     }
 
-    public function index(Request $request, Cafe $cafe)
+    public function index(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        $subscriptions = Subscription::where('cafe_id', (string) $cafe->id)
+        $subscriptions = Subscription::where('shop_id', (string) $shop->id)
             ->with('package', 'packagePayments')
             ->get();
 
@@ -236,13 +236,13 @@ class SubscriptionController extends Controller
      * Gói MỚI NHẤT của quán, kể cả khi đã quá hạn.
      *
      * Cố ý KHÔNG dùng scope effective(): frontend cần thấy cả gói đã hết hạn để hiện
-     * chế độ "chỉ xem" và mời gia hạn. Xem Subscription::scopeLatestForCafe().
+     * chế độ "chỉ xem" và mời gia hạn. Xem Subscription::scopeLatestForShop().
      */
-    public function active(Request $request, Cafe $cafe)
+    public function active(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        $subscription = Subscription::latestForCafe((string) $cafe->id)
+        $subscription = Subscription::latestForShop((string) $shop->id)
             ->with('package', 'packagePayments')
             ->first();
 
@@ -253,11 +253,11 @@ class SubscriptionController extends Controller
      * Lịch sử thanh toán gói của chính user (để user theo dõi trạng thái:
      * chờ duyệt / đã thanh toán / bị từ chối + thông tin hoàn tiền nếu có).
      */
-    public function payments(Request $request, Cafe $cafe)
+    public function payments(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        $payments = PackagePayment::where('cafe_id', (string) $cafe->id)
+        $payments = PackagePayment::where('shop_id', (string) $shop->id)
             // Giao dịch qua cổng online (VNPay/MoMo...) CHỈ hiện khi ĐÃ thanh toán (paid).
             // Đơn đang chờ cổng / bị hủy / thất bại đều không hiện (tránh hiểu nhầm "đã thanh toán").
             // Các phương thức khác vẫn hiện đầy đủ mọi trạng thái.
@@ -272,9 +272,9 @@ class SubscriptionController extends Controller
         return response()->json($payments);
     }
 
-    public function store(Request $request, Cafe $cafe)
+    public function store(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
         $validated = $request->validate([
             'package_id' => 'required|string',
@@ -296,7 +296,7 @@ class SubscriptionController extends Controller
 
         $package = Package::findOrFail($validated['package_id']);
         $user = $request->user();
-        $cafeId = (string) $cafe->id;
+        $shopId = (string) $shop->id;
 
         // Dọn đơn cổng online (VNPay/MoMo) bị bỏ dở CỦA CHÍNH QUÁN NÀY: chúng tự kích hoạt
         // qua callback, KHÔNG chờ admin — nên không được chặn thao tác mới.
@@ -308,7 +308,7 @@ class SubscriptionController extends Controller
         // Hai lớp bảo vệ cho tình huống đó: ngưỡng thời gian ở đây, và
         // SubscriptionActivator vẫn kích hoạt được đơn 'failed' khi cổng xác nhận thu tiền.
         $staleBefore = $this->gatewayPendingDeadline();
-        $stalePayments = PackagePayment::where('cafe_id', $cafeId)
+        $stalePayments = PackagePayment::where('shop_id', $shopId)
             ->where('payment_status', 'pending')
             ->whereIn('payment_method', PackagePayment::ONLINE_GATEWAYS)
             ->where('created_at', '<', $staleBefore)
@@ -382,7 +382,7 @@ class SubscriptionController extends Controller
                     'message' => 'Tài khoản của bạn đã dùng gói dùng thử miễn phí rồi. Mỗi tài khoản chỉ được dùng thử một lần — vui lòng chọn gói trả phí cho quán này.',
                 ], 400);
             }
-            if ($cafe->has_used_free_trial) {
+            if ($shop->has_used_free_trial) {
                 return response()->json([
                     'message' => 'Quán này đã dùng gói dùng thử trước đó. Mỗi quán chỉ được dùng thử một lần — vui lòng chọn gói trả phí.',
                 ], 400);
@@ -390,9 +390,9 @@ class SubscriptionController extends Controller
         }
 
         // Gói hiện hành của QUÁN NÀY để so cấp bậc (mua mới / nâng cấp / gia hạn).
-        // latestForCafe sắp theo end_date: quán có nhiều bản ghi 'active' thì gói còn
+        // latestForShop sắp theo end_date: quán có nhiều bản ghi 'active' thì gói còn
         // hạn phải thắng gói đã hết, kể cả khi bản ghi của nó được tạo trước.
-        $activeSub = Subscription::latestForCafe($cafeId)->first();
+        $activeSub = Subscription::latestForShop($shopId)->first();
 
         $now = now();
 
@@ -411,7 +411,7 @@ class SubscriptionController extends Controller
             $paymentStatus = $isTrial ? 'paid' : 'pending';
 
             $subscription = $this->atomic(function () use (
-                $user, $cafe, $cafeId, $package, $timeSub, $startDate, $endDate, $amount,
+                $user, $shop, $shopId, $package, $timeSub, $startDate, $endDate, $amount,
                 $subtotal, $vatRate, $vatAmount,
                 $subscriptionStatus, $paymentStatus, $txnCode,
                 $validated, $now, $isTrial
@@ -420,7 +420,7 @@ class SubscriptionController extends Controller
                 // sẽ tự nhét user_id vào document, mà gói thì gắn với quán chứ không
                 // gắn với tài khoản.
                 $subscription = Subscription::create([
-                    'cafe_id' => $cafeId,
+                    'shop_id' => $shopId,
                     'package_id' => (string) $package->id,
                     'time_subscription_id' => $timeSub ? (string) $timeSub->id : null,
                     'package_name_snapshot' => $package->name,
@@ -432,7 +432,7 @@ class SubscriptionController extends Controller
 
                 $subscription->packagePayments()->create([
                     'user_id' => (string) $user->id,
-                    'cafe_id' => $cafeId,
+                    'shop_id' => $shopId,
                     'package_id' => (string) $package->id,
                     'time_subscription_id' => $timeSub ? (string) $timeSub->id : null,
                     'subtotal' => $subtotal,
@@ -452,7 +452,7 @@ class SubscriptionController extends Controller
 
                 // Đánh dấu đã dùng thử ở CẢ HAI cấp — xem hai cổng kiểm tra ở trên.
                 if ($isTrial) {
-                    $cafe->update(['has_used_free_trial' => true]);
+                    $shop->update(['has_used_free_trial' => true]);
                     $user->update(['has_used_free_trial' => true]);
                 }
 
@@ -487,7 +487,7 @@ class SubscriptionController extends Controller
             $upgradePaymentStatus = $payable > 0 ? 'pending' : 'paid';
 
             $subscription = $this->atomic(function () use (
-                $user, $cafeId, $package, $timeSub, $startDate, $endDate, $payable,
+                $user, $shopId, $package, $timeSub, $startDate, $endDate, $payable,
                 $subtotal, $vatRate, $vatAmount, $now,
                 $txnCode, $validated, $activeSub, $credit, $gatewayCharge, $upgradePaymentStatus
             ) {
@@ -499,7 +499,7 @@ class SubscriptionController extends Controller
                 // Tạo sub mới. VNPay -> 'pending' (chưa hiệu lực) tới khi cổng xác nhận.
                 // total_amount = số THỰC TRẢ (đã cấn trừ) -> pro-rata lần nâng cấp sau tính đúng.
                 $subscription = Subscription::create([
-                    'cafe_id' => $cafeId,
+                    'shop_id' => $shopId,
                     'package_id' => (string) $package->id,
                     'time_subscription_id' => $timeSub ? (string) $timeSub->id : null,
                     'package_name_snapshot' => $package->name,
@@ -511,7 +511,7 @@ class SubscriptionController extends Controller
 
                 $subscription->packagePayments()->create([
                     'user_id' => (string) $user->id,
-                    'cafe_id' => $cafeId,
+                    'shop_id' => $shopId,
                     'package_id' => (string) $package->id,
                     'time_subscription_id' => $timeSub ? (string) $timeSub->id : null,
                     'subtotal' => $subtotal,
@@ -556,7 +556,7 @@ class SubscriptionController extends Controller
             }
 
             $this->atomic(function () use (
-                $activeSub, $newEndDate, $user, $cafeId, $package, $timeSub, $amount,
+                $activeSub, $newEndDate, $user, $shopId, $package, $timeSub, $amount,
                 $subtotal, $vatRate, $vatAmount,
                 $validated, $txnCode, $previousEndDate, $isGateway
             ) {
@@ -575,7 +575,7 @@ class SubscriptionController extends Controller
                 // Tạo package_payment
                 $activeSub->packagePayments()->create([
                     'user_id' => (string) $user->id,
-                    'cafe_id' => $cafeId,
+                    'shop_id' => $shopId,
                     'package_id' => (string) $package->id,
                     'time_subscription_id' => $timeSub ? (string) $timeSub->id : null,
                     'subtotal' => $subtotal,

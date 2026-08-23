@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 /**
@@ -10,12 +10,12 @@ use Illuminate\Http\Exceptions\HttpResponseException;
  *
  * Trước đây chỉ method index() kiểm tra quyền sở hữu quán, còn
  * store/update/destroy/show/pay thì không. Một user có thể thao tác
- * dữ liệu của quán người khác chỉ bằng cách truyền cafe_id của họ.
+ * dữ liệu của quán người khác chỉ bằng cách truyền shop_id của họ.
  * Trait này tập trung việc kiểm tra để mọi action dùng chung.
  */
-trait ChecksCafeOwnership
+trait ChecksShopAccess
 {
-    protected function authorizeCafe(Cafe $cafe): void
+    protected function authorizeShop(Shop $shop): void
     {
         $user = request()->user();
 
@@ -25,7 +25,7 @@ trait ChecksCafeOwnership
             );
         }
 
-        if ((string) $cafe->user_id !== (string) $user->id && $user->role !== 'admin') {
+        if ((string) $shop->user_id !== (string) $user->id && $user->role !== 'admin') {
             throw new HttpResponseException(
                 response()->json(['message' => 'Forbidden'], 403)
             );

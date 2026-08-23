@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\CheckSubscription;
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Category;
 use App\Models\Package;
 use App\Models\PackagePayment;
@@ -25,12 +25,12 @@ use Laravel\Sanctum\Sanctum;
 class SubscriptionLifecycleTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'packages', 'time_subscriptions', 'subscriptions',
-        'package_payments', 'categories', 'items', 'tables', 'toppings', 'orders',
+        'users', 'shops', 'packages', 'time_subscriptions', 'subscriptions',
+        'package_payments', 'categories', 'products', 'tables', 'toppings', 'orders',
     ];
 
     private User $user;
-    private Cafe $cafe;
+    private Shop $shop;
     private Package $goiPro;
     private Package $goiProMax;
     private Package $goiThu;
@@ -45,7 +45,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
             'password' => Hash::make('Password@123'),
             'role' => 'user', 'status' => 'active',
         ]);
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán vòng đời gói', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán vòng đời gói', 'status' => 'open']);
 
         $this->goiPro = Package::create([
             'name' => 'Fun Pro', 'type' => 'pro', 'level' => 1,
@@ -75,7 +75,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     private function capGoi(Package $goi, int $conLaiNgay, float $daTra = 218_900): Subscription
     {
         return Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $goi->id,
             'package_name_snapshot' => $goi->name,
             'start_date' => now()->subDays(30 - $conLaiNgay),
@@ -112,7 +112,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     /** Chỉ ĐẶT mua — dừng ở bước chờ cổng, chưa có đồng nào vào. */
     private function dat(Package $goi, ?TimeSubscription $thoiHan = null, string $cach = 'vnpay')
     {
-        return $this->postJson("/api/cafes/{$this->cafe->id}/subscriptions", array_filter([
+        return $this->postJson("/api/shops/{$this->shop->id}/subscriptions", array_filter([
             'package_id' => (string) $goi->id,
             'time_subscription_id' => $thoiHan ? (string) $thoiHan->id : null,
             'payment_method' => $cach,
@@ -128,7 +128,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
      */
     private function congXacNhanDaThu(): void
     {
-        $choXacNhan = PackagePayment::where('cafe_id', (string) $this->cafe->id)
+        $choXacNhan = PackagePayment::where('shop_id', (string) $this->shop->id)
             ->where('payment_status', 'pending')
             ->orderBy('created_at', 'desc')
             ->first();
@@ -147,7 +147,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
         $res = $this->mua($this->goiPro, $th);
 
         $res->assertStatus(201);
-        $sub = Subscription::where('cafe_id', (string) $this->cafe->id)->first();
+        $sub = Subscription::where('shop_id', (string) $this->shop->id)->first();
         $this->assertNotNull($sub);
         $this->assertSame((string) $this->goiPro->id, (string) $sub->package_id);
         // Giá 199.000 + VAT 10% = 218.900
@@ -210,7 +210,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     {
         // Gói Pro 218.900 cho 30 ngày, đã dùng 15 ngày -> còn khoảng một nửa.
         $cu = Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->goiPro->id,
             'package_name_snapshot' => 'Fun Pro',
             'start_date' => now()->subDays(15), 'end_date' => now()->addDays(15),
@@ -241,7 +241,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     {
         // Gói cũ vừa mua hôm qua, giá rất cao; gói mới rẻ hơn nhiều.
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->goiPro->id,
             'package_name_snapshot' => 'Fun Pro',
             'start_date' => now()->subDay(), 'end_date' => now()->addDays(29),
@@ -273,7 +273,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
         $conHan = $this->capGoi($this->goiProMax, 20);
         $daHet  = $this->capGoi($this->goiPro, -10);
 
-        $chon = Subscription::latestForCafe((string) $this->cafe->id)->first();
+        $chon = Subscription::latestForShop((string) $this->shop->id)->first();
 
         $this->assertSame((string) $conHan->id, (string) $chon->id,
             'Chọn nhầm gói đã hết hạn vì nó được tạo sau.');
@@ -304,7 +304,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
         $this->capGoi($this->goiProMax, -1);   // hết hạn hôm qua
         $th = $this->thoiHan($this->goiPro);
 
-        // Gói đã hết hạn không còn được latestForCafe tính là "đang dùng" theo end_date,
+        // Gói đã hết hạn không còn được latestForShop tính là "đang dùng" theo end_date,
         // nhưng vẫn 'active' nên hệ thống coi là gia hạn/đổi gói chứ không chặn.
         $this->mua($this->goiPro, $th)->assertStatus(400);
         // Ghi lại hành vi thật: vẫn bị chặn vì bản ghi cũ còn status 'active'.
@@ -315,7 +315,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
 
     private function xemTruoc(Package $goi, ?TimeSubscription $th = null)
     {
-        return $this->getJson("/api/cafes/{$this->cafe->id}/subscriptions/preview?" . http_build_query(array_filter([
+        return $this->getJson("/api/shops/{$this->shop->id}/subscriptions/preview?" . http_build_query(array_filter([
             'package_id' => (string) $goi->id,
             'time_subscription_id' => $th ? (string) $th->id : null,
         ])));
@@ -342,7 +342,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     public function test_xem_truoc_nang_cap_khop_voi_so_tien_that_su_bi_thu(): void
     {
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->goiPro->id,
             'package_name_snapshot' => 'Fun Pro',
             'start_date' => now()->subDays(15), 'end_date' => now()->addDays(15),
@@ -376,7 +376,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     public function test_xem_truoc_bao_khi_can_tru_phu_het_gia(): void
     {
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->goiPro->id,
             'package_name_snapshot' => 'Fun Pro',
             'start_date' => now()->subDay(), 'end_date' => now()->addDays(29),
@@ -395,9 +395,9 @@ class SubscriptionLifecycleTest extends MongoTestCase
             'full_name' => 'Người khác', 'email' => 'khac-' . uniqid() . '@funcafe.test',
             'password' => Hash::make('Password@123'), 'role' => 'user', 'status' => 'active',
         ]);
-        $quanHo = $nguoiKhac->cafes()->create(['name' => 'Quán của họ', 'status' => 'open']);
+        $quanHo = $nguoiKhac->shops()->create(['name' => 'Quán của họ', 'status' => 'open']);
 
-        $this->getJson("/api/cafes/{$quanHo->id}/subscriptions/preview?package_id={$this->goiPro->id}")
+        $this->getJson("/api/shops/{$quanHo->id}/subscriptions/preview?package_id={$this->goiPro->id}")
             ->assertStatus(403);
     }
 
@@ -422,7 +422,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
                 ->assertJsonValidationErrors('payment_method');
         }
 
-        $this->assertSame(0, Subscription::where('cafe_id', (string) $this->cafe->id)->count(),
+        $this->assertSame(0, Subscription::where('shop_id', (string) $this->shop->id)->count(),
             'Có gói được cấp dù không giao dịch nào qua cổng.');
     }
 
@@ -437,7 +437,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     {
         $sub = $this->capGoi($this->goiPro, 10);
         $sub->packagePayments()->create([
-            'user_id' => (string) $this->user->id, 'cafe_id' => (string) $this->cafe->id,
+            'user_id' => (string) $this->user->id, 'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->goiPro->id,
             'amount' => 218_900, 'payment_method' => 'bank_transfer',
             'payment_status' => 'pending', 'transaction_code' => 'TXN-CHO-0001',
@@ -453,10 +453,10 @@ class SubscriptionLifecycleTest extends MongoTestCase
     {
         $this->mua($this->goiThu)->assertStatus(201);
 
-        $sub = Subscription::where('cafe_id', (string) $this->cafe->id)->first();
+        $sub = Subscription::where('shop_id', (string) $this->shop->id)->first();
         $this->assertSame(7, (int) $sub->start_date->diffInDays($sub->end_date));
         $this->assertEquals(0, (float) $sub->total_amount, 'Gói dùng thử phải miễn phí.');
-        $this->assertTrue((bool) $this->cafe->fresh()->has_used_free_trial);
+        $this->assertTrue((bool) $this->shop->fresh()->has_used_free_trial);
         $this->assertTrue((bool) $this->user->fresh()->has_used_free_trial);
     }
 
@@ -468,9 +468,9 @@ class SubscriptionLifecycleTest extends MongoTestCase
     {
         $this->mua($this->goiThu)->assertStatus(201);
 
-        $quanMoi = $this->user->cafes()->create(['name' => 'Quán thứ hai', 'status' => 'open']);
+        $quanMoi = $this->user->shops()->create(['name' => 'Quán thứ hai', 'status' => 'open']);
 
-        $this->postJson("/api/cafes/{$quanMoi->id}/subscriptions", [
+        $this->postJson("/api/shops/{$quanMoi->id}/subscriptions", [
             'package_id' => (string) $this->goiThu->id, 'payment_method' => 'vnpay',
         ])->assertStatus(400)
           ->assertJsonPath('message', 'Tài khoản của bạn đã dùng gói dùng thử miễn phí rồi. Mỗi tài khoản chỉ được dùng thử một lần — vui lòng chọn gói trả phí cho quán này.');
@@ -488,7 +488,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     {
         $this->mua($this->goiThu)->assertStatus(201);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/subscriptions", [
+        $this->postJson("/api/shops/{$this->shop->id}/subscriptions", [
             'package_id' => (string) $this->goiThu->id, 'payment_method' => 'vnpay',
         ])->assertStatus(400)
           ->assertJsonPath('message', 'Tài khoản của bạn đã dùng gói dùng thử miễn phí rồi. Mỗi tài khoản chỉ được dùng thử một lần — vui lòng chọn gói trả phí cho quán này.');
@@ -520,12 +520,12 @@ class SubscriptionLifecycleTest extends MongoTestCase
         // TRƯỚC khi chạy middleware, nên id bịa sẽ trả 404 và ta không đo được điều
         // đang cần đo (403 hay không).
         $thay = [
-            '{cafe}'     => (string) $this->cafe->id,
-            '{category}' => (string) Category::create(['cafe_id' => (string) $this->cafe->id, 'name' => 'DM', 'is_active' => true])->id,
-            '{item}'     => (string) \App\Models\Item::create(['cafe_id' => (string) $this->cafe->id, 'name' => 'Món', 'base_price' => 1000, 'is_available' => true])->id,
-            '{topping}'  => (string) \App\Models\Topping::create(['cafe_id' => (string) $this->cafe->id, 'name' => 'Top', 'price' => 1000, 'is_available' => true])->id,
-            '{table}'    => (string) $this->cafe->tables()->create(['name' => 'Bàn 1', 'capacity' => 2, 'status' => 'empty'])->id,
-            '{order}'    => (string) \App\Models\Order::create(['cafe_id' => (string) $this->cafe->id, 'code' => 'ORD-X', 'status' => 'active', 'subtotal' => 0, 'total_amount' => 0])->id,
+            '{shop}'     => (string) $this->shop->id,
+            '{category}' => (string) Category::create(['shop_id' => (string) $this->shop->id, 'name' => 'DM', 'is_active' => true])->id,
+            '{product}'  => (string) \App\Models\Product::create(['shop_id' => (string) $this->shop->id, 'name' => 'Món', 'base_price' => 1000, 'is_available' => true])->id,
+            '{topping}'  => (string) \App\Models\Topping::create(['shop_id' => (string) $this->shop->id, 'name' => 'Top', 'price' => 1000, 'is_available' => true])->id,
+            '{table}'    => (string) $this->shop->tables()->create(['name' => 'Bàn 1', 'capacity' => 2, 'status' => 'empty'])->id,
+            '{order}'    => (string) \App\Models\Order::create(['shop_id' => (string) $this->shop->id, 'code' => 'ORD-X', 'status' => 'active', 'subtotal' => 0, 'total_amount' => 0])->id,
         ];
 
         $lot = [];
@@ -547,9 +547,9 @@ class SubscriptionLifecycleTest extends MongoTestCase
     {
         $this->capGoi($this->goiProMax, -1);
 
-        $this->getJson("/api/cafes/{$this->cafe->id}/items")->assertStatus(200);
-        $this->getJson("/api/cafes/{$this->cafe->id}/tables")->assertStatus(200);
-        $this->getJson("/api/cafes/{$this->cafe->id}/orders?status=paid")->assertStatus(200);
+        $this->getJson("/api/shops/{$this->shop->id}/products")->assertStatus(200);
+        $this->getJson("/api/shops/{$this->shop->id}/tables")->assertStatus(200);
+        $this->getJson("/api/shops/{$this->shop->id}/orders?status=paid")->assertStatus(200);
     }
 
     /** 6.6.3: còn đúng một ngày thì vẫn ghi được — không cắt sớm một ngày nào. */
@@ -557,7 +557,7 @@ class SubscriptionLifecycleTest extends MongoTestCase
     {
         $this->capGoi($this->goiProMax, 1);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/categories", ['name' => 'Danh mục cuối kỳ'])
+        $this->postJson("/api/shops/{$this->shop->id}/categories", ['name' => 'Danh mục cuối kỳ'])
             ->assertStatus(201);
     }
 
@@ -565,14 +565,14 @@ class SubscriptionLifecycleTest extends MongoTestCase
     public function test_gia_han_xong_mo_khoa_ngay(): void
     {
         $sub = $this->capGoi($this->goiProMax, -1);
-        $this->postJson("/api/cafes/{$this->cafe->id}/categories", ['name' => 'Bị chặn'])->assertStatus(403);
+        $this->postJson("/api/shops/{$this->shop->id}/categories", ['name' => 'Bị chặn'])->assertStatus(403);
 
         // Gia hạn (đường duyệt tay: cộng hạn ngay tại store).
         $sub->update(['end_date' => now()->addMonth()]);
 
         // Vẫn dùng đúng phiên đăng nhập cũ, không đăng nhập lại.
-        $this->postJson("/api/cafes/{$this->cafe->id}/categories", ['name' => 'Sau khi gia hạn'])
+        $this->postJson("/api/shops/{$this->shop->id}/categories", ['name' => 'Sau khi gia hạn'])
             ->assertStatus(201);
-        $this->assertSame(1, Category::where('cafe_id', (string) $this->cafe->id)->count());
+        $this->assertSame(1, Category::where('shop_id', (string) $this->shop->id)->count());
     }
 }

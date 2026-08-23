@@ -8,7 +8,7 @@ class OrderDetail extends Model
 {
     protected $connection = 'mongodb';
     protected $collection = 'order_details';
-    protected $fillable = ['order_id', 'item_id', 'item_name_snapshot', 'item_price_id', 'size_name_snapshot', 'quantity', 'unit_price', 'subtotal', 'topping_total', 'total_price', 'note'];
+    protected $fillable = ['order_id', 'product_id', 'product_name_snapshot', 'product_size_id', 'size_name_snapshot', 'quantity', 'unit_price', 'subtotal', 'topping_total', 'total_price', 'note'];
 
     protected $casts = [
         'quantity' => 'integer',
@@ -23,14 +23,14 @@ class OrderDetail extends Model
         return $this->belongsTo(Order::class);
     }
 
-    public function item()
+    public function product()
     {
-        return $this->belongsTo(Item::class);
+        return $this->belongsTo(Product::class);
     }
 
-    public function itemPrice()
+    public function productSize()
     {
-        return $this->belongsTo(ItemPrice::class);
+        return $this->belongsTo(ProductSize::class);
     }
 
     public function orderDetailToppings()

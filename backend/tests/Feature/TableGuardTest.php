@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Subscription;
@@ -18,10 +18,10 @@ use Laravel\Sanctum\Sanctum;
  */
 class TableGuardTest extends MongoTestCase
 {
-    protected array $collections = ['users', 'cafes', 'packages', 'subscriptions', 'tables', 'orders'];
+    protected array $collections = ['users', 'shops', 'packages', 'subscriptions', 'tables', 'orders'];
 
     private User $user;
-    private Cafe $cafe;
+    private Shop $shop;
 
     protected function setUp(): void
     {
@@ -34,14 +34,14 @@ class TableGuardTest extends MongoTestCase
             'role' => 'user',
             'status' => 'active',
         ]);
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán kiểm thử bàn', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán kiểm thử bàn', 'status' => 'open']);
 
         $package = Package::create([
             'name' => 'Pro Max', 'type' => 'promax', 'level' => 2,
             'status' => 'active', 'is_trial' => false, 'can_use_ai' => true,
         ]);
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $package->id,
             'package_name_snapshot' => $package->name,
             'start_date' => now()->subDay(),
@@ -55,13 +55,13 @@ class TableGuardTest extends MongoTestCase
 
     private function taoBan(string $ten = 'Bàn 1')
     {
-        return $this->cafe->tables()->create(['name' => $ten, 'capacity' => 4, 'status' => 'empty']);
+        return $this->shop->tables()->create(['name' => $ten, 'capacity' => 4, 'status' => 'empty']);
     }
 
     private function taoDon($table, string $status)
     {
         return Order::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'table_id' => (string) $table->id,
             'code' => 'ORD-' . uniqid(),
             'status' => $status,
@@ -75,19 +75,19 @@ class TableGuardTest extends MongoTestCase
         $table = $this->taoBan();
         $this->taoDon($table, 'active');
 
-        $this->deleteJson("/api/cafes/{$this->cafe->id}/tables/{$table->id}")
+        $this->deleteJson("/api/shops/{$this->shop->id}/tables/{$table->id}")
             ->assertStatus(400)
             ->assertJsonPath('message', 'Không thể xóa bàn đang có order chưa thanh toán');
 
-        $this->assertSame(1, $this->cafe->tables()->count(), 'Bàn phải còn nguyên.');
+        $this->assertSame(1, $this->shop->tables()->count(), 'Bàn phải còn nguyên.');
     }
 
     public function test_xoa_duoc_ban_trong(): void
     {
         $table = $this->taoBan();
 
-        $this->deleteJson("/api/cafes/{$this->cafe->id}/tables/{$table->id}")->assertStatus(200);
-        $this->assertSame(0, $this->cafe->tables()->count());
+        $this->deleteJson("/api/shops/{$this->shop->id}/tables/{$table->id}")->assertStatus(200);
+        $this->assertSame(0, $this->shop->tables()->count());
     }
 
     /** Đơn đã thanh toán xong thì bàn trống trở lại — không có lý do gì giữ nó lại. */
@@ -96,8 +96,8 @@ class TableGuardTest extends MongoTestCase
         $table = $this->taoBan();
         $this->taoDon($table, 'paid');
 
-        $this->deleteJson("/api/cafes/{$this->cafe->id}/tables/{$table->id}")->assertStatus(200);
-        $this->assertSame(0, $this->cafe->tables()->count());
+        $this->deleteJson("/api/shops/{$this->shop->id}/tables/{$table->id}")->assertStatus(200);
+        $this->assertSame(0, $this->shop->tables()->count());
     }
 
     public function test_khong_dong_duoc_vao_ban_cua_quan_nguoi_khac(): void
@@ -109,11 +109,11 @@ class TableGuardTest extends MongoTestCase
             'role' => 'user',
             'status' => 'active',
         ]);
-        $quanKhac = $nguoiKhac->cafes()->create(['name' => 'Quán của người khác', 'status' => 'open']);
+        $quanKhac = $nguoiKhac->shops()->create(['name' => 'Quán của người khác', 'status' => 'open']);
         $banCuaHo = $quanKhac->tables()->create(['name' => 'Bàn A', 'capacity' => 2, 'status' => 'empty']);
 
         // Vẫn đang đăng nhập bằng tài khoản ban đầu.
-        $this->deleteJson("/api/cafes/{$quanKhac->id}/tables/{$banCuaHo->id}")->assertStatus(403);
+        $this->deleteJson("/api/shops/{$quanKhac->id}/tables/{$banCuaHo->id}")->assertStatus(403);
         $this->assertSame(1, $quanKhac->tables()->count(), 'Bàn của người khác phải còn nguyên.');
     }
 }

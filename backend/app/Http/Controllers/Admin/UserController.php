@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Subscription;
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\PackagePayment;
 use Illuminate\Http\Request;
 
@@ -31,18 +31,18 @@ class UserController extends Controller
         $userIds = $users->pluck('_id')->map(fn($id) => (string) $id)->toArray();
 
         // ĐA QUÁN: mỗi user có nhiều quán, mỗi quán có gói riêng. Gom quán theo user,
-        // và gói active theo TỪNG QUÁN (cafe_id).
-        $cafesByUser = Cafe::whereIn('user_id', $userIds)
+        // và gói active theo TỪNG QUÁN (shop_id).
+        $shopsByUser = Shop::whereIn('user_id', $userIds)
             ->get()
             ->groupBy(fn($c) => (string) $c->user_id);
 
-        $cafeIds = Cafe::whereIn('user_id', $userIds)->get()->pluck('id')->map(fn($id) => (string) $id)->toArray();
+        $shopIds = Shop::whereIn('user_id', $userIds)->get()->pluck('id')->map(fn($id) => (string) $id)->toArray();
 
-        $subsByCafe = Subscription::whereIn('cafe_id', $cafeIds)
+        $subsByShop = Subscription::whereIn('shop_id', $shopIds)
             ->effective()
             ->with('package')
             ->get()
-            ->keyBy(fn($s) => (string) $s->cafe_id);
+            ->keyBy(fn($s) => (string) $s->shop_id);
 
         // Lịch sử chi tiêu: gom SẴN theo user bằng MỘT truy vấn thay vì hỏi lại trong
         // vòng lặp — 50 user/trang mà query trong vòng lặp là 50 lượt đi CSDL.
@@ -52,19 +52,19 @@ class UserController extends Controller
             ->get()
             ->groupBy(fn($p) => (string) $p->user_id);
 
-        $result = $users->map(function ($user) use ($cafesByUser, $subsByCafe, $paymentsByUser) {
+        $result = $users->map(function ($user) use ($shopsByUser, $subsByShop, $paymentsByUser) {
             $userId = (string) $user->_id;
-            $cafes = $cafesByUser->get($userId, collect());
+            $shops = $shopsByUser->get($userId, collect());
 
-            $cafeList = $cafes->map(function ($cafe) use ($subsByCafe) {
-                $sub = $subsByCafe->get((string) $cafe->id);
+            $shopList = $shops->map(function ($shop) use ($subsByShop) {
+                $sub = $subsByShop->get((string) $shop->id);
                 return [
-                    'id' => (string) $cafe->id,
-                    'name' => $cafe->name,
+                    'id' => (string) $shop->id,
+                    'name' => $shop->name,
                     // open | closed | inactive — quán không xóa được, chỉ đổi trạng thái
-                    'status' => $cafe->status ?? 'open',
-                    'address' => $cafe->address ?? '',
-                    // 'none' chứ không 'free' — xem chú thích ở CafeController::index.
+                    'status' => $shop->status ?? 'open',
+                    'address' => $shop->address ?? '',
+                    // 'none' chứ không 'free' — xem chú thích ở ShopController::index.
                     'package_type' => $sub ? ($sub->package->type ?? 'none') : 'none',
                     'package_name' => $sub ? ($sub->package->name ?? '') : '',
                     'package_end_date' => $sub?->end_date,
@@ -74,20 +74,20 @@ class UserController extends Controller
             $payments = $paymentsByUser->get($userId, collect());
 
             // Gói active bất kỳ (quán đầu có gói) — để hiển thị nhanh trạng thái tài khoản.
-            $firstWithPkg = $cafeList->firstWhere('package_type', '!=', 'none');
-            $firstCafe = $cafes->first();
+            $firstWithPkg = $shopList->firstWhere('package_type', '!=', 'none');
+            $firstShop = $shops->first();
 
             $data = $user->toArray();
-            $data['cafe_count'] = $cafes->count();
-            $data['cafes'] = $cafeList;
-            $data['active_package_count'] = $cafeList->where('package_type', '!=', 'none')->count();
+            $data['shop_count'] = $shops->count();
+            $data['shops'] = $shopList;
+            $data['active_package_count'] = $shopList->where('package_type', '!=', 'none')->count();
             $data['payment_count'] = $payments->count();
             $data['total_paid'] = (float) $payments->sum('amount');
             $data['last_payment_at'] = $payments->max('paid_at');
             // Trường số ít giữ tương thích ngược cho bảng admin cũ.
             $data['package_type'] = $firstWithPkg['package_type'] ?? 'none';
             $data['package_name'] = $firstWithPkg['package_name'] ?? '';
-            $data['cafe_name'] = $firstCafe ? $firstCafe->name : null;
+            $data['shop_name'] = $firstShop ? $firstShop->name : null;
             return $data;
         });
 

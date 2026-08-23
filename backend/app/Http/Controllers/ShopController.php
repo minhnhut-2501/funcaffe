@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Subscription;
 use Illuminate\Http\Request;
 
-class CafeController extends Controller
+class ShopController extends Controller
 {
     public function __construct()
     {
@@ -20,7 +20,7 @@ class CafeController extends Controller
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        $cafes = $user->cafes;
+        $shops = $user->shops;
 
         // Đính kèm gói MỚI NHẤT của TỪNG quán. Không có phần này thì frontend chỉ biết
         // hạn của quán đang chọn, nên không thể cảnh báo "quán khác của bạn sắp hết
@@ -28,21 +28,21 @@ class CafeController extends Controller
         //
         // KHÔNG dùng scope effective(): nó loại luôn gói đã quá hạn, mà quán hết hạn
         // mới chính là quán cần cảnh báo gấp nhất. Frontend tự phân loại theo end_date.
-        // Xem Subscription::scopeLatestForCafe() để biết vì sao hai khái niệm này khác
+        // Xem Subscription::scopeLatestForShop() để biết vì sao hai khái niệm này khác
         // nhau và khi nào dùng cái nào.
         //
         // Một truy vấn cho tất cả các quán. Sắp xếp TĂNG DẦN vì keyBy giữ phần tử cuối
         // khi trùng khóa -> quán nào cũng giữ lại đúng gói có end_date lớn nhất.
-        $subs = Subscription::whereIn('cafe_id', $cafes->pluck('id')->map(fn ($id) => (string) $id)->toArray())
+        $subs = Subscription::whereIn('shop_id', $shops->pluck('id')->map(fn ($id) => (string) $id)->toArray())
             ->where('status', 'active')
             ->orderBy('end_date', 'asc')
             ->with('package')
             ->get()
-            ->keyBy(fn ($s) => (string) $s->cafe_id);
+            ->keyBy(fn ($s) => (string) $s->shop_id);
 
-        $result = $cafes->map(function ($cafe) use ($subs) {
-            $sub = $subs->get((string) $cafe->id);
-            $data = $cafe->toArray();
+        $result = $shops->map(function ($shop) use ($subs) {
+            $sub = $subs->get((string) $shop->id);
+            $data = $shop->toArray();
             // 'none' chứ không 'free' khi không đọc được loại gói: gói Fun Free là bản
             // dùng thử Pro Max (không giới hạn bàn/món, có AI), nên lấy nó làm giá trị
             // dự phòng là cấp quyền cao nhất cho đúng lúc dữ liệu hỏng.
@@ -67,22 +67,22 @@ class CafeController extends Controller
             'bank_account_name' => 'nullable|string|max:255',
         ]);
 
-        $cafe = $request->user()->cafes()->create($validated + ['status' => 'open']);
+        $shop = $request->user()->shops()->create($validated + ['status' => 'open']);
 
-        return response()->json($cafe, 201);
+        return response()->json($shop, 201);
     }
 
-    public function show(Request $request, Cafe $cafe)
+    public function show(Request $request, Shop $shop)
     {
-        if ($cafe->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
+        if ($shop->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
             return response()->json(['message' => 'Forbidden'], 403);
         }
-        return response()->json($cafe);
+        return response()->json($shop);
     }
 
-    public function update(Request $request, Cafe $cafe)
+    public function update(Request $request, Shop $shop)
     {
-        if ($cafe->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
+        if ($shop->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -98,8 +98,8 @@ class CafeController extends Controller
             'bank_account_name' => 'nullable|string|max:255',
         ]);
 
-        $cafe->update($validated);
-        return response()->json($cafe);
+        $shop->update($validated);
+        return response()->json($shop);
     }
 
     // KHÔNG có destroy(): quán là gốc của bàn, danh mục, món, topping, order, hóa đơn

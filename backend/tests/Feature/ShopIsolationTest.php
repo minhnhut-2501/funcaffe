@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Category;
-use App\Models\Item;
+use App\Models\Product;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Subscription;
-use App\Models\CafeTable;
+use App\Models\ShopTable;
 use App\Models\Topping;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -29,20 +29,20 @@ use Laravel\Sanctum\Sanctum;
  * Chấp nhận cả 403 (biết quán đó có, nhưng không phải của bạn) lẫn 404 (coi như không
  * tồn tại). Điều KHÔNG chấp nhận là 2xx.
  */
-class CafeIsolationTest extends MongoTestCase
+class ShopIsolationTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'packages', 'subscriptions', 'categories', 'items',
-        'item_prices', 'toppings', 'tables', 'orders', 'order_details', 'reviews',
+        'users', 'shops', 'packages', 'subscriptions', 'categories', 'products',
+        'product_sizes', 'toppings', 'tables', 'orders', 'order_details', 'reviews',
     ];
 
     private User $chuA;
     private User $chuB;
-    private Cafe $quanA;
+    private Shop $quanA;
     private Category $danhMucA;
-    private Item $monA;
+    private Product $monA;
     private Topping $toppingA;
-    private CafeTable $banA;
+    private ShopTable $banA;
     private Order $donA;
 
     protected function setUp(): void
@@ -57,13 +57,13 @@ class CafeIsolationTest extends MongoTestCase
         $this->chuA = $this->taoChuQuan('a');
         $this->chuB = $this->taoChuQuan('b');
 
-        $this->quanA = $this->chuA->cafes()->create(['name' => 'Quán của A', 'status' => 'open']);
+        $this->quanA = $this->chuA->shops()->create(['name' => 'Quán của A', 'status' => 'open']);
         // Quán B tồn tại để B là một chủ quán hợp lệ, không phải kẻ lạ không có gì.
-        $this->chuB->cafes()->create(['name' => 'Quán của B', 'status' => 'open']);
+        $this->chuB->shops()->create(['name' => 'Quán của B', 'status' => 'open']);
 
-        foreach ([$this->quanA->id, Cafe::where('name', 'Quán của B')->first()->id] as $cid) {
+        foreach ([$this->quanA->id, Shop::where('name', 'Quán của B')->first()->id] as $cid) {
             Subscription::create([
-                'cafe_id' => (string) $cid, 'package_id' => (string) $goi->id,
+                'shop_id' => (string) $cid, 'package_id' => (string) $goi->id,
                 'package_name_snapshot' => 'Pro Max',
                 'start_date' => now()->subDay(), 'end_date' => now()->addMonth(),
                 'total_amount' => 499_000, 'status' => 'active',
@@ -71,15 +71,15 @@ class CafeIsolationTest extends MongoTestCase
         }
 
         $this->danhMucA = Category::create([
-            'cafe_id' => (string) $this->quanA->id, 'name' => 'Cà phê', 'is_active' => true,
+            'shop_id' => (string) $this->quanA->id, 'name' => 'Cà phê', 'is_active' => true,
         ]);
-        $this->monA = Item::create([
-            'cafe_id' => (string) $this->quanA->id,
+        $this->monA = Product::create([
+            'shop_id' => (string) $this->quanA->id,
             'category_id' => (string) $this->danhMucA->id,
             'name' => 'Cà phê sữa', 'base_price' => 30_000, 'is_available' => true,
         ]);
         $this->toppingA = Topping::create([
-            'cafe_id' => (string) $this->quanA->id, 'name' => 'Trân châu',
+            'shop_id' => (string) $this->quanA->id, 'name' => 'Trân châu',
             'price' => 7_000, 'is_available' => true,
         ]);
         $this->banA = $this->quanA->tables()->create([
@@ -87,11 +87,11 @@ class CafeIsolationTest extends MongoTestCase
         ]);
 
         Sanctum::actingAs($this->chuA);
-        $this->postJson("/api/cafes/{$this->quanA->id}/orders", [
+        $this->postJson("/api/shops/{$this->quanA->id}/orders", [
             'table_id' => (string) $this->banA->id,
-            'items' => [['item_id' => (string) $this->monA->id, 'item_name_snapshot' => 'Cà phê sữa', 'quantity' => 1]],
+            'items' => [['product_id' => (string) $this->monA->id, 'product_name_snapshot' => 'Cà phê sữa', 'quantity' => 1]],
         ])->assertStatus(201);
-        $this->donA = Order::where('cafe_id', (string) $this->quanA->id)->firstOrFail();
+        $this->donA = Order::where('shop_id', (string) $this->quanA->id)->firstOrFail();
     }
 
     private function taoChuQuan(string $dau): User
@@ -105,7 +105,7 @@ class CafeIsolationTest extends MongoTestCase
     }
 
     /**
-     * Chủ quán B gọi MỌI đường có `{cafe}` bằng mã quán của A → phải bị từ chối.
+     * Chủ quán B gọi MỌI đường có `{shop}` bằng mã quán của A → phải bị từ chối.
      *
      * Đây là bài chính. Nó quét đủ mọi controller có route theo quán, nên không controller
      * nào lọt ra ngoài tầm kiểm — kể cả những cái viết sau này.
@@ -113,7 +113,7 @@ class CafeIsolationTest extends MongoTestCase
     public function test_chu_quan_khac_khong_cham_duoc_bat_ky_duong_nao_cua_quan_nay(): void
     {
         $thayThe = [
-            '{cafe}' => (string) $this->quanA->id,
+            '{shop}' => (string) $this->quanA->id,
             '{category}' => (string) $this->danhMucA->id,
             '{item}' => (string) $this->monA->id,
             '{topping}' => (string) $this->toppingA->id,
@@ -127,7 +127,7 @@ class CafeIsolationTest extends MongoTestCase
 
         foreach (\Illuminate\Support\Facades\Route::getRoutes() as $route) {
             $uri = $route->uri();
-            if (!str_contains($uri, '{cafe}')) {
+            if (!str_contains($uri, '{shop}')) {
                 continue;
             }
             // Còn tham số nào không thay được thì bỏ qua — id giả sẽ cho 404 và che
@@ -160,26 +160,26 @@ class CafeIsolationTest extends MongoTestCase
     {
         Sanctum::actingAs($this->chuA);
 
-        $this->getJson("/api/cafes/{$this->quanA->id}")->assertStatus(200);
-        $this->getJson("/api/cafes/{$this->quanA->id}/items")->assertStatus(200);
-        $this->getJson("/api/cafes/{$this->quanA->id}/orders")->assertStatus(200);
-        $this->getJson("/api/cafes/{$this->quanA->id}/revenue-summary")->assertStatus(404); // đường không tồn tại — chốt kiểm bài
+        $this->getJson("/api/shops/{$this->quanA->id}")->assertStatus(200);
+        $this->getJson("/api/shops/{$this->quanA->id}/products")->assertStatus(200);
+        $this->getJson("/api/shops/{$this->quanA->id}/orders")->assertStatus(200);
+        $this->getJson("/api/shops/{$this->quanA->id}/revenue-summary")->assertStatus(404); // đường không tồn tại — chốt kiểm bài
     }
 
     /**
-     * Đọc và SỬA thông tin quán người khác qua `PUT /cafes/{cafe}`.
+     * Đọc và SỬA thông tin quán người khác qua `PUT /shops/{shop}`.
      *
-     * `CafeController` tự kiểm quyền chứ không dùng chốt chặn chung `authorizeCafe()`,
+     * `ShopController` tự kiểm quyền chứ không dùng chốt chặn chung `authorizeShop()`,
      * nên phải soi riêng: hai chỗ viết hai kiểu là hai chỗ có thể lệch nhau.
      */
     public function test_khong_xem_va_khong_sua_duoc_thong_tin_quan_nguoi_khac(): void
     {
         Sanctum::actingAs($this->chuB);
 
-        $this->getJson("/api/cafes/{$this->quanA->id}")->assertStatus(403);
-        $this->putJson("/api/cafes/{$this->quanA->id}", ['name' => 'Đã bị đổi tên'])->assertStatus(403);
+        $this->getJson("/api/shops/{$this->quanA->id}")->assertStatus(403);
+        $this->putJson("/api/shops/{$this->quanA->id}", ['name' => 'Đã bị đổi tên'])->assertStatus(403);
 
-        $this->assertSame('Quán của A', Cafe::find($this->quanA->id)->name);
+        $this->assertSame('Quán của A', Shop::find($this->quanA->id)->name);
     }
 
     /** Danh sách quán chỉ trả quán của chính mình. */
@@ -187,7 +187,7 @@ class CafeIsolationTest extends MongoTestCase
     {
         Sanctum::actingAs($this->chuB);
 
-        $ten = collect($this->getJson('/api/cafes')->assertStatus(200)->json())->pluck('name')->all();
+        $ten = collect($this->getJson('/api/shops')->assertStatus(200)->json())->pluck('name')->all();
 
         $this->assertContains('Quán của B', $ten);
         $this->assertNotContains('Quán của A', $ten);
@@ -196,13 +196,13 @@ class CafeIsolationTest extends MongoTestCase
     /**
      * Doanh thu gộp chỉ cộng quán của chính mình.
      *
-     * `UserRevenueController` không đi qua `{cafe}` nên bài quét bảng route ở trên không
+     * `UserRevenueController` không đi qua `{shop}` nên bài quét bảng route ở trên không
      * chạm tới. Nó gom theo `user_id` — bài này giữ đúng điều đó.
      */
     public function test_doanh_thu_gop_khong_cong_quan_nguoi_khac(): void
     {
         Sanctum::actingAs($this->chuA);
-        $this->postJson("/api/cafes/{$this->quanA->id}/orders/{$this->donA->id}/pay", [
+        $this->postJson("/api/shops/{$this->quanA->id}/orders/{$this->donA->id}/pay", [
             'payment_method' => 'cash',
             // Bắt buộc từ khi tiền mặt phải ghi số khách đưa; bài này soi ranh giới hai quán.
             'cash_received' => 1_000_000,
@@ -225,6 +225,6 @@ class CafeIsolationTest extends MongoTestCase
         ]);
 
         Sanctum::actingAs($admin);
-        $this->getJson("/api/cafes/{$this->quanA->id}")->assertStatus(200);
+        $this->getJson("/api/shops/{$this->quanA->id}")->assertStatus(200);
     }
 }

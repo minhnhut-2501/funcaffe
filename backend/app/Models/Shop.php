@@ -4,10 +4,10 @@ namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
 
-class Cafe extends Model
+class Shop extends Model
 {
     protected $connection = 'mongodb';
-    protected $collection = 'cafes';
+    protected $collection = 'shops';
     protected $fillable = [
         'user_id', 'name', 'address', 'phone', 'description', 'status', 'logo',
         // Tài khoản ngân hàng nhận tiền (VietQR) cho luồng khách trả tiền cho chủ quán
@@ -27,7 +27,7 @@ class Cafe extends Model
 
     public function subscriptions()
     {
-        return $this->hasMany(Subscription::class, 'cafe_id');
+        return $this->hasMany(Subscription::class, 'shop_id');
     }
 
     public function categories()
@@ -35,9 +35,9 @@ class Cafe extends Model
         return $this->hasMany(Category::class);
     }
 
-    public function items()
+    public function products()
     {
-        return $this->hasMany(Item::class);
+        return $this->hasMany(Product::class);
     }
 
     public function toppings()
@@ -47,7 +47,7 @@ class Cafe extends Model
 
     public function tables()
     {
-        return $this->hasMany(CafeTable::class);
+        return $this->hasMany(ShopTable::class);
     }
 
     public function orders()

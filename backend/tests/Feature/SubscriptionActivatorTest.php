@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Package;
 use App\Models\PackagePayment;
 use App\Models\Subscription;
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Hash;
  */
 class SubscriptionActivatorTest extends MongoTestCase
 {
-    protected array $collections = ['users', 'cafes', 'packages', 'subscriptions', 'package_payments'];
+    protected array $collections = ['users', 'shops', 'packages', 'subscriptions', 'package_payments'];
 
     private function makePayment(string $paymentStatus, string $subscriptionStatus = 'pending'): PackagePayment
     {
@@ -34,7 +34,7 @@ class SubscriptionActivatorTest extends MongoTestCase
             'status' => 'active',
         ]);
 
-        $cafe = $user->cafes()->create(['name' => 'Quán kiểm thử', 'status' => 'open']);
+        $shop = $user->shops()->create(['name' => 'Quán kiểm thử', 'status' => 'open']);
 
         $package = Package::create([
             'name' => 'Pro Max', 'type' => 'promax', 'level' => 2,
@@ -42,7 +42,7 @@ class SubscriptionActivatorTest extends MongoTestCase
         ]);
 
         $subscription = Subscription::create([
-            'cafe_id' => (string) $cafe->id,
+            'shop_id' => (string) $shop->id,
             'package_id' => (string) $package->id,
             'package_name_snapshot' => $package->name,
             'start_date' => now(),
@@ -53,7 +53,7 @@ class SubscriptionActivatorTest extends MongoTestCase
 
         return $subscription->packagePayments()->create([
             'user_id' => (string) $user->id,
-            'cafe_id' => (string) $cafe->id,
+            'shop_id' => (string) $shop->id,
             'package_id' => (string) $package->id,
             'amount' => 199_000,
             'payment_method' => 'vnpay',
@@ -116,7 +116,7 @@ class SubscriptionActivatorTest extends MongoTestCase
 
         app(SubscriptionActivator::class)->markPaidAndActivate($payment->fresh());
 
-        $this->assertTrue((bool) Cafe::find($payment->cafe_id)->has_used_free_trial);
+        $this->assertTrue((bool) Shop::find($payment->shop_id)->has_used_free_trial);
         $this->assertTrue((bool) User::find($payment->user_id)->has_used_free_trial);
     }
 }

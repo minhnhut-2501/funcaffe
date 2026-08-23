@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Category;
-use App\Models\Item;
+use App\Models\Product;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Subscription;
@@ -23,14 +23,14 @@ use Laravel\Sanctum\Sanctum;
 class OrderLifecycleTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'packages', 'subscriptions', 'categories',
-        'items', 'item_prices', 'toppings', 'tables', 'orders',
+        'users', 'shops', 'packages', 'subscriptions', 'categories',
+        'products', 'product_sizes', 'toppings', 'tables', 'orders',
         'order_details', 'order_detail_toppings',
     ];
 
     private User $user;
-    private Cafe $cafe;
-    private Item $item;
+    private Shop $shop;
+    private Product $product;
     private $table;
 
     protected function setUp(): void
@@ -44,14 +44,14 @@ class OrderLifecycleTest extends MongoTestCase
             'role' => 'user',
             'status' => 'active',
         ]);
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán vòng đời', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán vòng đời', 'status' => 'open']);
 
         $package = Package::create([
             'name' => 'Pro Max', 'type' => 'promax', 'level' => 2,
             'status' => 'active', 'is_trial' => false, 'can_use_ai' => true,
         ]);
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $package->id,
             'package_name_snapshot' => $package->name,
             'start_date' => now()->subDay(),
@@ -61,27 +61,27 @@ class OrderLifecycleTest extends MongoTestCase
         ]);
 
         $category = Category::create([
-            'cafe_id' => (string) $this->cafe->id, 'name' => 'Cà phê', 'is_active' => true,
+            'shop_id' => (string) $this->shop->id, 'name' => 'Cà phê', 'is_active' => true,
         ]);
-        $this->item = Item::create([
-            'cafe_id' => (string) $this->cafe->id,
+        $this->item = Product::create([
+            'shop_id' => (string) $this->shop->id,
             'category_id' => (string) $category->id,
             'name' => 'Cà phê sữa',
             'base_price' => 30_000,
             'is_available' => true,
         ]);
-        $this->table = $this->cafe->tables()->create(['name' => 'Bàn 1', 'capacity' => 4, 'status' => 'empty']);
+        $this->table = $this->shop->tables()->create(['name' => 'Bàn 1', 'capacity' => 4, 'status' => 'empty']);
 
         Sanctum::actingAs($this->user);
     }
 
     private function taoDon(int $soLuong = 2): string
     {
-        return $this->postJson("/api/cafes/{$this->cafe->id}/orders", [
+        return $this->postJson("/api/shops/{$this->shop->id}/orders", [
             'table_id' => (string) $this->table->id,
             'items' => [[
-                'item_id' => (string) $this->item->id,
-                'item_name_snapshot' => 'Cà phê sữa',
+                'product_id' => (string) $this->item->id,
+                'product_name_snapshot' => 'Cà phê sữa',
                 'quantity' => $soLuong,
             ]],
         ])->json('id');
@@ -107,7 +107,7 @@ class OrderLifecycleTest extends MongoTestCase
     public function test_thanh_toan_lan_hai_bi_tu_choi_va_khong_ghi_de_ma_phieu(): void
     {
         $orderId = $this->taoDon();
-        $url = "/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay";
+        $url = "/api/shops/{$this->shop->id}/orders/{$orderId}/pay";
 
         $maPhieu = $this->postJson($url, $this->traTienMat())
             ->assertStatus(200)
@@ -124,13 +124,13 @@ class OrderLifecycleTest extends MongoTestCase
     public function test_mot_don_chi_sinh_mot_ma_phieu(): void
     {
         $orderId = $this->taoDon();
-        $url = "/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay";
+        $url = "/api/shops/{$this->shop->id}/orders/{$orderId}/pay";
 
         $this->postJson($url, $this->traTienMat());
         $this->postJson($url, $this->traTienMat());
         $this->postJson($url, $this->traTienMat());
 
-        $soPhieu = $this->cafe->orders()->whereNotNull('invoice_code')->count();
+        $soPhieu = $this->shop->orders()->whereNotNull('invoice_code')->count();
         $this->assertSame(1, $soPhieu);
     }
 
@@ -146,10 +146,10 @@ class OrderLifecycleTest extends MongoTestCase
         $orderId = $this->taoDon();
 
         // Giao diện gỡ dòng cuối cùng -> gửi danh sách món rỗng.
-        $this->putJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}", ['items' => []])
+        $this->putJson("/api/shops/{$this->shop->id}/orders/{$orderId}", ['items' => []])
             ->assertStatus(200);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", $this->traTienMat())
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", $this->traTienMat())
             ->assertStatus(422)
             ->assertJsonPath('message', 'Đơn chưa có món nào, không thể thanh toán.');
     }
@@ -161,7 +161,7 @@ class OrderLifecycleTest extends MongoTestCase
         $orderId = $this->taoDon();
         $this->assertSame('serving', $this->table->fresh()->status);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/cancel")->assertStatus(200);
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/cancel")->assertStatus(200);
 
         $this->assertSame('cancelled', Order::find($orderId)->status);
         $this->assertSame('empty', $this->table->fresh()->status);
@@ -171,9 +171,9 @@ class OrderLifecycleTest extends MongoTestCase
     public function test_don_da_thanh_toan_thi_khong_huy_duoc(): void
     {
         $orderId = $this->taoDon();
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", $this->traTienMat());
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", $this->traTienMat());
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/cancel")
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/cancel")
             ->assertStatus(400)
             ->assertJsonPath('message', 'Order đã thanh toán, không thể hủy.');
 
@@ -184,7 +184,7 @@ class OrderLifecycleTest extends MongoTestCase
     public function test_huy_lai_don_da_huy_van_tra_ve_thanh_cong(): void
     {
         $orderId = $this->taoDon();
-        $url = "/api/cafes/{$this->cafe->id}/orders/{$orderId}/cancel";
+        $url = "/api/shops/{$this->shop->id}/orders/{$orderId}/cancel";
 
         $this->postJson($url)->assertStatus(200);
         $this->postJson($url)->assertStatus(200);
@@ -193,9 +193,9 @@ class OrderLifecycleTest extends MongoTestCase
     public function test_don_da_huy_thi_khong_thanh_toan_duoc(): void
     {
         $orderId = $this->taoDon();
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/cancel");
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/cancel");
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", $this->traTienMat())
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", $this->traTienMat())
             ->assertStatus(400);
 
         $this->assertNull(Order::find($orderId)->invoice_code, 'Đơn đã hủy vẫn sinh ra mã phiếu.');
@@ -211,26 +211,26 @@ class OrderLifecycleTest extends MongoTestCase
      */
     public function test_don_bi_tu_choi_khong_de_lai_don_ma_lam_ket_ban(): void
     {
-        $monAn = Item::create([
-            'cafe_id' => (string) $this->cafe->id,
+        $monAn = Product::create([
+            'shop_id' => (string) $this->shop->id,
             'name' => 'Bánh mì', 'base_price' => 25_000, 'is_available' => false,
         ]);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders", [
+        $this->postJson("/api/shops/{$this->shop->id}/orders", [
             'table_id' => (string) $this->table->id,
             'items' => [
-                ['item_id' => (string) $this->item->id, 'item_name_snapshot' => 'Cà phê sữa', 'quantity' => 1],
-                ['item_id' => (string) $monAn->id, 'item_name_snapshot' => 'Bánh mì', 'quantity' => 1],
+                ['product_id' => (string) $this->item->id, 'product_name_snapshot' => 'Cà phê sữa', 'quantity' => 1],
+                ['product_id' => (string) $monAn->id, 'product_name_snapshot' => 'Bánh mì', 'quantity' => 1],
             ],
         ])->assertStatus(422);
 
-        $this->assertSame(0, $this->cafe->orders()->count(), 'Đơn bị từ chối vẫn để lại bản ghi trong CSDL.');
+        $this->assertSame(0, $this->shop->orders()->count(), 'Đơn bị từ chối vẫn để lại bản ghi trong CSDL.');
         $this->assertSame('empty', $this->table->fresh()->status, 'Bàn bị kẹt ở trạng thái đang phục vụ.');
 
         // Và bàn vẫn gọi món mới được như bình thường.
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders", [
+        $this->postJson("/api/shops/{$this->shop->id}/orders", [
             'table_id' => (string) $this->table->id,
-            'items' => [['item_id' => (string) $this->item->id, 'item_name_snapshot' => 'Cà phê sữa', 'quantity' => 1]],
+            'items' => [['product_id' => (string) $this->item->id, 'product_name_snapshot' => 'Cà phê sữa', 'quantity' => 1]],
         ])->assertStatus(201);
     }
 
@@ -242,19 +242,19 @@ class OrderLifecycleTest extends MongoTestCase
     public function test_sua_don_that_bai_khong_lam_mat_mon_dang_co(): void
     {
         $orderId = $this->taoDon(2);   // 60.000
-        $monAn = Item::create([
-            'cafe_id' => (string) $this->cafe->id,
+        $monAn = Product::create([
+            'shop_id' => (string) $this->shop->id,
             'name' => 'Bánh mì', 'base_price' => 25_000, 'is_available' => false,
         ]);
 
-        $this->putJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}", [
+        $this->putJson("/api/shops/{$this->shop->id}/orders/{$orderId}", [
             'items' => [
-                ['item_id' => (string) $this->item->id, 'item_name_snapshot' => 'Cà phê sữa', 'quantity' => 5],
-                ['item_id' => (string) $monAn->id, 'item_name_snapshot' => 'Bánh mì', 'quantity' => 1],
+                ['product_id' => (string) $this->item->id, 'product_name_snapshot' => 'Cà phê sữa', 'quantity' => 5],
+                ['product_id' => (string) $monAn->id, 'product_name_snapshot' => 'Bánh mì', 'quantity' => 1],
             ],
         ])->assertStatus(422);
 
-        $don = $this->getJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}")->json();
+        $don = $this->getJson("/api/shops/{$this->shop->id}/orders/{$orderId}")->json();
         $this->assertCount(1, $don['order_details'], 'Dòng món cũ bị xóa mất sau một request hỏng.');
         $this->assertSame(2, (int) $don['order_details'][0]['quantity']);
         $this->assertSame(60_000.0, (float) $don['subtotal'], 'Tạm tính không còn khớp với các dòng món.');
@@ -273,14 +273,14 @@ class OrderLifecycleTest extends MongoTestCase
         // Kéo ngày tạo về hôm qua, giữ nguyên trạng thái đang phục vụ.
         Order::where('_id', $orderId)->update(['created_at' => now()->subDay()]);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", $this->traTienMat())
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", $this->traTienMat())
             ->assertStatus(200);
 
         $homNay  = now()->format('Y-m-d');
         $homQua  = now()->subDay()->format('Y-m-d');
 
-        $donHomNay = $this->getJson("/api/cafes/{$this->cafe->id}/orders?status=paid&from={$homNay}&to={$homNay}")->json();
-        $donHomQua = $this->getJson("/api/cafes/{$this->cafe->id}/orders?status=paid&from={$homQua}&to={$homQua}")->json();
+        $donHomNay = $this->getJson("/api/shops/{$this->shop->id}/orders?status=paid&from={$homNay}&to={$homNay}")->json();
+        $donHomQua = $this->getJson("/api/shops/{$this->shop->id}/orders?status=paid&from={$homQua}&to={$homQua}")->json();
 
         $this->assertCount(1, $donHomNay, 'Đơn trả tiền hôm nay phải nằm trong doanh thu hôm nay.');
         $this->assertCount(0, $donHomQua, 'Đơn không được tính vào ngày mở đơn.');
@@ -292,10 +292,10 @@ class OrderLifecycleTest extends MongoTestCase
         $orderId = $this->taoDon(1);
         Order::where('_id', $orderId)->update(['created_at' => now()->subDay()]);
 
-        $res = $this->putJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}", [
+        $res = $this->putJson("/api/shops/{$this->shop->id}/orders/{$orderId}", [
             'items' => [[
-                'item_id' => (string) $this->item->id,
-                'item_name_snapshot' => 'Cà phê sữa',
+                'product_id' => (string) $this->item->id,
+                'product_name_snapshot' => 'Cà phê sữa',
                 'quantity' => 3,
             ]],
         ]);
@@ -319,7 +319,7 @@ class OrderLifecycleTest extends MongoTestCase
 
         $this->item->update(['base_price' => 50_000]);
 
-        $don = $this->getJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}")->json();
+        $don = $this->getJson("/api/shops/{$this->shop->id}/orders/{$orderId}")->json();
         $this->assertSame(60_000.0, (float) $don['subtotal'], 'Đơn đang mở bị đổi giá dưới tay nhân viên.');
     }
 
@@ -328,10 +328,10 @@ class OrderLifecycleTest extends MongoTestCase
         $orderId = $this->taoDon(2);
         $this->item->update(['base_price' => 50_000]);
 
-        $res = $this->putJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}", [
+        $res = $this->putJson("/api/shops/{$this->shop->id}/orders/{$orderId}", [
             'items' => [[
-                'item_id' => (string) $this->item->id,
-                'item_name_snapshot' => 'Cà phê sữa',
+                'product_id' => (string) $this->item->id,
+                'product_name_snapshot' => 'Cà phê sữa',
                 'quantity' => 2,
             ]],
         ]);

@@ -30,7 +30,7 @@ class AuthFlowTest extends MongoTestCase
 {
     use RefreshDatabase;
 
-    protected array $collections = ['users', 'cafes', 'subscriptions', 'packages'];
+    protected array $collections = ['users', 'shops', 'subscriptions', 'packages'];
 
     private const MAT_KHAU = 'Password@123';
 

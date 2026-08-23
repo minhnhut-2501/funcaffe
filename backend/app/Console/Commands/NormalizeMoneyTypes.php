@@ -38,8 +38,8 @@ class NormalizeMoneyTypes extends Command
 
     /** Bảng → các trường mang giá trị tiền. */
     private const TRUONG_TIEN = [
-        'items'                 => ['base_price'],
-        'item_prices'           => ['price'],
+        'products'              => ['base_price'],
+        'product_sizes'           => ['price'],
         'toppings'              => ['price'],
         'orders'                => ['subtotal', 'discount_amount', 'total_amount', 'cash_received', 'change_amount'],
         'order_details'         => ['unit_price', 'subtotal', 'topping_total', 'total_price'],

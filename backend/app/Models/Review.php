@@ -9,7 +9,7 @@ class Review extends Model
     protected $connection = 'mongodb';
     protected $collection = 'reviews';
     protected $fillable = [
-        'user_id', 'cafe_id', 'package_id',
+        'user_id', 'shop_id', 'package_id',
         'rating', 'title', 'comment',
         'status',
         // Các bản đánh giá cũ của chính chủ quán này. Mỗi chủ quán chỉ có MỘT
@@ -26,9 +26,9 @@ class Review extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function cafe()
+    public function shop()
     {
-        return $this->belongsTo(Cafe::class);
+        return $this->belongsTo(Shop::class);
     }
 
     public function package()

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Concerns\ChecksCafeOwnership;
-use App\Models\Cafe;
+use App\Http\Controllers\Concerns\ChecksShopAccess;
+use App\Models\Shop;
 use App\Models\Order;
 use App\Services\GeminiService;
 use App\Services\RevenueStats;
@@ -19,7 +19,7 @@ use Throwable;
  */
 class AiController extends Controller
 {
-    use ChecksCafeOwnership;
+    use ChecksShopAccess;
 
     public function __construct(
         private GeminiService $gemini,
@@ -28,10 +28,10 @@ class AiController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    /** POST cafes/{cafe}/ai/chat */
-    public function chat(Request $request, Cafe $cafe)
+    /** POST shops/{shop}/ai/chat */
+    public function chat(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
         $validated = $request->validate([
             'messages'                 => 'required|array|min:1|max:30',
@@ -40,17 +40,17 @@ class AiController extends Controller
         ]);
 
         try {
-            $reply = $this->gemini->chat($validated['messages'], $this->cafeContext($cafe));
+            $reply = $this->gemini->chat($validated['messages'], $this->shopContext($shop));
             return response()->json(['reply' => $reply]);
         } catch (Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 502);
         }
     }
 
-    /** POST cafes/{cafe}/ai/chat/stream — trả text dần cho hiệu ứng gõ chữ */
-    public function chatStream(Request $request, Cafe $cafe)
+    /** POST shops/{shop}/ai/chat/stream — trả text dần cho hiệu ứng gõ chữ */
+    public function chatStream(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
         $validated = $request->validate([
             'messages'           => 'required|array|min:1|max:30',
@@ -58,7 +58,7 @@ class AiController extends Controller
             'messages.*.content' => 'required|string|max:4000',
         ]);
 
-        $system = $this->cafeContext($cafe);
+        $system = $this->shopContext($shop);
         $messages = $validated['messages'];
 
         return response()->stream(function () use ($messages, $system) {
@@ -82,18 +82,18 @@ class AiController extends Controller
         ]);
     }
 
-    /** POST cafes/{cafe}/ai/revenue-analysis */
-    public function revenueAnalysis(Request $request, Cafe $cafe)
+    /** POST shops/{shop}/ai/revenue-analysis */
+    public function revenueAnalysis(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
         // Cache theo quán 1 giờ: bấm lại không gọi Gemini (tiết kiệm & nhanh).
-        $cacheKey = "ai_revenue_analysis_{$cafe->id}";
+        $cacheKey = "ai_revenue_analysis_{$shop->id}";
         if (!$request->boolean('refresh') && Cache::has($cacheKey)) {
             return response()->json(Cache::get($cacheKey) + ['cached' => true]);
         }
 
-        $stats = $this->buildRevenueStats($cafe);
+        $stats = $this->buildRevenueStats($shop);
 
         if ($stats['invoice_count'] === 0) {
             return response()->json([
@@ -105,7 +105,7 @@ class AiController extends Controller
             . 'Phân tích số liệu doanh thu được cung cấp và trả lời NGẮN GỌN, THỰC TẾ bằng tiếng Việt. '
             . 'Chỉ dựa trên số liệu đưa ra, không bịa thêm số. Tiền tệ là VND.';
 
-        $prompt = "Số liệu doanh thu quán \"{$cafe->name}\":\n"
+        $prompt = "Số liệu doanh thu quán \"{$shop->name}\":\n"
             . json_encode($stats, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
         $schema = [
@@ -132,20 +132,20 @@ class AiController extends Controller
     }
 
     /**
-     * GET cafes/{cafe}/ai/suggestions — câu gợi ý mở đầu, chọn theo tình trạng THẬT.
+     * GET shops/{shop}/ai/suggestions — câu gợi ý mở đầu, chọn theo tình trạng THẬT.
      *
      * Trước đây frontend ghi cứng ba câu, trong đó có câu hỏi về số bàn — mà chính
      * ngữ cảnh gửi cho Gemini lại không có số liệu đó, nên bấm vào là AI đoán bừa.
      * Sinh ở backend vì đây là nơi biết trạng thái quán, và cũng là nơi dựng ngữ
      * cảnh — hai bên khớp nhau thì không còn cảnh gợi ý hỏi thứ AI không trả lời được.
      */
-    public function suggestions(Request $request, Cafe $cafe)
+    public function suggestions(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        [$serving, $empty] = $this->tableOccupancy($cafe);
-        $todayRevenue = $this->sumPaid($cafe, Carbon::today(), Carbon::tomorrow());
-        $hasSales = $this->paidOrders($cafe)->exists();
+        [$serving, $empty] = $this->tableOccupancy($shop);
+        $todayRevenue = $this->sumPaid($shop, Carbon::today(), Carbon::tomorrow());
+        $hasSales = $this->paidOrders($shop)->exists();
 
         $suggestions = [];
 
@@ -185,12 +185,12 @@ class AiController extends Controller
      *    liệu nhiều tháng; chậm 10 phút thì không ai nhận ra, mà kéo về ở mỗi tin
      *    nhắn thì đúng vào cái bẫy hiệu năng đã gỡ ở sumPaid().
      */
-    private function cafeContext(Cafe $cafe): string
+    private function shopContext(Shop $shop): string
     {
-        [$serving, $empty, $tableCount] = $this->tableOccupancy($cafe);
-        $todayRevenue = $this->sumPaid($cafe, Carbon::today(), Carbon::tomorrow());
+        [$serving, $empty, $tableCount] = $this->tableOccupancy($shop);
+        $todayRevenue = $this->sumPaid($shop, Carbon::today(), Carbon::tomorrow());
 
-        return "Bạn là trợ lý AI cho quán cà phê \"{$cafe->name}\". "
+        return "Bạn là trợ lý AI cho quán cà phê \"{$shop->name}\". "
             . "Trả lời ngắn gọn, thân thiện bằng tiếng Việt. Tiền tệ là VND.\n"
             . "Chỉ dựa trên số liệu dưới đây, KHÔNG bịa thêm số.\n\n"
             . "Tình hình ngay lúc này:\n"
@@ -198,7 +198,7 @@ class AiController extends Controller
             . "- Đang phục vụ: {$serving} bàn\n"
             . "- Còn trống: {$empty} bàn\n"
             . "- Doanh thu hôm nay: " . number_format($todayRevenue, 0, ',', '.') . "đ\n\n"
-            . $this->cachedSalesContext($cafe);
+            . $this->cachedSalesContext($shop);
     }
 
     /**
@@ -211,11 +211,11 @@ class AiController extends Controller
      *
      * @return array{0:int,1:int,2:int} [đang phục vụ, còn trống, tổng số bàn]
      */
-    private function tableOccupancy(Cafe $cafe): array
+    private function tableOccupancy(Shop $shop): array
     {
-        $tableCount = $cafe->tables()->count();
+        $tableCount = $shop->tables()->count();
 
-        $serving = Order::where('cafe_id', $cafe->id)
+        $serving = Order::where('shop_id', $shop->id)
             ->where('status', 'active')
             ->get(['table_id'])
             ->pluck('table_id')
@@ -237,17 +237,17 @@ class AiController extends Controller
      * trợ lý trả lời được "món nào bán chạy / ế", "tháng này so tháng trước", những
      * câu mà trước đây nó hoàn toàn không có dữ liệu để trả lời.
      */
-    private function cachedSalesContext(Cafe $cafe): string
+    private function cachedSalesContext(Shop $shop): string
     {
-        return Cache::remember("ai_cafe_sales_ctx_{$cafe->id}", now()->addMinutes(10), function () use ($cafe) {
-            $items = $cafe->items()->get(['name', 'base_price', 'is_available']);
+        return Cache::remember("ai_shop_sales_ctx_{$shop->id}", now()->addMinutes(10), function () use ($shop) {
+            $items = $shop->products()->get(['name', 'base_price', 'is_available']);
             $menu = $items->map(function ($it) {
                 $price = number_format((float) ($it->base_price ?? 0), 0, ',', '.');
                 $status = ($it->is_available ?? true) ? '' : ' (đang ẩn)';
                 return "- {$it->name}: {$price}đ{$status}";
             })->implode("\n");
 
-            $stats = $this->buildRevenueStats($cafe);
+            $stats = $this->buildRevenueStats($shop);
 
             $topItems = collect($stats['top_items'])->take(5)->map(function ($row, $i) {
                 $revenue = number_format((float) $row['revenue'], 0, ',', '.');
@@ -271,12 +271,12 @@ class AiController extends Controller
     }
 
     /** Gom số liệu doanh thu (chỉ hóa đơn đã thanh toán, loại hoàn tiền). */
-    private function buildRevenueStats(Cafe $cafe): array
+    private function buildRevenueStats(Shop $shop): array
     {
         // Tổng và số hóa đơn TOÀN THỜI GIAN tính bằng phép gộp ở CSDL — không cần
         // nạp document nào về PHP cho hai con số này.
-        $total = (int) $this->paidOrders($cafe)->sum('total_amount');
-        $invoiceCount = $this->paidOrders($cafe)->count();
+        $total = (int) $this->paidOrders($shop)->sum('total_amount');
+        $invoiceCount = $this->paidOrders($shop)->count();
 
         // Phần chi tiết (theo tháng / theo ngày / top món) chỉ cần 12 THÁNG gần đây:
         // kết quả trả về chỉ lấy 6 tháng và 30 ngày cuối. Nạp cả lịch sử kèm dòng món
@@ -286,7 +286,7 @@ class AiController extends Controller
         // nơi có một bản chép tay, và chỉ cần sửa cách tính ở một bên là hai màn hình
         // cùng nói về một quán mà ra hai con số.
         $since = Carbon::now()->subMonths(12)->startOfMonth();
-        $so = $this->revenueStats->forCafes([(string) $cafe->id], $since->format('Y-m-d'));
+        $so = $this->revenueStats->forShops([(string) $shop->id], $since->format('Y-m-d'));
 
         $byMonth = $so['by_month'];
         $byDay = $so['by_day'];
@@ -310,12 +310,12 @@ class AiController extends Controller
      * Doanh thu trong một khoảng, LỌC Ở CSDL.
      *
      * Hàm này chạy mỗi lần người dùng gửi một tin nhắn cho trợ lý AI (qua
-     * cafeContext), mà nó chỉ cần tổng tiền của ĐÚNG MỘT NGÀY. Trước đây nó lấy
+     * shopContext), mà nó chỉ cần tổng tiền của ĐÚNG MỘT NGÀY. Trước đây nó lấy
      * toàn bộ đơn đã thanh toán từ ngày khai trương về rồi lọc bằng PHP.
      */
-    private function sumPaid(Cafe $cafe, Carbon $from, Carbon $to): int
+    private function sumPaid(Shop $shop, Carbon $from, Carbon $to): int
     {
-        return (int) $this->paidOrders($cafe)
+        return (int) $this->paidOrders($shop)
             ->where(function ($q) use ($from, $to) {
                 $q->whereBetween('paid_at', [$from, $to])
                   // Đơn cũ có thể thiếu paid_at (trước khi trường này được ghi);
@@ -326,9 +326,9 @@ class AiController extends Controller
     }
 
     /** Truy vấn gốc cho mọi thống kê doanh thu: chỉ đơn đã thu tiền. */
-    private function paidOrders(Cafe $cafe)
+    private function paidOrders(Shop $shop)
     {
-        return Order::where('cafe_id', $cafe->id)
+        return Order::where('shop_id', $shop->id)
             ->where('status', 'paid')
             ->where('payment_status', 'paid');
     }

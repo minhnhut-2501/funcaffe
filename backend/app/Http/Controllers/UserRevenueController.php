@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Order;
 use App\Models\Subscription;
 use App\Services\RevenueStats;
@@ -27,25 +27,25 @@ class UserRevenueController extends Controller
     {
         $user = $request->user();
 
-        $cafes = Cafe::where('user_id', (string) $user->id)->get();
-        if ($cafes->isEmpty()) {
+        $shops = Shop::where('user_id', (string) $user->id)->get();
+        if ($shops->isEmpty()) {
             return response()->json([
                 'total' => 0,
                 'today' => 0,
                 'this_month' => 0,
                 'count' => 0,
                 'revenue_by_month' => [],
-                'cafes' => [],
+                'shops' => [],
             ]);
         }
 
-        $cafeIds = $cafes->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $shopIds = $shops->pluck('id')->map(fn ($id) => (string) $id)->all();
 
         // Gói active (còn hiệu lực) của từng quán -> hiện tên gói trên thẻ.
-        $activeSubs = Subscription::whereIn('cafe_id', $cafeIds)
+        $activeSubs = Subscription::whereIn('shop_id', $shopIds)
             ->effective()
             ->get()
-            ->keyBy(fn ($s) => (string) $s->cafe_id);
+            ->keyBy(fn ($s) => (string) $s->shop_id);
 
         // Doanh thu đọc thẳng từ order đã thanh toán (bỏ bảng invoices).
         //
@@ -53,18 +53,18 @@ class UserRevenueController extends Controller
         // document: chủ ba quán chạy hai năm là vài chục nghìn tài liệu đầy đủ nằm
         // trong RAM của PHP cho mỗi lần mở Bảng điều khiển, trong khi tất cả những gì
         // dùng tới chỉ là số tiền và ngày.
-        $invoices = Order::whereIn('cafe_id', $cafeIds)
+        $invoices = Order::whereIn('shop_id', $shopIds)
             ->where('status', 'paid')
             ->where('payment_status', 'paid')
-            ->get(['cafe_id', 'total_amount', 'paid_at', 'created_at']);
+            ->get(['shop_id', 'total_amount', 'paid_at', 'created_at']);
 
         $todayStr = Carbon::now()->format('Y-m-d');
         $thisMonthStr = Carbon::now()->format('Y-m');
 
         $byMonth = [];                 // gộp mọi quán, key 'Y-m'
-        $perCafe = [];                 // key cafe_id => ['total','today','month','count']
-        foreach ($cafeIds as $cid) {
-            $perCafe[$cid] = ['total' => 0, 'today' => 0, 'month' => 0, 'count' => 0];
+        $perShop = [];                 // key shop_id => ['total','today','month','count']
+        foreach ($shopIds as $cid) {
+            $perShop[$cid] = ['total' => 0, 'today' => 0, 'month' => 0, 'count' => 0];
         }
 
         $grandTotal = 0;
@@ -73,19 +73,19 @@ class UserRevenueController extends Controller
         $grandCount = 0;
 
         foreach ($invoices as $inv) {
-            $cid = (string) $inv->cafe_id;
+            $cid = (string) $inv->shop_id;
             $amount = (int) ($inv->total_amount ?? 0);
             $date = $this->toCarbon($inv->paid_at ?? $inv->created_at);
 
             $grandTotal += $amount;
             $grandCount += 1;
-            if (isset($perCafe[$cid])) {
-                $perCafe[$cid]['total'] += $amount;
+            if (isset($perShop[$cid])) {
+                $perShop[$cid]['total'] += $amount;
                 // SỐ hóa đơn, không chỉ số tiền. Trang Quản lý quán hiện "N hóa đơn"
                 // cạnh mỗi quán; thiếu số này thì trang buộc phải tự tải về toàn bộ
                 // hóa đơn chỉ để đếm — đúng lượt gọi nặng mà endpoint này sinh ra để
                 // thay thế.
-                $perCafe[$cid]['count'] += 1;
+                $perShop[$cid]['count'] += 1;
             }
 
             if ($date) {
@@ -94,14 +94,14 @@ class UserRevenueController extends Controller
 
                 if ($date->format('Y-m-d') === $todayStr) {
                     $grandToday += $amount;
-                    if (isset($perCafe[$cid])) {
-                        $perCafe[$cid]['today'] += $amount;
+                    if (isset($perShop[$cid])) {
+                        $perShop[$cid]['today'] += $amount;
                     }
                 }
                 if ($mKey === $thisMonthStr) {
                     $grandMonth += $amount;
-                    if (isset($perCafe[$cid])) {
-                        $perCafe[$cid]['month'] += $amount;
+                    if (isset($perShop[$cid])) {
+                        $perShop[$cid]['month'] += $amount;
                     }
                 }
             }
@@ -109,15 +109,15 @@ class UserRevenueController extends Controller
 
         ksort($byMonth);
 
-        $cafeRows = $cafes->map(function ($cafe) use ($perCafe, $activeSubs) {
-            $cid = (string) $cafe->id;
+        $shopRows = $shops->map(function ($shop) use ($perShop, $activeSubs) {
+            $cid = (string) $shop->id;
             $sub = $activeSubs->get($cid);
-            $stat = $perCafe[$cid] ?? ['total' => 0, 'today' => 0, 'month' => 0, 'count' => 0];
+            $stat = $perShop[$cid] ?? ['total' => 0, 'today' => 0, 'month' => 0, 'count' => 0];
 
             return [
-                'cafe_id' => $cid,
-                'cafe_name' => $cafe->name,
-                'status' => $cafe->status,
+                'shop_id' => $cid,
+                'shop_name' => $shop->name,
+                'status' => $shop->status,
                 'package_name' => $sub->package_name_snapshot ?? null,
                 'has_package' => $sub !== null,
                 'total' => $stat['total'],
@@ -133,7 +133,7 @@ class UserRevenueController extends Controller
             'this_month' => $grandMonth,
             'count' => $grandCount,
             'revenue_by_month' => array_slice($byMonth, -12, 12, true),
-            'cafes' => $cafeRows,
+            'shops' => $shopRows,
         ]);
     }
 
@@ -160,24 +160,24 @@ class UserRevenueController extends Controller
             'from'    => 'nullable|date_format:Y-m-d',
             'to'      => 'nullable|date_format:Y-m-d',
             // Vắng mặt = gộp mọi quán của chủ tài khoản.
-            'cafe_id' => 'nullable|string',
+            'shop_id' => 'nullable|string',
         ]);
 
-        $cafes = Cafe::where('user_id', (string) $user->id)->get();
+        $shops = Shop::where('user_id', (string) $user->id)->get();
 
-        if (!empty($validated['cafe_id'])) {
-            $chon = $cafes->first(fn ($c) => (string) $c->id === $validated['cafe_id']);
+        if (!empty($validated['shop_id'])) {
+            $chon = $shops->first(fn ($c) => (string) $c->id === $validated['shop_id']);
             // Quán không thuộc tài khoản này thì báo không tìm thấy, đừng lặng lẽ trả
             // về toàn số 0 — người đọc sẽ tưởng quán mình chưa bán được gì.
             if (!$chon) {
                 return response()->json(['message' => 'Không tìm thấy quán.'], 404);
             }
-            $cafes = collect([$chon]);
+            $shops = collect([$chon]);
         }
 
-        $tenQuan = $cafes->mapWithKeys(fn ($c) => [(string) $c->id => $c->name]);
+        $tenQuan = $shops->mapWithKeys(fn ($c) => [(string) $c->id => $c->name]);
 
-        $so = $stats->forCafes(
+        $so = $stats->forShops(
             $tenQuan->keys()->all(),
             $validated['from'] ?? null,
             $validated['to'] ?? null,
@@ -189,9 +189,9 @@ class UserRevenueController extends Controller
             'by_day'    => (object) $so['by_day'],
             'by_month'  => (object) $so['by_month'],
             'top_items' => $so['top_items'],
-            'cafes'     => collect($so['by_cafe'])->map(fn ($row, $cid) => [
-                'cafe_id'   => $cid,
-                'cafe_name' => $tenQuan[$cid] ?? '',
+            'shops'     => collect($so['by_shop'])->map(fn ($row, $cid) => [
+                'shop_id'   => $cid,
+                'shop_name' => $tenQuan[$cid] ?? '',
                 'total'     => $row['total'],
                 'count'     => $row['count'],
             ])->values(),

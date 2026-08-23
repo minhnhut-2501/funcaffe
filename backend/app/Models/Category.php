@@ -8,19 +8,19 @@ class Category extends Model
 {
     protected $connection = 'mongodb';
     protected $collection = 'categories';
-    protected $fillable = ['cafe_id', 'name', 'description', 'is_active'];
+    protected $fillable = ['shop_id', 'name', 'description', 'is_active'];
 
     protected $casts = [
         'is_active' => 'boolean',
     ];
 
-    public function cafe()
+    public function shop()
     {
-        return $this->belongsTo(Cafe::class);
+        return $this->belongsTo(Shop::class);
     }
 
-    public function items()
+    public function products()
     {
-        return $this->hasMany(Item::class);
+        return $this->hasMany(Product::class);
     }
 }

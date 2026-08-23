@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Category;
 use App\Models\Package;
 use App\Models\Subscription;
@@ -20,11 +20,11 @@ use Laravel\Sanctum\Sanctum;
 class PackageLimitTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'packages', 'subscriptions', 'categories', 'items', 'item_prices', 'tables',
+        'users', 'shops', 'packages', 'subscriptions', 'categories', 'products', 'product_sizes', 'tables',
     ];
 
     private User $user;
-    private Cafe $cafe;
+    private Shop $shop;
 
     protected function setUp(): void
     {
@@ -38,7 +38,7 @@ class PackageLimitTest extends MongoTestCase
             'status' => 'active',
         ]);
 
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán kiểm thử hạn mức', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán kiểm thử hạn mức', 'status' => 'open']);
 
         Sanctum::actingAs($this->user);
     }
@@ -61,7 +61,7 @@ class PackageLimitTest extends MongoTestCase
         ]);
 
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $package->id,
             'package_name_snapshot' => $package->name,
             'start_date' => now()->subMonth(),
@@ -76,18 +76,18 @@ class PackageLimitTest extends MongoTestCase
     private function createTables(int $count): void
     {
         for ($i = 1; $i <= $count; $i++) {
-            $this->cafe->tables()->create(['name' => "Bàn {$i}", 'capacity' => 4, 'status' => 'empty']);
+            $this->shop->tables()->create(['name' => "Bàn {$i}", 'capacity' => 4, 'status' => 'empty']);
         }
     }
 
-    private function createItems(int $count, int $hidden = 0): void
+    private function createProducts(int $count, int $hidden = 0): void
     {
         $category = Category::create([
-            'cafe_id' => (string) $this->cafe->id, 'name' => 'Cà phê', 'is_active' => true,
+            'shop_id' => (string) $this->shop->id, 'name' => 'Cà phê', 'is_active' => true,
         ]);
 
         for ($i = 1; $i <= $count; $i++) {
-            $this->cafe->items()->create([
+            $this->shop->products()->create([
                 'category_id' => (string) $category->id,
                 'name' => "Món {$i}",
                 'base_price' => 25_000,
@@ -98,18 +98,18 @@ class PackageLimitTest extends MongoTestCase
 
     private function postTable(string $name = 'Bàn thêm')
     {
-        return $this->postJson("/api/cafes/{$this->cafe->id}/tables", [
+        return $this->postJson("/api/shops/{$this->shop->id}/tables", [
             'name' => $name, 'capacity' => 4,
         ]);
     }
 
-    private function postItem(string $name = 'Món thêm')
+    private function postProduct(string $name = 'Món thêm')
     {
-        $category = Category::where('cafe_id', (string) $this->cafe->id)->first()
-            ?? Category::create(['cafe_id' => (string) $this->cafe->id, 'name' => 'Cà phê', 'is_active' => true]);
+        $category = Category::where('shop_id', (string) $this->shop->id)->first()
+            ?? Category::create(['shop_id' => (string) $this->shop->id, 'name' => 'Cà phê', 'is_active' => true]);
         $categoryId = (string) $category->id;
 
-        return $this->postJson("/api/cafes/{$this->cafe->id}/items", [
+        return $this->postJson("/api/shops/{$this->shop->id}/products", [
             'category_id' => $categoryId, 'name' => $name, 'base_price' => 30_000,
         ]);
     }
@@ -123,7 +123,7 @@ class PackageLimitTest extends MongoTestCase
             ->assertStatus(422)
             ->assertJsonPath('message', 'Gói Pro chỉ cho phép tối đa 10 bàn. Nâng cấp gói để dùng nhiều hơn.');
 
-        $this->assertSame(10, $this->cafe->tables()->count(), 'Bàn thứ 11 không được ghi vào CSDL.');
+        $this->assertSame(10, $this->shop->tables()->count(), 'Bàn thứ 11 không được ghi vào CSDL.');
     }
 
     public function test_goi_pro_cho_them_ban_khi_chua_cham_tran(): void
@@ -132,19 +132,19 @@ class PackageLimitTest extends MongoTestCase
         $this->createTables(9);
 
         $this->postTable()->assertStatus(201);
-        $this->assertSame(10, $this->cafe->tables()->count());
+        $this->assertSame(10, $this->shop->tables()->count());
     }
 
     public function test_goi_pro_chan_mon_vuot_han_muc(): void
     {
         $this->givePackage(maxTables: 10, maxItems: 15);
-        $this->createItems(15);
+        $this->createProducts(15);
 
-        $this->postItem()
+        $this->postProduct()
             ->assertStatus(422)
             ->assertJsonPath('message', 'Gói Pro chỉ cho phép tối đa 15 món. Nâng cấp gói để dùng nhiều hơn.');
 
-        $this->assertSame(15, $this->cafe->items()->count());
+        $this->assertSame(15, $this->shop->products()->count());
     }
 
     /**
@@ -155,19 +155,19 @@ class PackageLimitTest extends MongoTestCase
     public function test_mon_da_an_van_chiem_suat_trong_han_muc(): void
     {
         $this->givePackage(maxTables: 10, maxItems: 15);
-        $this->createItems(15, hidden: 5);
+        $this->createProducts(15, hidden: 5);
 
-        $this->postItem()->assertStatus(422);
+        $this->postProduct()->assertStatus(422);
     }
 
     public function test_goi_pro_max_khong_gioi_han_ban_va_mon(): void
     {
         $this->givePackage(maxTables: null, maxItems: null);
         $this->createTables(30);
-        $this->createItems(40);
+        $this->createProducts(40);
 
         $this->postTable()->assertStatus(201);
-        $this->postItem()->assertStatus(201);
+        $this->postProduct()->assertStatus(201);
     }
 
     /**
@@ -182,12 +182,12 @@ class PackageLimitTest extends MongoTestCase
             ->assertStatus(403)
             ->assertJsonPath('message', 'Quán này cần kích hoạt gói dịch vụ để sử dụng chức năng này.');
 
-        $this->getJson("/api/cafes/{$this->cafe->id}/tables")->assertStatus(200);
+        $this->getJson("/api/shops/{$this->shop->id}/tables")->assertStatus(200);
     }
 
     public function test_quan_khong_co_goi_khong_ghi_duoc_gi(): void
     {
         $this->postTable()->assertStatus(403);
-        $this->postItem()->assertStatus(403);
+        $this->postProduct()->assertStatus(403);
     }
 }

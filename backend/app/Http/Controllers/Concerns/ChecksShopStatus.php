@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 /**
@@ -19,12 +19,12 @@ use Illuminate\Http\Exceptions\HttpResponseException;
  * nếu không thì tiền của khách đang ngồi bị nhốt lại trong một cái bàn không ai chốt
  * được, và đó là cách chắc chắn nhất để mất số liệu.
  */
-trait ChecksCafeStatus
+trait ChecksShopStatus
 {
     /** Mở đơn MỚI: chỉ khi quán đang mở cửa. */
-    protected function guardBanHang(Cafe $cafe): void
+    protected function guardBanHang(Shop $shop): void
     {
-        $trangThai = $cafe->status ?? 'open';
+        $trangThai = $shop->status ?? 'open';
 
         if ($trangThai === 'open') {
             return;
@@ -38,9 +38,9 @@ trait ChecksCafeStatus
     }
 
     /** Sửa thực đơn, bàn, danh mục: chặn khi quán đã ngừng hoạt động hẳn. */
-    protected function guardSuaDoi(Cafe $cafe): void
+    protected function guardSuaDoi(Shop $shop): void
     {
-        if (($cafe->status ?? 'open') !== 'inactive') {
+        if (($shop->status ?? 'open') !== 'inactive') {
             return;
         }
 

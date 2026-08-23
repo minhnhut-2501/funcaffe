@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Package;
 use App\Models\TimeSubscription;
 use App\Models\User;
@@ -22,7 +22,7 @@ use Laravel\Sanctum\Sanctum;
  */
 class PublicEdgeCacheTest extends MongoTestCase
 {
-    protected array $collections = ['users', 'cafes', 'packages', 'time_subscriptions'];
+    protected array $collections = ['users', 'shops', 'packages', 'time_subscriptions'];
 
     private function taoGoi(): Package
     {
@@ -117,7 +117,7 @@ class PublicEdgeCacheTest extends MongoTestCase
             'role' => 'user',
             'is_active' => true,
         ]);
-        Cafe::create([
+        Shop::create([
             'user_id' => (string) $user->id,
             'name' => 'Quan Goc Nho',
             'address' => '1 Le Loi',
@@ -126,7 +126,7 @@ class PublicEdgeCacheTest extends MongoTestCase
 
         Sanctum::actingAs($user);
 
-        $res = $this->getJson('/api/cafes', ['Origin' => 'https://funcafe.pro']);
+        $res = $this->getJson('/api/shops', ['Origin' => 'https://funcafe.pro']);
 
         $res->assertOk();
         $this->assertNotSame('*', $res->headers->get('Access-Control-Allow-Origin'));

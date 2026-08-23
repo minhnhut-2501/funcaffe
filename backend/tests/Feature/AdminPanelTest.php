@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\ContactMessage;
 use App\Models\Package;
 use App\Models\PackagePayment;
@@ -32,13 +32,13 @@ class AdminPanelTest extends MongoTestCase
     use RefreshDatabase;
 
     protected array $collections = [
-        'users', 'cafes', 'packages', 'time_subscriptions', 'subscriptions',
+        'users', 'shops', 'packages', 'time_subscriptions', 'subscriptions',
         'package_payments', 'reviews', 'contact_messages',
     ];
 
     private User $admin;
     private User $chuQuan;
-    private Cafe $quan;
+    private Shop $quan;
     private Package $goi;
     private TimeSubscription $moc;
 
@@ -54,7 +54,7 @@ class AdminPanelTest extends MongoTestCase
             'full_name' => 'Chủ quán', 'email' => 'cq-' . uniqid() . '@funcafe.test',
             'password' => Hash::make('Password@123'), 'role' => 'user', 'status' => 'active',
         ]);
-        $this->quan = $this->chuQuan->cafes()->create(['name' => 'Quán A', 'status' => 'open']);
+        $this->quan = $this->chuQuan->shops()->create(['name' => 'Quán A', 'status' => 'open']);
 
         $this->goi = Package::create([
             'name' => 'Pro', 'type' => 'pro', 'level' => 1, 'status' => 'active',
@@ -92,7 +92,7 @@ class AdminPanelTest extends MongoTestCase
     public function test_chu_quan_khong_vao_duoc_bat_ky_duong_quan_tri_nao(): void
     {
         $danhGia = Review::create([
-            'user_id' => (string) $this->chuQuan->id, 'cafe_id' => (string) $this->quan->id,
+            'user_id' => (string) $this->chuQuan->id, 'shop_id' => (string) $this->quan->id,
             'rating' => 5, 'title' => 'Tốt', 'comment' => 'Rất tốt', 'status' => 'visible',
         ]);
         $tinNhan = ContactMessage::create([
@@ -133,7 +133,7 @@ class AdminPanelTest extends MongoTestCase
     {
         $this->laAdmin();
 
-        $this->getJson('/api/cafes')->assertStatus(200)->assertJsonCount(0);
+        $this->getJson('/api/shops')->assertStatus(200)->assertJsonCount(0);
     }
 
     // ===== 7.2 Người dùng ======================================================
@@ -183,7 +183,7 @@ class AdminPanelTest extends MongoTestCase
     public function test_sua_han_muc_goi_co_hieu_luc_ngay_voi_nguoi_dang_dung(): void
     {
         Subscription::create([
-            'cafe_id' => (string) $this->quan->id,
+            'shop_id' => (string) $this->quan->id,
             'package_id' => (string) $this->goi->id,
             'package_name_snapshot' => 'Pro',
             'start_date' => now()->subDay(), 'end_date' => now()->addMonth(),
@@ -194,7 +194,7 @@ class AdminPanelTest extends MongoTestCase
         $this->putJson("/api/admin/packages/{$this->goi->id}", ['max_tables' => 99])->assertStatus(200);
 
         $this->laChuQuan();
-        $goiCuaQuan = $this->getJson("/api/cafes/{$this->quan->id}/subscriptions")->json();
+        $goiCuaQuan = $this->getJson("/api/shops/{$this->quan->id}/subscriptions")->json();
 
         $this->assertSame(99, (int) $goiCuaQuan[0]['package']['max_tables'],
             'Hạn mức mới chưa tới được quán đang dùng gói đó.');
@@ -424,13 +424,13 @@ class AdminPanelTest extends MongoTestCase
     public function test_an_hien_danh_gia_phan_anh_ngay_ra_trang_cong_khai(): void
     {
         Subscription::create([
-            'cafe_id' => (string) $this->quan->id, 'package_id' => (string) $this->goi->id,
+            'shop_id' => (string) $this->quan->id, 'package_id' => (string) $this->goi->id,
             'package_name_snapshot' => 'Pro',
             'start_date' => now()->subDay(), 'end_date' => now()->addMonth(),
             'total_amount' => 600_000, 'status' => 'active',
         ]);
         $dg = Review::create([
-            'user_id' => (string) $this->chuQuan->id, 'cafe_id' => (string) $this->quan->id,
+            'user_id' => (string) $this->chuQuan->id, 'shop_id' => (string) $this->quan->id,
             'rating' => 5, 'title' => 'Tốt', 'comment' => 'Rất tốt', 'status' => 'visible',
         ]);
 
@@ -448,7 +448,7 @@ class AdminPanelTest extends MongoTestCase
     public function test_danh_sach_danh_gia_cua_admin_khong_kem_mat_khau(): void
     {
         Review::create([
-            'user_id' => (string) $this->chuQuan->id, 'cafe_id' => (string) $this->quan->id,
+            'user_id' => (string) $this->chuQuan->id, 'shop_id' => (string) $this->quan->id,
             'rating' => 4, 'title' => 'Khá', 'comment' => 'Dùng được', 'status' => 'visible',
         ]);
 
@@ -676,7 +676,7 @@ class AdminPanelTest extends MongoTestCase
     private function taoGiaoDich(string $trangThai, string $cach = 'vnpay'): PackagePayment
     {
         $sub = Subscription::create([
-            'cafe_id' => (string) $this->quan->id,
+            'shop_id' => (string) $this->quan->id,
             'package_id' => (string) $this->goi->id,
             'time_subscription_id' => (string) $this->moc->id,
             'package_name_snapshot' => 'Pro',
@@ -686,7 +686,7 @@ class AdminPanelTest extends MongoTestCase
 
         return $sub->packagePayments()->create([
             'user_id' => (string) $this->chuQuan->id,
-            'cafe_id' => (string) $this->quan->id,
+            'shop_id' => (string) $this->quan->id,
             'package_id' => (string) $this->goi->id,
             'time_subscription_id' => (string) $this->moc->id,
             'subtotal' => 545_455, 'vat_rate' => 10, 'vat_amount' => 54_545,

@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 /**
  * Gộp các đánh giá trùng của cùng một tài khoản.
  *
- * Trước đây khóa duy nhất của đánh giá là cặp (user_id + cafe_id), nên chủ quán
+ * Trước đây khóa duy nhất của đánh giá là cặp (user_id + shop_id), nên chủ quán
  * có 3 quán viết được 3 đánh giá và cả 3 cùng lên trang chủ. Nay khóa là user_id
  * (xem ReviewController@store), nhưng dữ liệu cũ đã dính rồi — lệnh này dọn.
  *

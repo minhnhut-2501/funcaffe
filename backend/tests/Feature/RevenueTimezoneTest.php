@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Order;
 use App\Models\User;
 use Carbon\Carbon;
@@ -27,10 +27,10 @@ use Laravel\Sanctum\Sanctum;
  */
 class RevenueTimezoneTest extends MongoTestCase
 {
-    protected array $collections = ['users', 'cafes', 'orders', 'subscriptions', 'packages'];
+    protected array $collections = ['users', 'shops', 'orders', 'subscriptions', 'packages'];
 
     private User $user;
-    private Cafe $cafe;
+    private Shop $shop;
 
     protected function setUp(): void
     {
@@ -43,7 +43,7 @@ class RevenueTimezoneTest extends MongoTestCase
             'role' => 'user',
             'status' => 'active',
         ]);
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán múi giờ', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán múi giờ', 'status' => 'open']);
 
         Sanctum::actingAs($this->user);
     }
@@ -58,7 +58,7 @@ class RevenueTimezoneTest extends MongoTestCase
     private function donDaThu(string $utc, int $tien): void
     {
         Order::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'code' => 'DH-' . uniqid(),
             'invoice_code' => 'HD-' . uniqid(),
             'status' => 'paid',

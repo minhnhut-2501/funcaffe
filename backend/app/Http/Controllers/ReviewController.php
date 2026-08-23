@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Review;
-use App\Http\Controllers\Concerns\ChecksCafeOwnership;
+use App\Http\Controllers\Concerns\ChecksShopAccess;
 use Illuminate\Http\Request;
 
 class ReviewController extends Controller
 {
-    use ChecksCafeOwnership;
+    use ChecksShopAccess;
 
     public function __construct()
     {
@@ -23,13 +23,13 @@ class ReviewController extends Controller
         // nằm nguyên chỗ cũ, và khi đã quá 12 đánh giá thì bản vừa sửa còn không lọt vào
         // danh sách — đúng cái cảm giác "sửa xong mà không thấy gì đổi".
         $reviews = Review::where('status', 'visible')
-            ->with('user', 'cafe', 'package')
+            ->with('user', 'shop', 'package')
             ->orderBy('updated_at', 'desc')
             ->limit(12)
             ->get()
             ->map(function ($review) {
                 // SECURITY: chỉ trả field cần cho hiển thị public — TUYỆT ĐỐI không
-                // nhúng nguyên object user/cafe (lộ email, phone, reset_token...).
+                // nhúng nguyên object user/shop (lộ email, phone, reset_token...).
                 return [
                     'id'           => (string) $review->_id,
                     'rating'       => $review->rating,
@@ -41,7 +41,7 @@ class ReviewController extends Controller
                     // này công khai kèm tên và tên quán, nên avatar cùng mức công khai.
                     // Chưa tải ảnh -> null, frontend rơi về avatar chữ cái.
                     'avatar'       => $review->user?->avatar ?: null,
-                    'cafe_name'    => $review->cafe?->name ?? '',
+                    'shop_name'    => $review->shop?->name ?? '',
                     'package_name' => $review->package?->name ?? '',
                 ];
             });
@@ -52,7 +52,7 @@ class ReviewController extends Controller
     /**
      * GET reviews/mine — đánh giá của chính người đang đăng nhập.
      *
-     * Không nhận cafe: mỗi tài khoản chỉ có MỘT đánh giá về FunCafe, nên frontend
+     * Không nhận shop: mỗi tài khoản chỉ có MỘT đánh giá về FunCafe, nên frontend
      * không được phép hỏi "đánh giá của tôi ở quán này" — hỏi vậy thì đổi sang quán
      * chưa từng đánh giá sẽ tưởng là chưa viết bao giờ.
      * Trả về null (không phải 404) khi chưa có: "chưa viết" là trạng thái bình thường.
@@ -75,11 +75,11 @@ class ReviewController extends Controller
         return response()->json($data);
     }
 
-    public function index(Cafe $cafe)
+    public function index(Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        $reviews = Review::where('cafe_id', $cafe->id)
+        $reviews = Review::where('shop_id', $shop->id)
             ->with('user', 'package')
             ->orderBy('created_at', 'desc')
             ->get()
@@ -95,9 +95,9 @@ class ReviewController extends Controller
         return response()->json($reviews);
     }
 
-    public function store(Request $request, Cafe $cafe)
+    public function store(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
         // Tiêu đề và nội dung BẮT BUỘC. Đánh giá chỉ có số sao trần trụi không nói được
         // gì với người đang cân nhắc dùng FunCafe, mà băng đánh giá ở trang chủ lại chỉ
@@ -120,15 +120,15 @@ class ReviewController extends Controller
 
         $user = $request->user();
         // ĐA QUÁN: snapshot gói lấy theo gói active CỦA QUÁN đang đánh giá.
-        $package = \App\Models\Subscription::where('cafe_id', (string) $cafe->id)
+        $package = \App\Models\Subscription::where('shop_id', (string) $shop->id)
             ->where('status', 'active')
             ->first();
 
         // UPSERT theo NGƯỜI DÙNG, không theo cặp (người dùng + quán). Đây là đánh giá
         // về PHẦN MỀM FunCafe chứ không phải về từng quán, nên một chủ quán có 3 quán
-        // vẫn chỉ có một tiếng nói. Trước đây truy vấn này lọc thêm cafe_id nên ai có
+        // vẫn chỉ có một tiếng nói. Trước đây truy vấn này lọc thêm shop_id nên ai có
         // 3 quán viết được 3 đánh giá, và cả 3 cùng lên trang chủ.
-        // cafe_id vẫn được GHI lại làm ngữ cảnh (đánh giá viết khi đang đứng ở quán nào).
+        // shop_id vẫn được GHI lại làm ngữ cảnh (đánh giá viết khi đang đứng ở quán nào).
         $existing = Review::where('user_id', (string) $user->id)->first();
 
         if ($existing) {
@@ -155,9 +155,9 @@ class ReviewController extends Controller
             }
 
             $existing->update(array_merge($validated, [
-                // Cập nhật cả cafe_id: ngữ cảnh phải là quán mà chủ quán đang đứng lúc
+                // Cập nhật cả shop_id: ngữ cảnh phải là quán mà chủ quán đang đứng lúc
                 // sửa, nếu không trang chủ vẫn ghi tên quán đầu tiên họ từng dùng.
-                'cafe_id'    => (string) $cafe->id,
+                'shop_id'    => (string) $shop->id,
                 'package_id' => $package ? (string) $package->package_id : $existing->package_id,
                 'history'    => $history,
             ]));
@@ -166,7 +166,7 @@ class ReviewController extends Controller
         } else {
             $review = Review::create(array_merge($validated, [
                 'user_id' => (string) $user->id,
-                'cafe_id' => (string) $cafe->id,
+                'shop_id' => (string) $shop->id,
                 'package_id' => $package ? (string) $package->package_id : null,
                 'status' => 'visible',
             ]));

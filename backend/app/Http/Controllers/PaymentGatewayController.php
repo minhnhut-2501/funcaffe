@@ -61,7 +61,7 @@ class PaymentGatewayController extends Controller
             'transaction_code' => $payment->transaction_code,
             'gateway_txn_no'   => $payment->gateway_txn_no,
             'payment_status'   => $payment->fresh()?->payment_status,
-            'cafe_id'          => (string) $payment->cafe_id,
+            'shop_id'          => (string) $payment->shop_id,
             'amount'           => $payment->amount,
         ]);
     }

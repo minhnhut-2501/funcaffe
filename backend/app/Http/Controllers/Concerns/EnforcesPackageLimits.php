@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Package;
 use App\Models\Subscription;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -21,12 +21,12 @@ trait EnforcesPackageLimits
      * Gói đang hiệu lực của chủ quán, lấy theo subscription active mới nhất.
      * Trả null khi user chưa có gói (việc chặn do tầng khác lo: canEdit / LockedButton).
      */
-    protected function effectivePackage(Cafe $cafe): ?Package
+    protected function effectivePackage(Shop $shop): ?Package
     {
         // B5: dùng scope effective() (active + còn hạn) — trước đây chỉ lọc status
         // nên gói đã quá end_date vẫn được tính là còn gói.
-        // ĐA QUÁN: gói tính theo CHÍNH QUÁN (cafe_id), không theo chủ quán.
-        $sub = Subscription::where('cafe_id', (string) $cafe->id)
+        // ĐA QUÁN: gói tính theo CHÍNH QUÁN (shop_id), không theo chủ quán.
+        $sub = Subscription::where('shop_id', (string) $shop->id)
             ->effective()
             ->latest()
             ->first();
@@ -40,11 +40,11 @@ trait EnforcesPackageLimits
 
     /**
      * Ném lỗi 422 khi thao tác tạo mới vượt giới hạn của gói.
-     * $resource: 'tables' | 'items'.
+     * $resource: 'tables' | 'products'.
      */
-    protected function enforcePackageLimit(Cafe $cafe, string $resource, int $currentCount): void
+    protected function enforcePackageLimit(Shop $shop, string $resource, int $currentCount): void
     {
-        $pkg = $this->effectivePackage($cafe);
+        $pkg = $this->effectivePackage($shop);
 
         if (!$pkg) {
             return; // chưa có gói active — không thuộc phạm vi giới hạn số lượng

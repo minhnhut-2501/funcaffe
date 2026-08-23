@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\PackagePayment;
 use App\Models\Subscription;
 use App\Models\TimeSubscription;
@@ -99,9 +99,9 @@ class SubscriptionActivator
             if ($payment->action_type === 'new') {
                 $pkg = $sub->package;
                 if ($pkg && $pkg->is_trial) {
-                    $cafe = Cafe::find($payment->cafe_id ?? $sub->cafe_id);
-                    if ($cafe) {
-                        $cafe->update(['has_used_free_trial' => true]);
+                    $shop = Shop::find($payment->shop_id ?? $sub->shop_id);
+                    if ($shop) {
+                        $shop->update(['has_used_free_trial' => true]);
                     }
                     $user = User::find($payment->user_id);
                     if ($user) {

@@ -2,9 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CafeController;
+use App\Http\Controllers\ShopController;
 use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\ItemController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ToppingController;
 use App\Http\Controllers\TableController;
 use App\Http\Controllers\OrderController;
@@ -54,10 +54,10 @@ Route::post('/contact', [ContactController::class, 'store'])->middleware('thrott
 
 // Trợ lý TƯ VẤN (public) — hộp chat ở trang giới thiệu, hỏi được khi CHƯA đăng nhập.
 //
-// KHÔNG gắn middleware 'ai' và cũng KHÔNG mang {cafe}: đây là tuyến tư vấn bán hàng,
+// KHÔNG gắn middleware 'ai' và cũng KHÔNG mang {shop}: đây là tuyến tư vấn bán hàng,
 // ngữ cảnh chỉ có bảng gói và thông tin sản phẩm (ConsultKnowledgeService) — không
 // một truy vấn nào chạm vào doanh thu, bàn hay thực đơn của quán nào. Hỏi số liệu
-// quán thì phải đi tuyến cafes/{cafe}/ai/* bên dưới, và tuyến đó vẫn chặn ở Pro Max.
+// quán thì phải đi tuyến shops/{shop}/ai/* bên dưới, và tuyến đó vẫn chặn ở Pro Max.
 //
 // Trần 'ai-tu-van' (AppServiceProvider) chặt hơn hẳn trần chung: mỗi lượt gọi ở đây
 // đốt hạn ngạch Gemini bậc miễn phí, mà hạn ngạch đó dùng chung với trợ lý của chủ
@@ -67,69 +67,69 @@ Route::middleware('throttle:ai-tu-van')->group(function () {
     Route::post('/ai/consult/stream', [AiConsultController::class, 'chatStream']);
 });
 
-// Cafe (user's own)
+// Shop (user's own)
 // KHÔNG có route xóa quán: xóa một quán sẽ bỏ rơi toàn bộ bàn, thực đơn, hóa đơn
 // và gói đã mua của quán đó (Mongo không cascade). Chủ quán chỉ đổi
-// cafes.status: open (đang mở cửa) / closed (đã đóng cửa) / inactive (ngừng hoạt động).
-Route::apiResource('cafes', CafeController::class)->except('destroy')->middleware('auth:sanctum');
+// shops.status: open (đang mở cửa) / closed (đã đóng cửa) / inactive (ngừng hoạt động).
+Route::apiResource('shops', ShopController::class)->except('destroy')->middleware('auth:sanctum');
 
-// Cafe-scoped resources (read allowed without subscription, write requires subscription)
+// Shop-scoped resources (read allowed without subscription, write requires subscription)
 Route::middleware('auth:sanctum')->group(function () {
     // Categories - CRUD
-    Route::get('cafes/{cafe}/categories', [CategoryController::class, 'index']);
-    Route::post('cafes/{cafe}/categories', [CategoryController::class, 'store'])->middleware('subscription');
-    Route::put('cafes/{cafe}/categories/{category}', [CategoryController::class, 'update'])->middleware('subscription');
+    Route::get('shops/{shop}/categories', [CategoryController::class, 'index']);
+    Route::post('shops/{shop}/categories', [CategoryController::class, 'store'])->middleware('subscription');
+    Route::put('shops/{shop}/categories/{category}', [CategoryController::class, 'update'])->middleware('subscription');
     // KHÔNG có route xóa danh mục: xóa sẽ bỏ rơi các món bên trong (mồ côi
     // danh mục) — chủ quán chỉ ẨN danh mục (is_active = false).
 
     // Items - CRUD
-    Route::get('cafes/{cafe}/items', [ItemController::class, 'index']);
-    Route::post('cafes/{cafe}/items', [ItemController::class, 'store'])->middleware('subscription');
-    Route::put('cafes/{cafe}/items/{item}', [ItemController::class, 'update'])->middleware('subscription');
+    Route::get('shops/{shop}/products', [ProductController::class, 'index']);
+    Route::post('shops/{shop}/products', [ProductController::class, 'store'])->middleware('subscription');
+    Route::put('shops/{shop}/products/{product}', [ProductController::class, 'update'])->middleware('subscription');
     // KHÔNG có route xóa món: món đã bán nằm trong order/hóa đơn cũ,
     // chủ quán chỉ được ẨN món (is_available = false) thay vì xóa.
     // KHÔNG có route cấu hình topping riêng cho món: topping đi kèm trường
     // `topping_ids` ngay trong body của store/update món.
 
     // Toppings - CRUD
-    Route::get('cafes/{cafe}/toppings', [ToppingController::class, 'index']);
-    Route::post('cafes/{cafe}/toppings', [ToppingController::class, 'store'])->middleware('subscription');
-    Route::put('cafes/{cafe}/toppings/{topping}', [ToppingController::class, 'update'])->middleware('subscription');
+    Route::get('shops/{shop}/toppings', [ToppingController::class, 'index']);
+    Route::post('shops/{shop}/toppings', [ToppingController::class, 'store'])->middleware('subscription');
+    Route::put('shops/{shop}/toppings/{topping}', [ToppingController::class, 'update'])->middleware('subscription');
     // KHÔNG có route xóa topping: topping từng bán nằm trong hóa đơn cũ và
     // cấu hình gắn món — chủ quán chỉ ẨN topping (is_available = false).
 
     // Tables - CRUD
-    Route::get('cafes/{cafe}/tables', [TableController::class, 'index']);
-    Route::post('cafes/{cafe}/tables', [TableController::class, 'store'])->middleware('subscription');
-    Route::put('cafes/{cafe}/tables/{table}', [TableController::class, 'update'])->middleware('subscription');
-    Route::delete('cafes/{cafe}/tables/{table}', [TableController::class, 'destroy'])->middleware('subscription');
+    Route::get('shops/{shop}/tables', [TableController::class, 'index']);
+    Route::post('shops/{shop}/tables', [TableController::class, 'store'])->middleware('subscription');
+    Route::put('shops/{shop}/tables/{table}', [TableController::class, 'update'])->middleware('subscription');
+    Route::delete('shops/{shop}/tables/{table}', [TableController::class, 'destroy'])->middleware('subscription');
 
     // Orders - create/pay requires subscription
-    Route::get('cafes/{cafe}/orders', [OrderController::class, 'index']);
-    Route::post('cafes/{cafe}/orders', [OrderController::class, 'store'])->middleware('subscription');
-    Route::get('cafes/{cafe}/orders/{order}', [OrderController::class, 'show']);
-    Route::put('cafes/{cafe}/orders/{order}', [OrderController::class, 'update'])->middleware('subscription');
-    Route::post('cafes/{cafe}/orders/{order}/pay', [OrderController::class, 'pay'])->middleware('subscription');
-    Route::post('cafes/{cafe}/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('subscription');
+    Route::get('shops/{shop}/orders', [OrderController::class, 'index']);
+    Route::post('shops/{shop}/orders', [OrderController::class, 'store'])->middleware('subscription');
+    Route::get('shops/{shop}/orders/{order}', [OrderController::class, 'show']);
+    Route::put('shops/{shop}/orders/{order}', [OrderController::class, 'update'])->middleware('subscription');
+    Route::post('shops/{shop}/orders/{order}/pay', [OrderController::class, 'pay'])->middleware('subscription');
+    Route::post('shops/{shop}/orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('subscription');
 
     // Reviews
     // Đánh giá là về PHẦN MỀM, mỗi tài khoản một cái — nên route đọc "của tôi" KHÔNG
-    // đi qua {cafe}. Frontend hỏi theo quán thì đổi sang quán chưa đánh giá sẽ tưởng
+    // đi qua {shop}. Frontend hỏi theo quán thì đổi sang quán chưa đánh giá sẽ tưởng
     // là chưa từng viết và mời viết lại.
     Route::get('reviews/mine', [ReviewController::class, 'mine']);
-    Route::get('cafes/{cafe}/reviews', [ReviewController::class, 'index']);
-    Route::post('cafes/{cafe}/reviews', [ReviewController::class, 'store'])->middleware('subscription');
+    Route::get('shops/{shop}/reviews', [ReviewController::class, 'index']);
+    Route::post('shops/{shop}/reviews', [ReviewController::class, 'store'])->middleware('subscription');
 
     // Trợ lý AI (chỉ gói bật can_use_ai — middleware 'ai'; throttle chống đốt credit)
-    Route::post('cafes/{cafe}/ai/chat', [AiController::class, 'chat'])
+    Route::post('shops/{shop}/ai/chat', [AiController::class, 'chat'])
         ->middleware(['ai', 'throttle:20,1']);
-    Route::post('cafes/{cafe}/ai/chat/stream', [AiController::class, 'chatStream'])
+    Route::post('shops/{shop}/ai/chat/stream', [AiController::class, 'chatStream'])
         ->middleware(['ai', 'throttle:20,1']);
-    Route::post('cafes/{cafe}/ai/revenue-analysis', [AiController::class, 'revenueAnalysis'])
+    Route::post('shops/{shop}/ai/revenue-analysis', [AiController::class, 'revenueAnalysis'])
         ->middleware(['ai', 'throttle:10,1']);
     // Câu gợi ý mở đầu cho chat — chỉ đếm dữ liệu của quán, KHÔNG gọi Gemini,
     // nên throttle rộng tay hơn các endpoint đốt credit ở trên.
-    Route::get('cafes/{cafe}/ai/suggestions', [AiController::class, 'suggestions'])
+    Route::get('shops/{shop}/ai/suggestions', [AiController::class, 'suggestions'])
         ->middleware(['ai', 'throttle:60,1']);
 });
 
@@ -144,14 +144,14 @@ Route::get('payments/vnpay/ipn', [\App\Http\Controllers\PaymentGatewayController
 Route::get('payments/momo/return', [\App\Http\Controllers\PaymentGatewayController::class, 'momoReturn']);
 Route::post('payments/momo/ipn', [\App\Http\Controllers\PaymentGatewayController::class, 'momoIpn']);
 
-// Subscriptions — ĐA QUÁN: gói/thanh toán độc lập theo từng quán (cafes/{cafe}/...)
+// Subscriptions — ĐA QUÁN: gói/thanh toán độc lập theo từng quán (shops/{shop}/...)
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('cafes/{cafe}/subscriptions', [SubscriptionController::class, 'index']);
-    Route::get('cafes/{cafe}/subscriptions/active', [SubscriptionController::class, 'active']);
-    Route::get('cafes/{cafe}/subscriptions/payments', [SubscriptionController::class, 'payments']);
+    Route::get('shops/{shop}/subscriptions', [SubscriptionController::class, 'index']);
+    Route::get('shops/{shop}/subscriptions/active', [SubscriptionController::class, 'active']);
+    Route::get('shops/{shop}/subscriptions/payments', [SubscriptionController::class, 'payments']);
     // Xem trước số phải trả (gồm phần cấn trừ khi nâng cấp) — chỉ đọc, không tạo giao dịch.
-    Route::get('cafes/{cafe}/subscriptions/preview', [SubscriptionController::class, 'preview']);
-    Route::post('cafes/{cafe}/subscriptions', [SubscriptionController::class, 'store']);
+    Route::get('shops/{shop}/subscriptions/preview', [SubscriptionController::class, 'preview']);
+    Route::post('shops/{shop}/subscriptions', [SubscriptionController::class, 'store']);
 
     // Tổng doanh thu gộp tất cả quán của user (không theo quán cụ thể)
     Route::get('revenue/overview', [\App\Http\Controllers\UserRevenueController::class, 'overview']);

@@ -2,33 +2,33 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cafe;
-use App\Models\CafeTable;
-use App\Http\Controllers\Concerns\ChecksCafeOwnership;
-use App\Http\Controllers\Concerns\ChecksCafeStatus;
+use App\Models\Shop;
+use App\Models\ShopTable;
+use App\Http\Controllers\Concerns\ChecksShopAccess;
+use App\Http\Controllers\Concerns\ChecksShopStatus;
 use App\Http\Controllers\Concerns\EnforcesPackageLimits;
 use Illuminate\Http\Request;
 
 class TableController extends Controller
 {
-    use ChecksCafeOwnership, EnforcesPackageLimits, ChecksCafeStatus;
+    use ChecksShopAccess, EnforcesPackageLimits, ChecksShopStatus;
 
     public function __construct()
     {
         $this->middleware('auth:sanctum');
     }
 
-    public function index(Request $request, Cafe $cafe)
+    public function index(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
-        return response()->json($cafe->tables);
+        $this->authorizeShop($shop);
+        return response()->json($shop->tables);
     }
 
-    public function store(Request $request, Cafe $cafe)
+    public function store(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
-        $this->guardSuaDoi($cafe);
-        $this->enforcePackageLimit($cafe, 'tables', $cafe->tables()->count());
+        $this->authorizeShop($shop);
+        $this->guardSuaDoi($shop);
+        $this->enforcePackageLimit($shop, 'tables', $shop->tables()->count());
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -37,23 +37,23 @@ class TableController extends Controller
             'display_order' => 'nullable|integer|min:0',
         ]);
 
-        if ($this->trungTen($cafe, $validated['name'])) {
+        if ($this->trungTen($shop, $validated['name'])) {
             return response()->json([
                 'message' => 'Quán đã có bàn tên "' . trim($validated['name']) . '".',
                 'errors'  => ['name' => ['Tên bàn bị trùng với một bàn đang có.']],
             ], 422);
         }
 
-        $table = $cafe->tables()->create($validated);
+        $table = $shop->tables()->create($validated);
         return response()->json($table, 201);
     }
 
-    public function update(Request $request, Cafe $cafe, CafeTable $table)
+    public function update(Request $request, Shop $shop, ShopTable $table)
     {
-        $this->authorizeCafe($cafe);
-        $this->guardSuaDoi($cafe);
+        $this->authorizeShop($shop);
+        $this->guardSuaDoi($shop);
 
-        if ((string) $table->cafe_id !== (string) $cafe->id) {
+        if ((string) $table->shop_id !== (string) $shop->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
@@ -64,7 +64,7 @@ class TableController extends Controller
             'display_order' => 'nullable|integer|min:0',
         ]);
 
-        if (isset($validated['name']) && $this->trungTen($cafe, $validated['name'], (string) $table->id)) {
+        if (isset($validated['name']) && $this->trungTen($shop, $validated['name'], (string) $table->id)) {
             return response()->json([
                 'message' => 'Quán đã có bàn tên "' . trim($validated['name']) . '".',
                 'errors'  => ['name' => ['Tên bàn bị trùng với một bàn đang có.']],
@@ -81,26 +81,26 @@ class TableController extends Controller
      * bên cạnh. So sánh sau khi bỏ khoảng trắng thừa và bỏ phân biệt hoa thường —
      * "bàn 5" với "Bàn 5 " là cùng một cái bàn dưới mắt người dùng.
      */
-    private function trungTen(Cafe $cafe, string $ten, ?string $boQuaId = null): bool
+    private function trungTen(Shop $shop, string $ten, ?string $boQuaId = null): bool
     {
         $chuan = mb_strtolower(trim($ten));
 
-        return $cafe->tables()->get()->contains(
+        return $shop->tables()->get()->contains(
             fn ($ban) => (string) $ban->id !== $boQuaId
                 && mb_strtolower(trim((string) $ban->name)) === $chuan
         );
     }
 
-    public function destroy(Cafe $cafe, CafeTable $table)
+    public function destroy(Shop $shop, ShopTable $table)
     {
-        $this->authorizeCafe($cafe);
-        $this->guardSuaDoi($cafe);
+        $this->authorizeShop($shop);
+        $this->guardSuaDoi($shop);
 
-        if ((string) $table->cafe_id !== (string) $cafe->id) {
+        if ((string) $table->shop_id !== (string) $shop->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        $hasActiveOrder = $cafe->orders()->where('table_id', $table->id)->where('status', 'active')->exists();
+        $hasActiveOrder = $shop->orders()->where('table_id', $table->id)->where('status', 'active')->exists();
         if ($hasActiveOrder) {
             return response()->json(['message' => 'Không thể xóa bàn đang có order chưa thanh toán'], 400);
         }

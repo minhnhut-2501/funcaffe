@@ -8,7 +8,7 @@ class Order extends Model
 {
     protected $connection = 'mongodb';
     protected $collection = 'orders';
-    protected $fillable = ['cafe_id', 'table_id', 'code', 'status', 'note', 'subtotal', 'discount_amount', 'total_amount', 'paid_at',
+    protected $fillable = ['shop_id', 'table_id', 'code', 'status', 'note', 'subtotal', 'discount_amount', 'total_amount', 'paid_at',
         // Thanh toán gộp thẳng vào order (bỏ bảng invoices): mã phiếu + phương thức +
         // trạng thái thanh toán + tiền mặt/thối.
         'invoice_code', 'payment_method', 'payment_status', 'cash_received', 'change_amount'];
@@ -19,7 +19,7 @@ class Order extends Model
      * phép cộng nhiều dòng tích lũy sai số nhị phân (0.1 + 0.2 ≠ 0.3).
      *
      * Trước đây `subtotal`, `discount_amount`, `total_amount` ép kiểu 'float' trong
-     * khi `cash_received`, `change_amount` đã là 'integer', và `Item::base_price`
+     * khi `cash_received`, `change_amount` đã là 'integer', và `Product::base_price`
      * cũng vậy — cùng một đồng tiền mà hai kiểu khác nhau tùy chỗ đọc.
      *
      * Lưu ý cho người sửa sau: cast 'integer' của Laravel CẮT phần thập phân chứ
@@ -33,14 +33,14 @@ class Order extends Model
         'change_amount' => 'integer',
     ];
 
-    public function cafe()
+    public function shop()
     {
-        return $this->belongsTo(Cafe::class);
+        return $this->belongsTo(Shop::class);
     }
 
     public function table()
     {
-        return $this->belongsTo(CafeTable::class);
+        return $this->belongsTo(ShopTable::class);
     }
 
     public function orderDetails()

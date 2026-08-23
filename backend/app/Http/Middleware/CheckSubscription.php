@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Subscription;
 use Closure;
 use Illuminate\Http\Request;
@@ -13,13 +13,13 @@ class CheckSubscription
     {
         if ($request->user() && $request->user()->role !== 'admin') {
             // ĐA QUÁN: gói tính theo TỪNG QUÁN. Mọi route gắn middleware này đều là
-            // cafes/{cafe}/... nên đọc quán từ route rồi kiểm gói CÒN HIỆU LỰC của quán đó.
-            $cafe = $request->route('cafe');
-            $cafeId = $cafe instanceof Cafe ? (string) $cafe->id : (string) $cafe;
+            // shops/{shop}/... nên đọc quán từ route rồi kiểm gói CÒN HIỆU LỰC của quán đó.
+            $shop = $request->route('shop');
+            $shopId = $shop instanceof Shop ? (string) $shop->id : (string) $shop;
 
             // BUG-04 FIX: dùng scope effective() (active + còn hạn) cho thống nhất toàn hệ thống.
-            $hasActiveSub = $cafeId
-                ? Subscription::where('cafe_id', $cafeId)->effective()->exists()
+            $hasActiveSub = $shopId
+                ? Subscription::where('shop_id', $shopId)->effective()->exists()
                 : false;
 
             if (!$hasActiveSub) {

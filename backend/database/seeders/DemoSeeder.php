@@ -37,7 +37,7 @@ class DemoSeeder extends Seeder
 
     /** Các collection bị xóa sạch. Không đụng migrations/sessions/cache/jobs. */
     private const WIPE = [
-        'users', 'cafes', 'categories', 'items', 'item_prices', 'toppings', 'item_toppings',
+        'users', 'shops', 'categories', 'products', 'product_sizes', 'toppings', 'product_toppings',
         'tables', 'orders', 'order_details', 'order_detail_toppings', 'subscriptions',
         'package_payments', 'reviews', 'contact_messages', 'packages', 'time_subscriptions',
         'personal_access_tokens',
@@ -61,7 +61,7 @@ class DemoSeeder extends Seeder
         $this->seedPackages();
 
         $ownerId = $this->seedAccounts();
-        $this->seedOwnerCafes($ownerId);
+        $this->seedOwnerShops($ownerId);
         $this->seedFakeUsers();
         $this->seedContactMessages();
 
@@ -208,7 +208,7 @@ class DemoSeeder extends Seeder
             'full_name' => 'Nguyễn Minh Nhựt', 'email' => 'nphec4007@gmail.com',
             'password' => Hash::make(self::PASSWORD), 'phone' => '0901234567',
             'avatar' => null, 'role' => 'user', 'status' => 'active',
-            // Các quán của chủ này đều đã dùng hết lượt dùng thử (xem makeCafe), nên cờ
+            // Các quán của chủ này đều đã dùng hết lượt dùng thử (xem makeShop), nên cờ
             // cấp tài khoản phải khớp — dùng thử bị chặn ở cả hai cấp.
             'has_used_free_trial' => true,
             'created_at' => $this->ts($this->now->copy()->subMonths(7)),
@@ -219,14 +219,14 @@ class DemoSeeder extends Seeder
 
     // ------------------------------------------------------- 3 quán của chủ quán
 
-    private function seedOwnerCafes(string $ownerId): void
+    private function seedOwnerShops(string $ownerId): void
     {
         // Mốc bắt đầu bán hàng của hai quán trả phí: ngày đầu của tháng cách đây 2 tháng.
         // Chạy vào 8/2026 thì ra 01/06/2026 — đúng khoảng "từ tháng 6 đến giờ".
         $tuThang6 = $this->now->copy()->startOfMonth()->subMonths(2);
 
         // Quán 1 — Fun Free, CÒN 5 NGÀY: để giao diện hiện cảnh báo sắp hết hạn.
-        $c1 = $this->makeCafe($ownerId, 'Cà Phê Phin 76', '76 Trần Hưng Đạo, Q.5, TP.HCM', '0912345601',
+        $c1 = $this->makeShop($ownerId, 'Cà Phê Phin 76', '76 Trần Hưng Đạo, Q.5, TP.HCM', '0912345601',
             'Quán phin truyền thống trong hẻm, bán mang đi là chính.', '970436', '0071000123456',
             'NGUYEN MINH NHUT', '/quan/phin-76.jpg');
         $this->menuPhin76($c1);
@@ -234,7 +234,7 @@ class DemoSeeder extends Seeder
 
         // Gói Pro 3 tháng ĐÃ HẾT HẠN, nối liền ngay trước gói dùng thử hiện tại: 45 ngày
         // đơn hàng phía dưới đều nằm trong thời gian có gói hợp lệ, không có đoạn nào
-        // "bán hàng khi chưa mua gói". /cafes lấy gói có end_date LỚN NHẤT nên thẻ quán
+        // "bán hàng khi chưa mua gói". /shops lấy gói có end_date LỚN NHẤT nên thẻ quán
         // vẫn hiện Fun Free, còn đây là lịch sử.
         $old1 = $this->makeSubscription($c1, self::PKG_PRO, 'Pro', '6a3e50c13a064fb807035547',
             $this->now->copy()->subDays(92), $this->now->copy()->subDays(2), 549000);
@@ -247,7 +247,7 @@ class DemoSeeder extends Seeder
 
         // Quán 2 — Pro: dữ liệu vừa đủ để bộ đếm hạn mức (n/20 bàn, n/40 món) nhìn thấy được.
         // Gói mua trước mốc bán hàng vài ngày, nên mọi hoá đơn đều nằm trong hạn gói.
-        $c2 = $this->makeCafe($ownerId, 'Cà Phê Bên Hiên', '215 Nguyễn Văn Cừ, Q.1, TP.HCM', '0912345602',
+        $c2 = $this->makeShop($ownerId, 'Cà Phê Bên Hiên', '215 Nguyễn Văn Cừ, Q.1, TP.HCM', '0912345602',
             'Quán hai tầng, có sân trước, khách ngồi lâu và làm việc.', '970407', '19036789012345',
             'NGUYEN MINH NHUT', '/quan/ben-hien.jpg');
         $this->menuBenHien($c2);
@@ -261,7 +261,7 @@ class DemoSeeder extends Seeder
 
         // Quán 3 — Pro Max: quán lớn nhất, doanh thu cao nhất, có AI. Hai bản ghi gói nối
         // đuôi nhau (mua mới rồi gia hạn) để màn hình Gói dịch vụ có lịch sử thật.
-        $c3 = $this->makeCafe($ownerId, 'Nắng Sài Gòn Coffee', '12 Lê Lợi, Q.1, TP.HCM', '0912345603',
+        $c3 = $this->makeShop($ownerId, 'Nắng Sài Gòn Coffee', '12 Lê Lợi, Q.1, TP.HCM', '0912345603',
             'Quán lớn ngay trung tâm, phục vụ cả cà phê máy, trà và bánh.', '970422', '0031000998877',
             'NGUYEN MINH NHUT', '/quan/nang-sai-gon.jpg');
         $this->menuNangSaiGon($c3);
@@ -282,12 +282,12 @@ class DemoSeeder extends Seeder
         $this->makeOrders($c3, $tuThang6, 6, 11);
     }
 
-    private function makeCafe(string $userId, string $name, string $addr, string $phone,
+    private function makeShop(string $userId, string $name, string $addr, string $phone,
                               string $desc, string $bin, string $acc, string $accName,
                               ?string $logo = null): string
     {
         $id = (string) new ObjectId();
-        $this->insert('cafes', [[
+        $this->insert('shops', [[
             '_id' => new ObjectId($id), 'user_id' => $userId, 'name' => $name,
             'address' => $addr, 'phone' => $phone, 'description' => $desc,
             'logo' => $logo, 'status' => 'open',
@@ -299,12 +299,12 @@ class DemoSeeder extends Seeder
         return $id;
     }
 
-    private function makeTables(string $cafeId, int $n): void
+    private function makeTables(string $shopId, int $n): void
     {
         $docs = [];
         for ($i = 1; $i <= $n; $i++) {
             $docs[] = [
-                '_id' => new ObjectId(), 'cafe_id' => $cafeId, 'name' => "Bàn {$i}",
+                '_id' => new ObjectId(), 'shop_id' => $shopId, 'name' => "Bàn {$i}",
                 'capacity' => $i <= 2 ? 2 : ($i % 4 === 0 ? 6 : 4),
                 'display_order' => $i, 'status' => 'empty', 'current_order_id' => null,
                 'created_at' => $this->ts($this->now->copy()->subDays(120)),
@@ -316,13 +316,13 @@ class DemoSeeder extends Seeder
     /**
      * Nạp thực đơn từ mô tả gọn: mỗi danh mục là
      * [tên => [ [tên món, giá, sizes, cho topping, tên tệp ảnh], ... ] ].
-     * $sizes rỗng = món một giá (base_price); có sizes = base_price 0 + các dòng item_prices.
+     * $sizes rỗng = món một giá (base_price); có sizes = base_price 0 + các dòng product_sizes.
      *
      * Ảnh ghi thẳng vào đây dưới dạng đường dẫn tương đối `/mon/<tên>.jpg` — tệp nằm
      * trong `public/` của frontend (xem public/mon/NGUON-ANH.md). Trước đây phải chạy
      * riêng scripts/gan-anh-thuc-don.mjs để gán ảnh sau khi seed; nay không cần nữa.
      */
-    private function makeMenu(string $cafeId, array $tree, array $toppings = []): void
+    private function makeMenu(string $shopId, array $tree, array $toppings = []): void
     {
         $created = $this->ts($this->now->copy()->subDays(118));
 
@@ -333,7 +333,7 @@ class DemoSeeder extends Seeder
                 $tid = (string) new ObjectId();
                 $toppingIds[] = $tid;
                 $docs[] = [
-                    '_id' => new ObjectId($tid), 'cafe_id' => $cafeId, 'name' => $name,
+                    '_id' => new ObjectId($tid), 'shop_id' => $shopId, 'name' => $name,
                     'price' => $price, 'image' => "/mon/{$img}.jpg", 'is_available' => true,
                     'created_at' => $created,
                 ];
@@ -347,25 +347,25 @@ class DemoSeeder extends Seeder
         foreach ($tree as $catName => $rows) {
             $catId = (string) new ObjectId();
             $cats[] = [
-                '_id' => new ObjectId($catId), 'cafe_id' => $cafeId, 'name' => $catName,
+                '_id' => new ObjectId($catId), 'shop_id' => $shopId, 'name' => $catName,
                 'description' => null, 'is_active' => true, 'created_at' => $created,
             ];
 
             foreach ($rows as [$name, $price, $sizes, $allowTopping, $img]) {
-                $itemId = (string) new ObjectId();
+                $productId = (string) new ObjectId();
                 $items[] = [
-                    '_id' => new ObjectId($itemId), 'cafe_id' => $cafeId, 'category_id' => $catId,
+                    '_id' => new ObjectId($productId), 'shop_id' => $shopId, 'category_id' => $catId,
                     'name' => $name, 'description' => null, 'image' => "/mon/{$img}.jpg",
                     'base_price' => $sizes ? 0 : $price,
                     'has_size' => (bool) $sizes,
-                    'allow_topping' => $allowTopping && $toppingIds !== [],
+                    'has_topping' => $allowTopping && $toppingIds !== [],
                     'is_available' => true, 'display_order' => ++$order,
                     'created_at' => $created,
                 ];
 
                 foreach ($sizes as $sizeName => $sizePrice) {
                     $prices[] = [
-                        '_id' => new ObjectId(), 'item_id' => $itemId, 'size_name' => $sizeName,
+                        '_id' => new ObjectId(), 'product_id' => $productId, 'size_name' => $sizeName,
                         'price' => $sizePrice, 'is_active' => true, 'created_at' => $created,
                     ];
                 }
@@ -373,7 +373,7 @@ class DemoSeeder extends Seeder
                 if ($allowTopping) {
                     foreach ($toppingIds as $tid) {
                         $links[] = [
-                            '_id' => new ObjectId(), 'item_id' => $itemId, 'topping_id' => $tid,
+                            '_id' => new ObjectId(), 'product_id' => $productId, 'topping_id' => $tid,
                             'created_at' => $created,
                         ];
                     }
@@ -382,9 +382,9 @@ class DemoSeeder extends Seeder
         }
 
         $this->insert('categories', $cats);
-        $this->insert('items', $items);
-        $this->insert('item_prices', $prices);
-        $this->insert('item_toppings', $links);
+        $this->insert('products', $items);
+        $this->insert('product_sizes', $prices);
+        $this->insert('product_toppings', $links);
     }
 
     /**
@@ -392,10 +392,10 @@ class DemoSeeder extends Seeder
      * liệu mẫu giống một quán cà phê Việt Nam có thật. Ảnh cùng nguồn — xem
      * public/mon/NGUON-ANH.md, trong đó ghi rõ giấy phép và cách đã bỏ nhãn hiệu.
      */
-    private function menuPhin76(string $cafeId): void
+    private function menuPhin76(string $shopId): void
     {
         // Quán phin truyền thống: một giá, không size, không topping.
-        $this->makeMenu($cafeId, [
+        $this->makeMenu($shopId, [
             'Cà phê phin' => [
                 ['Phin Sữa Đá', 29000, [], false, 'phin-sua-da'],
                 ['Phin Đen Đá', 29000, [], false, 'phin-den-da'],
@@ -415,13 +415,13 @@ class DemoSeeder extends Seeder
         ]);
     }
 
-    private function menuBenHien(string $cafeId): void
+    private function menuBenHien(string $shopId): void
     {
         // 30 món và 14 bàn — dưới trần gói Pro (40 món / 20 bàn), đủ để bộ đếm hạn mức
         // trên màn hình Thực đơn và Bàn hiện ra con số có ý nghĩa.
         $s = fn (int $a, int $b, int $c) => ['S' => $a, 'M' => $b, 'L' => $c];
 
-        $this->makeMenu($cafeId, [
+        $this->makeMenu($shopId, [
             'Cà phê phin' => [
                 ['Phin Sữa Đá', 0, $s(29000, 39000, 45000), false, 'phin-sua-da'],
                 ['Phin Đen Đá', 0, $s(29000, 35000, 39000), false, 'phin-den-da'],
@@ -474,13 +474,13 @@ class DemoSeeder extends Seeder
         ]);
     }
 
-    private function menuNangSaiGon(string $cafeId): void
+    private function menuNangSaiGon(string $shopId): void
     {
         // Quán lớn nhất, gói Pro Max nên không vướng trần nào: 43 món, 18 bàn.
         $s = fn (int $a, int $b, int $c) => ['S' => $a, 'M' => $b, 'L' => $c];
         $ml = fn (int $a, int $b) => ['M' => $a, 'L' => $b];
 
-        $this->makeMenu($cafeId, [
+        $this->makeMenu($shopId, [
             'Cà phê phin' => [
                 ['Phin Sữa Đá', 0, $s(29000, 39000, 45000), false, 'phin-sua-da'],
                 ['Phin Đen Đá', 0, $s(29000, 35000, 39000), false, 'phin-den-da'],
@@ -548,7 +548,7 @@ class DemoSeeder extends Seeder
 
     // ------------------------------------------------------------------ gói/đơn
 
-    private function makeSubscription(string $cafeId, string $pkgId, string $pkgName,
+    private function makeSubscription(string $shopId, string $pkgId, string $pkgName,
                                       string $timeSubId, Carbon $start, Carbon $end, int $subtotal,
                                       string $actionType = 'new'): string
     {
@@ -556,7 +556,7 @@ class DemoSeeder extends Seeder
         $id = (string) new ObjectId();
 
         $this->insert('subscriptions', [[
-            '_id' => new ObjectId($id), 'cafe_id' => $cafeId, 'package_id' => $pkgId,
+            '_id' => new ObjectId($id), 'shop_id' => $shopId, 'package_id' => $pkgId,
             'time_subscription_id' => $timeSubId, 'package_name_snapshot' => $pkgName,
             'start_date' => $this->ts($start), 'end_date' => $this->ts($end),
             'status' => 'active',
@@ -569,7 +569,7 @@ class DemoSeeder extends Seeder
         return $id;
     }
 
-    private function makePayment(string $userId, string $cafeId, string $pkgId, string $timeSubId,
+    private function makePayment(string $userId, string $shopId, string $pkgId, string $timeSubId,
                                  string $subId, int $subtotal, string $method, Carbon $at,
                                  string $actionType = 'new'): void
     {
@@ -582,7 +582,7 @@ class DemoSeeder extends Seeder
         $at = $at->copy()->setTime(mt_rand(8, 22), mt_rand(0, 59), mt_rand(0, 59));
 
         $this->insert('package_payments', [[
-            '_id' => new ObjectId(), 'user_id' => $userId, 'cafe_id' => $cafeId,
+            '_id' => new ObjectId(), 'user_id' => $userId, 'shop_id' => $shopId,
             'package_id' => $pkgId, 'time_subscription_id' => $timeSubId, 'subscription_id' => $subId,
             'subtotal' => $subtotal, 'vat_rate' => self::VAT, 'vat_amount' => $vat,
             'amount' => $subtotal + $vat,
@@ -600,19 +600,19 @@ class DemoSeeder extends Seeder
      * Doanh thu chỉ tính order có status='paid' VÀ payment_status='paid' (xem
      * UserRevenueController), nên cả hai đều phải được đặt.
      */
-    private function makeOrders(string $cafeId, Carbon $tu, int $min, int $max): void
+    private function makeOrders(string $shopId, Carbon $tu, int $min, int $max): void
     {
         $days = (int) $tu->copy()->startOfDay()->diffInDays($this->now->copy()->startOfDay());
 
         // preserve_keys = false: pick()/array_rand() cần mảng đánh số liên tục từ 0.
-        $items = iterator_to_array($this->db->selectCollection('items')->find(['cafe_id' => $cafeId]), false);
-        $tables = iterator_to_array($this->db->selectCollection('tables')->find(['cafe_id' => $cafeId]), false);
-        $tops = iterator_to_array($this->db->selectCollection('toppings')->find(['cafe_id' => $cafeId]), false);
+        $items = iterator_to_array($this->db->selectCollection('products')->find(['shop_id' => $shopId]), false);
+        $tables = iterator_to_array($this->db->selectCollection('tables')->find(['shop_id' => $shopId]), false);
+        $tops = iterator_to_array($this->db->selectCollection('toppings')->find(['shop_id' => $shopId]), false);
 
         // Giá theo size, gom sẵn theo item để khỏi truy vấn trong vòng lặp.
-        $priceByItem = [];
-        foreach ($this->db->selectCollection('item_prices')->find() as $p) {
-            $priceByItem[(string) $p['item_id']][] = ['id' => (string) $p['_id'], 'name' => $p['size_name'], 'price' => (int) $p['price']];
+        $priceByProduct = [];
+        foreach ($this->db->selectCollection('product_sizes')->find() as $p) {
+            $priceByProduct[(string) $p['product_id']][] = ['id' => (string) $p['_id'], 'name' => $p['size_name'], 'price' => (int) $p['price']];
         }
 
         $orders = $details = $detailTops = [];
@@ -634,18 +634,18 @@ class DemoSeeder extends Seeder
                 $orderTotal = 0;
 
                 foreach (range(1, mt_rand(1, 4)) as $ignored) {
-                    $item = $this->pick($items);
-                    $itemId = (string) $item['_id'];
+                    $product = $this->pick($items);
+                    $productId = (string) $product['_id'];
                     $qty = mt_rand(1, 3);
 
-                    $sizes = $priceByItem[$itemId] ?? [];
+                    $sizes = $priceByProduct[$productId] ?? [];
                     if ($sizes) {
                         $size = $this->pick($sizes);
                         $unit = $size['price'];
                         $priceId = $size['id'];
                         $sizeName = $size['name'];
                     } else {
-                        $unit = (int) $item['base_price'];
+                        $unit = (int) $product['base_price'];
                         $priceId = null;
                         $sizeName = null;
                     }
@@ -653,7 +653,7 @@ class DemoSeeder extends Seeder
                     $detailId = (string) new ObjectId();
                     $lineTop = 0;
 
-                    if (($item['allow_topping'] ?? false) && $tops && mt_rand(0, 100) < 55) {
+                    if (($product['has_topping'] ?? false) && $tops && mt_rand(0, 100) < 55) {
                         $chosen = (array) array_rand($tops, min(count($tops), mt_rand(1, 2)));
                         foreach ($chosen as $ti) {
                             $t = $tops[$ti];
@@ -673,8 +673,8 @@ class DemoSeeder extends Seeder
                     $sub = $unit * $qty;
                     $details[] = [
                         '_id' => new ObjectId($detailId), 'order_id' => $orderId,
-                        'item_id' => $itemId, 'item_name_snapshot' => $item['name'],
-                        'item_price_id' => $priceId, 'size_name_snapshot' => $sizeName,
+                        'product_id' => $productId, 'product_name_snapshot' => $product['name'],
+                        'product_size_id' => $priceId, 'size_name_snapshot' => $sizeName,
                         'quantity' => $qty, 'unit_price' => $unit,
                         'subtotal' => $sub, 'topping_total' => $lineTop,
                         'total_price' => $sub + $lineTop, 'note' => null,
@@ -686,7 +686,7 @@ class DemoSeeder extends Seeder
                 $method = $this->pick(['cash', 'cash', 'vietqr', 'bank_transfer']);
                 $paidAt = $at->copy()->addMinutes(mt_rand(15, 90));
                 $doc = [
-                    '_id' => new ObjectId($orderId), 'cafe_id' => $cafeId,
+                    '_id' => new ObjectId($orderId), 'shop_id' => $shopId,
                     'table_id' => (string) $table['_id'],
                     'code' => 'ORD-' . $at->format('Ymd') . '-' . $seq,
                     'status' => 'paid', 'note' => null,
@@ -725,20 +725,20 @@ class DemoSeeder extends Seeder
         // có đường đi liên tục, không phải mấy cột lẻ tẻ.
         $people = [
             ['Trần Thị Mỹ Duyên', 'duyen.tran@gmail.com', '0903111222', 'Cà Phê Sân Vườn Duyên', '15 Phan Xích Long, Phú Nhuận, TP.HCM', self::PKG_PROMAX, '6a3e50c13a064fb80703554b', 4990000, 7, 'vnpay'],
-            ['Lê Hoàng Nam', 'namle.cafe@gmail.com', '0903111333', 'Nam Coffee Roastery', '88 Nguyễn Trãi, Q.5, TP.HCM', self::PKG_PRO, '6a3e50c13a064fb807035548', 1990000, 7, 'momo'],
+            ['Lê Hoàng Nam', 'namle.shop@gmail.com', '0903111333', 'Nam Coffee Roastery', '88 Nguyễn Trãi, Q.5, TP.HCM', self::PKG_PRO, '6a3e50c13a064fb807035548', 1990000, 7, 'momo'],
             ['Phạm Quốc Huy', 'huypham2000@gmail.com', '0903111444', 'Huy Tea & Coffee', '204 Lý Thường Kiệt, Q.10, TP.HCM', self::PKG_PRO, '6a3e50c13a064fb807035547', 549000, 6, 'vnpay'],
             ['Nguyễn Thị Bích Ngọc', 'ngocnguyen.tea@gmail.com', '0903111555', 'Ngọc Milk Tea', '32 Hùng Vương, TP. Cần Thơ', self::PKG_PROMAX, '6a3e50c13a064fb80703554a', 1399000, 6, 'momo'],
             ['Võ Thành Đạt', 'datvo.brew@gmail.com', '0903111666', 'Đạt Brew Lab', '7 Bạch Đằng, TP. Đà Nẵng', self::PKG_PRO, '6a3e50c13a064fb807035546', 199000, 5, 'vnpay'],
             ['Đặng Thu Hà', 'hadang.coffee@gmail.com', '0903111777', 'Hà Coffee House', '120 Trần Phú, TP. Nha Trang', self::PKG_FREE, '6a3e50c13a064fb807035545', 0, 5, null],
-            ['Bùi Minh Khoa', 'khoabui.cafe@gmail.com', '0903111888', 'Khoa Specialty', '55 Lê Duẩn, TP. Huế', self::PKG_PROMAX, '6a3e50c13a064fb807035549', 499000, 4, 'vnpay'],
+            ['Bùi Minh Khoa', 'khoabui.shop@gmail.com', '0903111888', 'Khoa Specialty', '55 Lê Duẩn, TP. Huế', self::PKG_PROMAX, '6a3e50c13a064fb807035549', 499000, 4, 'vnpay'],
             ['Hồ Thị Kim Anh', 'kimanh.ho@gmail.com', '0903111999', 'Kim Anh Trà Sữa', '9 Nguyễn Huệ, TP. Vũng Tàu', self::PKG_PRO, '6a3e50c13a064fb807035547', 549000, 4, 'momo'],
-            ['Trương Gia Bảo', 'baotruong.dev@gmail.com', '0903112000', 'Bảo Cafe Sách', '77 Hai Bà Trưng, TP. Đà Lạt', self::PKG_FREE, '6a3e50c13a064fb807035545', 0, 3, null],
+            ['Trương Gia Bảo', 'baotruong.dev@gmail.com', '0903112000', 'Bảo Shop Sách', '77 Hai Bà Trưng, TP. Đà Lạt', self::PKG_FREE, '6a3e50c13a064fb807035545', 0, 3, null],
             ['Lý Thanh Tùng', 'tunglythanh@gmail.com', '0903112111', 'Tùng Coffee Station', '3 Quang Trung, TP. Biên Hòa', self::PKG_PRO, '6a3e50c13a064fb807035546', 199000, 3, 'momo'],
-            ['Đỗ Ngọc Trâm', 'tramdo.cafe@gmail.com', '0903112222', 'Trâm Cà Phê Vườn', '18 Nguyễn Thị Minh Khai, TP. Buôn Ma Thuột', self::PKG_PROMAX, '6a3e50c13a064fb80703554a', 1399000, 2, 'vnpay'],
+            ['Đỗ Ngọc Trâm', 'tramdo.shop@gmail.com', '0903112222', 'Trâm Cà Phê Vườn', '18 Nguyễn Thị Minh Khai, TP. Buôn Ma Thuột', self::PKG_PROMAX, '6a3e50c13a064fb80703554a', 1399000, 2, 'vnpay'],
             ['Phan Văn Lộc', 'locphan.coffee@gmail.com', '0903112333', 'Lộc Phát Coffee', '221 Lê Văn Sỹ, Q.3, TP.HCM', self::PKG_PRO, '6a3e50c13a064fb807035548', 1990000, 2, 'momo'],
             ['Huỳnh Thị Mai', 'maihuynh.tea@gmail.com', '0903112444', 'Mai Trà Quán', '64 Hoàng Diệu, TP. Quy Nhơn', self::PKG_PRO, '6a3e50c13a064fb807035547', 549000, 1, 'vnpay'],
             ['Ngô Đức Thắng', 'thangngo.brew@gmail.com', '0903112555', 'Thắng Cà Phê Rang', '5 Trần Hưng Đạo, TP. Hải Phòng', self::PKG_PROMAX, '6a3e50c13a064fb807035549', 499000, 1, 'momo'],
-            ['Vũ Hải Yến', 'yenvu.cafe@gmail.com', '0903112666', 'Yến Coffee & Bakery', '90 Cầu Giấy, Hà Nội', self::PKG_FREE, '6a3e50c13a064fb807035545', 0, 1, null],
+            ['Vũ Hải Yến', 'yenvu.shop@gmail.com', '0903112666', 'Yến Coffee & Bakery', '90 Cầu Giấy, Hà Nội', self::PKG_FREE, '6a3e50c13a064fb807035545', 0, 1, null],
         ];
 
         // Đánh giá: MỖI NGƯỜI TỐI ĐA MỘT (có unique index trên reviews.user_id).
@@ -756,9 +756,9 @@ class DemoSeeder extends Seeder
             12 => [4, 'Thống kê món bán chạy giúp mình cắt bớt menu', 'Nhìn bảng mới biết có mấy món cả tháng bán chưa tới chục ly, bỏ luôn cho gọn.'],
         ];
 
-        $users = $cafes = $subs = $reviews = [];
+        $users = $shops = $subs = $reviews = [];
 
-        foreach ($people as $i => [$name, $email, $phone, $cafeName, $addr, $pkgId, $timeSubId, $price, $monthsAgo, $gateway]) {
+        foreach ($people as $i => [$name, $email, $phone, $shopName, $addr, $pkgId, $timeSubId, $price, $monthsAgo, $gateway]) {
             $uid = (string) new ObjectId();
             $cid = (string) new ObjectId();
             $joined = $this->now->copy()->subMonths($monthsAgo)->subDays(mt_rand(0, 25));
@@ -775,8 +775,8 @@ class DemoSeeder extends Seeder
                 'created_at' => $this->ts($joined),
             ];
 
-            $cafes[] = [
-                '_id' => new ObjectId($cid), 'user_id' => $uid, 'name' => $cafeName,
+            $shops[] = [
+                '_id' => new ObjectId($cid), 'user_id' => $uid, 'name' => $shopName,
                 'address' => $addr, 'phone' => $phone,
                 'description' => null, 'logo' => null, 'status' => 'open',
                 'has_used_free_trial' => true,
@@ -803,7 +803,7 @@ class DemoSeeder extends Seeder
 
             $ghiSub = function (string $id, Carbon $tu, Carbon $den, string $loai) use (&$subs, $cid, $pkgId, $timeSubId, $tenGoi, $price, $vat) {
                 $subs[] = [
-                    '_id' => new ObjectId($id), 'cafe_id' => $cid, 'package_id' => $pkgId,
+                    '_id' => new ObjectId($id), 'shop_id' => $cid, 'package_id' => $pkgId,
                     'time_subscription_id' => $timeSubId,
                     'package_name_snapshot' => $tenGoi,
                     'start_date' => $this->ts($tu), 'end_date' => $this->ts($den),
@@ -840,7 +840,7 @@ class DemoSeeder extends Seeder
                 }
 
                 $reviews[] = [
-                    '_id' => new ObjectId(), 'user_id' => $uid, 'cafe_id' => $cid,
+                    '_id' => new ObjectId(), 'user_id' => $uid, 'shop_id' => $cid,
                     'package_id' => $pkgId, 'rating' => $rating,
                     'title' => $title, 'comment' => $comment,
                     'status' => 'visible', 'history' => [],
@@ -850,7 +850,7 @@ class DemoSeeder extends Seeder
         }
 
         $this->insert('users', $users);
-        $this->insert('cafes', $cafes);
+        $this->insert('shops', $shops);
         $this->insert('subscriptions', $subs);
         $this->insert('reviews', $reviews);
     }
@@ -869,7 +869,7 @@ class DemoSeeder extends Seeder
     {
         // [tên, email, sđt, tên quán, ngày trước, nội dung, đã đọc, trả lời]
         $rows = [
-            ['Nguyễn Văn Sơn', 'sonnguyen.cafe@gmail.com', '0905220011', 'Cà Phê Sơn Ca', 1,
+            ['Nguyễn Văn Sơn', 'sonnguyen.shop@gmail.com', '0905220011', 'Cà Phê Sơn Ca', 1,
              'Chào shop, quán mình có 2 chi nhánh thì cần mua 2 gói riêng hay 1 gói dùng chung được ạ?', false, null],
             ['Trần Bảo Trân', 'trantran.milktea@gmail.com', '0905220022', 'Trân Milk Tea', 2,
              'Mình đang dùng thử gói Fun Free, hết 7 ngày thì dữ liệu món và bàn còn giữ không hay mất hết?', false, null],
@@ -879,7 +879,7 @@ class DemoSeeder extends Seeder
              'Mình muốn đổi từ gói Pro lên Pro Max giữa chừng thì tiền còn lại của gói cũ có được trừ vào không ạ?', true, null],
             ['Đinh Công Hậu', 'haudinh.brew@gmail.com', '0905220055', 'Hậu Brew', 7,
              'Bên mình cần xuất báo cáo doanh thu theo từng nhân viên. Hiện tại phần mềm có làm được chưa?', true, null],
-            ['Vũ Thanh Thảo', 'thaovu.cafe@gmail.com', '0905220066', 'Thảo Garden Cafe', 9,
+            ['Vũ Thanh Thảo', 'thaovu.shop@gmail.com', '0905220066', 'Thảo Garden Shop', 9,
              'Web dùng trên máy tính bảng có được không? Quán mình định để một cái iPad ở quầy cho nhân viên bấm order.', true,
              'Chào bạn, hệ thống chạy trên trình duyệt nên iPad dùng bình thường, không cần cài gì thêm. Bạn mở Safari rồi đăng nhập là được. Màn hình bán hàng đã được bố trí lại cho khổ máy tính bảng nên bấm khá thoải mái.'],
             ['Hoàng Minh Tuấn', 'tuanhm.coffee@gmail.com', '0905220077', 'Tuấn Cà Phê Sạch', 12,
@@ -888,13 +888,13 @@ class DemoSeeder extends Seeder
             ['Bùi Thị Lan', 'lanbui.tea@gmail.com', '0905220088', 'Lan Trà & Bánh', 15,
              'Cho mình hỏi phí gói Pro 12 tháng có xuất hoá đơn đỏ được không ạ? Quán mình cần để kê khai.', true,
              'Chào bạn, hiện tại hệ thống có ghi nhận VAT 10% trong từng hoá đơn mua gói và bạn tải lại được ở mục Gói dịch vụ. Về hoá đơn điện tử theo mẫu của cơ quan thuế thì bên mình đang làm, dự kiến có trong bản cập nhật tới.'],
-            ['Ngô Văn Cường', 'cuongngo.cafe@gmail.com', '0905220099', 'Cường Coffee House', 18,
+            ['Ngô Văn Cường', 'cuongngo.shop@gmail.com', '0905220099', 'Cường Coffee House', 18,
              'Mình lỡ xoá nhầm một món trong thực đơn, có khôi phục lại được không?', true,
              'Chào bạn, món đã xoá thì không khôi phục tự động được, nhưng các hoá đơn cũ vẫn giữ nguyên tên và giá món tại thời điểm bán nên số liệu doanh thu không bị ảnh hưởng. Bạn tạo lại món với tên cũ là dùng tiếp bình thường.'],
-            ['Trịnh Thu Hương', 'huongtrinh.brew@gmail.com', '0905220110', 'Hương Cafe Sân Thượng', 22,
+            ['Trịnh Thu Hương', 'huongtrinh.brew@gmail.com', '0905220110', 'Hương Shop Sân Thượng', 22,
              'Bên mình muốn nhân viên chỉ được bán hàng, không xem được doanh thu. Có phân quyền như vậy chưa?', true,
              'Chào bạn, bản hiện tại mỗi quán dùng chung một tài khoản chủ quán nên chưa tách quyền riêng cho nhân viên. Đây là việc bên mình đã ghi nhận và xếp vào nhóm ưu tiên, sẽ báo lại bạn khi có.'],
-            ['Lâm Gia Huy', 'huylam.cafe@gmail.com', '0905220121', 'Huy Cà Phê Vợt', 28,
+            ['Lâm Gia Huy', 'huylam.shop@gmail.com', '0905220121', 'Huy Cà Phê Vợt', 28,
              'Mình thanh toán VNPay xong nhưng gói chưa được kích hoạt, nhờ kiểm tra giúp mình.', true,
              'Chào bạn, mình đã kiểm tra và giao dịch của bạn đã về, gói đã được kích hoạt trong tài khoản. Trường hợp này thường do bạn đóng trang trong lúc VNPay đang chuyển về. Bạn đăng xuất rồi đăng nhập lại là thấy gói mới nhé.'],
             ['Đặng Khánh Ly', 'lydang.tea@gmail.com', '0905220132', 'Ly Tea Corner', 35,
@@ -903,11 +903,11 @@ class DemoSeeder extends Seeder
         ];
 
         $docs = [];
-        foreach ($rows as [$name, $email, $phone, $cafeName, $daysAgo, $content, $isRead, $reply]) {
+        foreach ($rows as [$name, $email, $phone, $shopName, $daysAgo, $content, $isRead, $reply]) {
             $at = $this->now->copy()->subDays($daysAgo)->setTime(mt_rand(8, 22), mt_rand(0, 59));
             $doc = [
                 '_id' => new ObjectId(), 'full_name' => $name, 'email' => $email,
-                'phone' => $phone, 'cafe_name' => $cafeName, 'content' => $content,
+                'phone' => $phone, 'shop_name' => $shopName, 'content' => $content,
                 'is_read' => $isRead,
                 'created_at' => $this->ts($at),
             ];
@@ -963,8 +963,8 @@ class DemoSeeder extends Seeder
     {
         $this->command->info('');
         $this->command->info('Kết quả:');
-        foreach (['users', 'cafes', 'packages', 'time_subscriptions', 'subscriptions', 'package_payments',
-                  'categories', 'items', 'item_prices', 'toppings', 'item_toppings', 'tables',
+        foreach (['users', 'shops', 'packages', 'time_subscriptions', 'subscriptions', 'package_payments',
+                  'categories', 'products', 'product_sizes', 'toppings', 'product_toppings', 'tables',
                   'orders', 'order_details', 'order_detail_toppings', 'reviews', 'contact_messages'] as $c) {
             $this->command->info(sprintf('  %-24s %6d', $c, $this->db->selectCollection($c)->countDocuments()));
         }

@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Category;
-use App\Models\Item;
+use App\Models\Product;
 use App\Models\Order;
 use App\Models\OrderDetail;
 use App\Models\Package;
@@ -25,7 +25,7 @@ use Laravel\Sanctum\Sanctum;
  *
  * Chốt chặn nằm ở chỗ nào gọi hàm nào, không nằm ở lời dặn cho AI:
  *   · tuyến công khai  -> ConsultKnowledgeService (chỉ bảng gói, không truy vấn quán)
- *   · tuyến trả phí    -> AiController::cafeContext (có doanh thu, bàn, thực đơn)
+ *   · tuyến trả phí    -> AiController::shopContext (có doanh thu, bàn, thực đơn)
  * Nên các bài dưới đây soi thẳng vào LỜI DẪN được gửi lên Gemini, chứ không soi câu
  * trả lời — câu trả lời do mô hình sinh ra, không phải thứ kiểm thử bám vào được.
  *
@@ -35,8 +35,8 @@ use Laravel\Sanctum\Sanctum;
 class AiConsultTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'packages', 'time_subscriptions', 'subscriptions',
-        'categories', 'items', 'tables', 'orders', 'order_details',
+        'users', 'shops', 'packages', 'time_subscriptions', 'subscriptions',
+        'categories', 'products', 'tables', 'orders', 'order_details',
     ];
 
     /** Tên món cố ý dị thường để không thể trùng ngẫu nhiên với chữ trong lời dẫn. */
@@ -44,7 +44,7 @@ class AiConsultTest extends MongoTestCase
     private const DOANH_THU = 247_000;
 
     private User $user;
-    private Cafe $cafe;
+    private Shop $shop;
     private Package $pro;
     private Package $proMax;
 
@@ -89,12 +89,12 @@ class AiConsultTest extends MongoTestCase
             'has_used_free_trial' => true,
         ]);
 
-        $this->cafe = $this->user->cafes()->create([
+        $this->shop = $this->user->shops()->create([
             'name' => 'Quán kiểm thử', 'status' => 'open', 'has_used_free_trial' => true,
         ]);
 
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->pro->id,
             'package_name_snapshot' => 'Pro',
             'start_date' => now()->subDays(10),
@@ -109,22 +109,22 @@ class AiConsultTest extends MongoTestCase
     /** Dựng dữ liệu THẬT để có cái mà rò rỉ — không có nó thì bài chống rò rỉ vô nghĩa. */
     private function taoDuLieuBanHang(): void
     {
-        $cafeId = (string) $this->cafe->id;
+        $shopId = (string) $this->shop->id;
 
-        $category = Category::create(['cafe_id' => $cafeId, 'name' => 'Trà', 'is_active' => true]);
+        $category = Category::create(['shop_id' => $shopId, 'name' => 'Trà', 'is_active' => true]);
 
-        $item = Item::create([
-            'cafe_id' => $cafeId,
+        $product = Product::create([
+            'shop_id' => $shopId,
             'category_id' => (string) $category->id,
             'name' => self::MON_BI_MAT,
             'base_price' => self::DOANH_THU,
             'is_available' => true,
         ]);
 
-        $this->cafe->tables()->create(['name' => 'Bàn 1', 'status' => 'available']);
+        $this->shop->tables()->create(['name' => 'Bàn 1', 'status' => 'available']);
 
         $order = Order::create([
-            'cafe_id' => $cafeId,
+            'shop_id' => $shopId,
             'status' => 'paid',
             'payment_status' => 'paid',
             'total_amount' => self::DOANH_THU,
@@ -133,8 +133,8 @@ class AiConsultTest extends MongoTestCase
 
         OrderDetail::create([
             'order_id' => (string) $order->id,
-            'item_id' => (string) $item->id,
-            'item_name_snapshot' => self::MON_BI_MAT,
+            'product_id' => (string) $product->id,
+            'product_name_snapshot' => self::MON_BI_MAT,
             'quantity' => 1,
             'unit_price' => self::DOANH_THU,
             'total_price' => self::DOANH_THU,
@@ -244,7 +244,7 @@ class AiConsultTest extends MongoTestCase
         $this->assertStringNotContainsString('Doanh thu hôm nay', $loiDan);
         $this->assertStringNotContainsString('Tình hình bán hàng', $loiDan);
         $this->assertStringNotContainsString('Tổng số bàn', $loiDan);
-        $this->assertStringNotContainsString($this->cafe->name, $loiDan,
+        $this->assertStringNotContainsString($this->shop->name, $loiDan,
             'Ngay cả TÊN quán cũng không nên có mặt — tuyến này không biết khách là quán nào.');
     }
 
@@ -256,13 +256,13 @@ class AiConsultTest extends MongoTestCase
      */
     public function test_tuyen_tra_phi_van_nap_so_lieu_that_cua_quan(): void
     {
-        Subscription::where('cafe_id', (string) $this->cafe->id)
+        Subscription::where('shop_id', (string) $this->shop->id)
             ->update(['package_id' => (string) $this->proMax->id]);
 
         $this->giaLapGemini();
         Sanctum::actingAs($this->user);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/ai/chat", [
+        $this->postJson("/api/shops/{$this->shop->id}/ai/chat", [
             'messages' => [['role' => 'user', 'content' => 'Doanh thu hôm nay bao nhiêu?']],
         ])->assertStatus(200);
 
@@ -278,7 +278,7 @@ class AiConsultTest extends MongoTestCase
     {
         Sanctum::actingAs($this->user);
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/ai/chat", [
+        $this->postJson("/api/shops/{$this->shop->id}/ai/chat", [
             'messages' => [['role' => 'user', 'content' => 'Doanh thu hôm nay bao nhiêu?']],
         ])->assertStatus(403);
     }

@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Package;
 use App\Models\Subscription;
 use Closure;
@@ -26,12 +26,12 @@ class RequiresAI
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // ĐA QUÁN: quyền AI tính theo gói CỦA QUÁN (route cafes/{cafe}/ai/...), không theo tài khoản.
-        $cafe = $request->route('cafe');
-        $cafeId = $cafe instanceof Cafe ? (string) $cafe->id : (string) $cafe;
+        // ĐA QUÁN: quyền AI tính theo gói CỦA QUÁN (route shops/{shop}/ai/...), không theo tài khoản.
+        $shop = $request->route('shop');
+        $shopId = $shop instanceof Shop ? (string) $shop->id : (string) $shop;
 
-        $sub = $cafeId
-            ? Subscription::where('cafe_id', $cafeId)->effective()->latest()->first()
+        $sub = $shopId
+            ? Subscription::where('shop_id', $shopId)->effective()->latest()->first()
             : null;
 
         $pkg = $sub ? Package::find($sub->package_id) : null;

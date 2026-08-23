@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Package;
 use App\Models\Review;
 use App\Models\Subscription;
@@ -22,10 +22,10 @@ use Laravel\Sanctum\Sanctum;
  */
 class ReviewRulesTest extends MongoTestCase
 {
-    protected array $collections = ['users', 'cafes', 'packages', 'subscriptions', 'reviews'];
+    protected array $collections = ['users', 'shops', 'packages', 'subscriptions', 'reviews'];
 
     private User $user;
-    private Cafe $cafe;
+    private Shop $shop;
     private Package $goi;
 
     protected function setUp(): void
@@ -40,14 +40,14 @@ class ReviewRulesTest extends MongoTestCase
             'role' => 'user', 'status' => 'active',
             'reset_token' => 'BI-MAT-KHONG-DUOC-LO',
         ]);
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán đánh giá', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán đánh giá', 'status' => 'open']);
 
         $this->goi = Package::create([
             'name' => 'Pro Max', 'type' => 'promax', 'level' => 2,
             'status' => 'active', 'is_trial' => false, 'can_use_ai' => true,
         ]);
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $this->goi->id,
             'package_name_snapshot' => 'Pro Max',
             'start_date' => now()->subDay(), 'end_date' => now()->addMonth(),
@@ -59,7 +59,7 @@ class ReviewRulesTest extends MongoTestCase
 
     private function gui(array $doiLai = [])
     {
-        return $this->postJson("/api/cafes/{$this->cafe->id}/reviews", array_merge([
+        return $this->postJson("/api/shops/{$this->shop->id}/reviews", array_merge([
             'rating' => 5, 'title' => 'Rất hài lòng', 'comment' => 'Phần mềm dễ dùng.',
         ], $doiLai));
     }
@@ -89,16 +89,16 @@ class ReviewRulesTest extends MongoTestCase
     /** Đánh giá là về PHẦN MỀM, không về từng quán: có hai quán vẫn chỉ một đánh giá. */
     public function test_co_hai_quan_van_chi_mot_danh_gia(): void
     {
-        $quanHai = $this->user->cafes()->create(['name' => 'Quán thứ hai', 'status' => 'open']);
+        $quanHai = $this->user->shops()->create(['name' => 'Quán thứ hai', 'status' => 'open']);
         Subscription::create([
-            'cafe_id' => (string) $quanHai->id, 'package_id' => (string) $this->goi->id,
+            'shop_id' => (string) $quanHai->id, 'package_id' => (string) $this->goi->id,
             'package_name_snapshot' => 'Pro Max',
             'start_date' => now()->subDay(), 'end_date' => now()->addMonth(),
             'total_amount' => 199_000, 'status' => 'active',
         ]);
 
         $this->gui();
-        $this->postJson("/api/cafes/{$quanHai->id}/reviews", [
+        $this->postJson("/api/shops/{$quanHai->id}/reviews", [
             'rating' => 4, 'title' => 'Quán hai', 'comment' => 'Vẫn tốt.',
         ]);
 
@@ -144,7 +144,7 @@ class ReviewRulesTest extends MongoTestCase
         ]);
         Review::create([
             'user_id' => (string) $nguoiKhac->id,
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'rating' => 4, 'title' => 'Viết sau', 'comment' => 'Dùng ổn.',
             'status' => 'visible',
         ]);
@@ -191,7 +191,7 @@ class ReviewRulesTest extends MongoTestCase
         $mot = $this->getJson('/api/reviews')->json()[0];
 
         $this->assertEqualsCanonicalizing(
-            ['id', 'rating', 'title', 'comment', 'created_at', 'user_name', 'avatar', 'cafe_name', 'package_name'],
+            ['id', 'rating', 'title', 'comment', 'created_at', 'user_name', 'avatar', 'shop_name', 'package_name'],
             array_keys($mot),
             'Có trường lạ lọt ra trang công khai — kiểm lại publicReviews().',
         );

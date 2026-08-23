@@ -2,22 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Order;
-use App\Models\Item;
-use App\Models\ItemPrice;
-use App\Models\ItemTopping;
+use App\Models\Product;
+use App\Models\ProductSize;
+use App\Models\ProductTopping;
 use App\Models\Topping;
-use App\Http\Controllers\Concerns\ChecksCafeOwnership;
-use App\Http\Controllers\Concerns\ChecksCafeStatus;
+use App\Http\Controllers\Concerns\ChecksShopAccess;
+use App\Http\Controllers\Concerns\ChecksShopStatus;
 use App\Http\Controllers\Concerns\RunsAtomically;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
 {
-    use ChecksCafeOwnership;
-    use ChecksCafeStatus;
+    use ChecksShopAccess;
+    use ChecksShopStatus;
     use RunsAtomically;
 
     public function __construct()
@@ -39,9 +39,9 @@ class OrderController extends Controller
      *               theo ngày tạo với đơn chưa trả (xem $dateField bên dưới)
      *  - limit: trần số bản ghi (1..1000)
      */
-    public function index(Request $request, Cafe $cafe)
+    public function index(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
         $validated = $request->validate([
             'status' => 'nullable|string',
@@ -63,7 +63,7 @@ class OrderController extends Controller
         // phải ba tầng lồng nhau như phía dòng món.
         //
         // KHÔNG bật cờ này cho trang Doanh thu: nó cần chi tiết để tính top món.
-        $query = $cafe->orders()->with(
+        $query = $shop->orders()->with(
             $request->boolean('slim')
                 ? ['table']
                 : ['orderDetails.orderDetailToppings.topping', 'table'],
@@ -100,11 +100,11 @@ class OrderController extends Controller
         return response()->json($query->get());
     }
 
-    public function show(Cafe $cafe, Order $order)
+    public function show(Shop $shop, Order $order)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        if ((string) $order->cafe_id !== (string) $cafe->id) {
+        if ((string) $order->shop_id !== (string) $shop->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
@@ -113,23 +113,23 @@ class OrderController extends Controller
     }
 
     /**
-     * BUG-02 FIX: Tự tính giá từ DB (ItemPrice / Item.base_price / Topping.price).
+     * BUG-02 FIX: Tự tính giá từ DB (ProductSize / Product.base_price / Topping.price).
      * Không tin giá frontend gửi lên (unit_price, subtotal, price_at_time bị bỏ khỏi validation).
      */
-    public function store(Request $request, Cafe $cafe)
+    public function store(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
-        // Mở đơn MỚI thì quán phải đang mở cửa (xem ChecksCafeStatus). Bàn đang ngồi
+        $this->authorizeShop($shop);
+        // Mở đơn MỚI thì quán phải đang mở cửa (xem ChecksShopStatus). Bàn đang ngồi
         // vẫn gọi thêm và thanh toán được — update()/pay()/cancel() không bị chặn.
-        $this->guardBanHang($cafe);
+        $this->guardBanHang($shop);
 
         $validated = $request->validate([
             'table_id'                              => 'required|string',
             'note'                                  => 'nullable|string',
             'items'                                 => 'required|array|min:1',
-            'items.*.item_id'                       => 'required|string',
-            'items.*.item_name_snapshot'            => 'required|string',
-            'items.*.item_price_id'                 => 'nullable|string',
+            'items.*.product_id'                       => 'required|string',
+            'items.*.product_name_snapshot'            => 'required|string',
+            'items.*.product_size_id'                 => 'nullable|string',
             'items.*.size_name_snapshot'            => 'nullable|string',
             'items.*.quantity'                      => 'required|integer|min:1',
             'items.*.note'                          => 'nullable|string',
@@ -140,13 +140,13 @@ class OrderController extends Controller
         ]);
 
         // Bàn phải thuộc quán này
-        if (!$cafe->tables()->where('_id', $validated['table_id'])->exists()) {
+        if (!$shop->tables()->where('_id', $validated['table_id'])->exists()) {
             return response()->json(['message' => 'Bàn không hợp lệ hoặc không thuộc quán của bạn.'], 422);
         }
 
         // Chống tạo order trùng: nếu bàn đã có order active thì không tạo mới,
         // trả về order hiện tại để client tiếp tục cập nhật vào đó.
-        $existing = $cafe->orders()
+        $existing = $shop->orders()
             ->where('table_id', $validated['table_id'])
             ->where('status', 'active')
             ->first();
@@ -157,18 +157,18 @@ class OrderController extends Controller
 
         // Kiểm hết mọi dòng TRƯỚC khi tạo đơn: dòng nào hỏng thì 422 bay ra từ đây,
         // lúc CSDL còn chưa có gì mới. Không còn cảnh đơn rỗng nằm lại làm kẹt bàn.
-        $cacDong = $this->chuanBiCacDong($cafe, $validated['items']);
+        $cacDong = $this->chuanBiCacDong($shop, $validated['items']);
 
-        $order = $this->atomic(function () use ($cafe, $validated, $cacDong) {
+        $order = $this->atomic(function () use ($shop, $validated, $cacDong) {
             $todayStr = now()->format('Ymd');
             // B7: count()+1 có thể trùng khi 2 request chạy song song — dò tiếp
             // tới số chưa dùng trước khi chốt mã.
-            $orderCount = $cafe->orders()->where('code', 'like', "ORD-{$todayStr}-%")->count() + 1;
+            $orderCount = $shop->orders()->where('code', 'like', "ORD-{$todayStr}-%")->count() + 1;
             do {
                 $orderCode = 'ORD-' . $todayStr . '-' . str_pad($orderCount++, 4, '0', STR_PAD_LEFT);
-            } while ($cafe->orders()->where('code', $orderCode)->exists());
+            } while ($shop->orders()->where('code', $orderCode)->exists());
 
-            $order = $cafe->orders()->create([
+            $order = $shop->orders()->create([
                 'table_id'     => $validated['table_id'],
                 'code'         => $orderCode,
                 'status'       => 'active',
@@ -189,7 +189,7 @@ class OrderController extends Controller
                 'total_amount' => $orderSubtotal,
             ]);
 
-            $cafe->tables()->where('_id', $order->table_id)->update([
+            $shop->tables()->where('_id', $order->table_id)->update([
                 'status'           => 'serving',
                 'current_order_id' => $order->id,
             ]);
@@ -204,11 +204,11 @@ class OrderController extends Controller
     /**
      * BUG-02 + BUG-08 FIX: update() cũng tự tính giá từ DB khi items được gửi lên.
      */
-    public function update(Request $request, Cafe $cafe, Order $order)
+    public function update(Request $request, Shop $shop, Order $order)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        if ((string) $order->cafe_id !== (string) $cafe->id) {
+        if ((string) $order->shop_id !== (string) $shop->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
@@ -222,9 +222,9 @@ class OrderController extends Controller
             'note'                                  => 'nullable|string',
             'discount_amount'                       => 'nullable|numeric|min:0',
             'items'                                 => 'sometimes|array',
-            'items.*.item_id'                       => 'required_with:items|string',
-            'items.*.item_name_snapshot'            => 'required_with:items|string',
-            'items.*.item_price_id'                 => 'nullable|string',
+            'items.*.product_id'                       => 'required_with:items|string',
+            'items.*.product_name_snapshot'            => 'required_with:items|string',
+            'items.*.product_size_id'                 => 'nullable|string',
             'items.*.size_name_snapshot'            => 'nullable|string',
             'items.*.quantity'                      => 'required_with:items|integer|min:1',
             'items.*.note'                          => 'nullable|string',
@@ -239,9 +239,9 @@ class OrderController extends Controller
         // Kiểm hết trước khi động vào đơn đang có: trước đây các dòng cũ bị xóa ngay
         // đầu vòng lặp, nên một request bị từ chối giữa chừng làm mất luôn đơn của
         // bàn đang ngồi.
-        $cacDong = $request->has('items') ? $this->chuanBiCacDong($cafe, $validated['items']) : [];
+        $cacDong = $request->has('items') ? $this->chuanBiCacDong($shop, $validated['items']) : [];
 
-        $this->atomic(function () use ($request, $cafe, $order, $validated, $oldTableId, $cacDong) {
+        $this->atomic(function () use ($request, $shop, $order, $validated, $oldTableId, $cacDong) {
             $updateData = [];
             if ($request->has('table_id'))       $updateData['table_id']       = $validated['table_id'];
             if ($request->has('note'))           $updateData['note']           = $validated['note'] ?? '';
@@ -279,8 +279,8 @@ class OrderController extends Controller
             $order->update($updateData);
 
             if ($request->has('table_id') && $oldTableId !== $validated['table_id']) {
-                $cafe->tables()->where('_id', $oldTableId)->update(['status' => 'empty', 'current_order_id' => null]);
-                $cafe->tables()->where('_id', $validated['table_id'])->update(['status' => 'serving', 'current_order_id' => $order->id]);
+                $shop->tables()->where('_id', $oldTableId)->update(['status' => 'empty', 'current_order_id' => null]);
+                $shop->tables()->where('_id', $validated['table_id'])->update(['status' => 'serving', 'current_order_id' => $order->id]);
             }
         });
 
@@ -288,11 +288,11 @@ class OrderController extends Controller
         return response()->json($order);
     }
 
-    public function pay(Request $request, Cafe $cafe, Order $order)
+    public function pay(Request $request, Shop $shop, Order $order)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        if ((string) $order->cafe_id !== (string) $cafe->id) {
+        if ((string) $order->shop_id !== (string) $shop->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
@@ -357,12 +357,12 @@ class OrderController extends Controller
         $todayStr     = now()->format('Ymd');
         // B7: dò tiếp tới số chưa dùng để tránh trùng mã khi request song song.
         // Mã phiếu (invoice_code) nay lưu thẳng trên order — không còn bảng invoices.
-        $invoiceCount = $cafe->orders()
+        $invoiceCount = $shop->orders()
             ->where('invoice_code', 'like', "INV-{$todayStr}-%")
             ->count() + 1;
         do {
             $invoiceCode = 'INV-' . $todayStr . '-' . str_pad($invoiceCount++, 4, '0', STR_PAD_LEFT);
-        } while ($cafe->orders()->where('invoice_code', $invoiceCode)->exists());
+        } while ($shop->orders()->where('invoice_code', $invoiceCode)->exists());
 
         $now = now();
 
@@ -396,7 +396,7 @@ class OrderController extends Controller
         }
 
         // Thanh toán xong -> bàn về TRỐNG luôn (bỏ trạng thái 'cleaning').
-        $cafe->tables()->where('_id', $order->table_id)->update([
+        $shop->tables()->where('_id', $order->table_id)->update([
             'status'           => 'empty',
             'current_order_id' => null,
         ]);
@@ -409,11 +409,11 @@ class OrderController extends Controller
      * Hủy order đang phục vụ: đánh dấu order 'cancelled' và trả bàn về TRỐNG.
      * Không hủy được order đã thanh toán.
      */
-    public function cancel(Request $request, Cafe $cafe, Order $order)
+    public function cancel(Request $request, Shop $shop, Order $order)
     {
-        $this->authorizeCafe($cafe);
+        $this->authorizeShop($shop);
 
-        if ((string) $order->cafe_id !== (string) $cafe->id) {
+        if ((string) $order->shop_id !== (string) $shop->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
@@ -438,7 +438,7 @@ class OrderController extends Controller
             // lại lệnh hủy sau khi mất mạng là chuyện bình thường), vẫn dọn bàn.
         }
 
-        $cafe->tables()->where('_id', $order->table_id)->update([
+        $shop->tables()->where('_id', $order->table_id)->update([
             'status'           => 'empty',
             'current_order_id' => null,
         ]);
@@ -459,12 +459,12 @@ class OrderController extends Controller
      * Cách làm bây giờ: kiểm hết mọi dòng trước; qua được hết mới bắt đầu ghi.
      *
      * BUG-FIX (B1): item / size / topping BẮT BUỘC tồn tại và thuộc đúng quán.
-     * Trước đây Item::find() không kiểm tra gì — id không tồn tại → giá 0 vẫn
+     * Trước đây Product::find() không kiểm tra gì — id không tồn tại → giá 0 vẫn
      * tạo được dòng order ("món ma"), hoặc dùng được giá của quán khác.
      *
      * @return array{detail: array, toppings: array, total: float}
      */
-    private function chuanBiDong(Cafe $cafe, array $itemData): array
+    private function chuanBiDong(Shop $shop, array $productData): array
     {
         $fail = function (string $msg) {
             throw new \Illuminate\Http\Exceptions\HttpResponseException(
@@ -477,60 +477,60 @@ class OrderController extends Controller
         // Kiểm is_available ở đây chứ không chỉ lọc lúc hiển thị thực đơn: giỏ hàng
         // được giữ lại phía server dưới dạng đơn nháp, nên món có thể bị chủ quán ẩn
         // (hết nguyên liệu) trong khoảng giữa lúc nhân viên bỏ vào giỏ và lúc chốt đơn.
-        $item = Item::find($itemData['item_id']);
-        if (!$item || (string) $item->cafe_id !== (string) $cafe->id) {
+        $product = Product::find($productData['product_id']);
+        if (!$product || (string) $product->shop_id !== (string) $shop->id) {
             $fail('Món không hợp lệ hoặc không thuộc quán của bạn.');
         }
-        if (!($item->is_available ?? true)) {
-            $fail('Món "' . $item->name . '" đã ngừng bán, vui lòng bỏ khỏi đơn.');
+        if (!($product->is_available ?? true)) {
+            $fail('Món "' . $product->name . '" đã ngừng bán, vui lòng bỏ khỏi đơn.');
         }
 
         // Ẩn danh mục = ẩn cả món bên trong (quy tắc 4.2.2, màn hình Bán hàng cũng
         // lọc như vậy). Chặn lại ở đây vì đơn nháp nằm phía máy chủ: chủ quán có thể
         // tắt cả danh mục ở tab khác trong lúc nhân viên đang gọi món.
-        if (!empty($item->category_id)) {
-            $danhMuc = \App\Models\Category::find($item->category_id);
+        if (!empty($product->category_id)) {
+            $danhMuc = \App\Models\Category::find($product->category_id);
             if ($danhMuc && !($danhMuc->is_active ?? true)) {
-                $fail('Danh mục "' . $danhMuc->name . '" đang ẩn nên món "' . $item->name . '" không bán được.');
+                $fail('Danh mục "' . $danhMuc->name . '" đang ẩn nên món "' . $product->name . '" không bán được.');
             }
         }
 
         // Tự lấy giá từ DB
-        if (!empty($itemData['item_price_id'])) {
-            $itemPrice = ItemPrice::find($itemData['item_price_id']);
+        if (!empty($productData['product_size_id'])) {
+            $productSize = ProductSize::find($productData['product_size_id']);
             // Size phải tồn tại và thuộc đúng món
-            if (!$itemPrice || (string) $itemPrice->item_id !== (string) $item->id) {
-                $fail('Size không hợp lệ cho món "' . $item->name . '".');
+            if (!$productSize || (string) $productSize->product_id !== (string) $product->id) {
+                $fail('Size không hợp lệ cho món "' . $product->name . '".');
             }
             // Size đã tắt thì không bán được nữa — cùng lý do với is_available của
             // món và topping: đơn nháp nằm phía máy chủ nên chủ quán có thể tắt một
             // size ở tab khác trong khoảng giữa lúc bỏ vào giỏ và lúc chốt đơn.
-            if (!($itemPrice->is_active ?? true)) {
-                $fail('Size "' . $itemPrice->size_name . '" của món "' . $item->name . '" đã ngừng bán, vui lòng chọn size khác.');
+            if (!($productSize->is_active ?? true)) {
+                $fail('Size "' . $productSize->size_name . '" của món "' . $product->name . '" đã ngừng bán, vui lòng chọn size khác.');
             }
-            $unitPrice = (float) $itemPrice->price;
+            $unitPrice = (float) $productSize->price;
         } else {
             // MÓN CÓ SIZE THÌ BẮT BUỘC CHỌN SIZE.
             //
             // Thiếu chốt này là một đường né giá: `base_price` vẫn nằm trên món kể cả
-            // khi has_size bật (ItemController::store validate nó là `required`), và
-            // chủ quán thường để đó một con số cũ hoặc 0. Bỏ trống `item_price_id` khi
+            // khi has_size bật (ProductController::store validate nó là `required`), và
+            // chủ quán thường để đó một con số cũ hoặc 0. Bỏ trống `product_size_id` khi
             // gọi API là rơi thẳng vào nhánh dưới và mua được ly cỡ lớn theo giá đó.
             // Giao diện luôn gửi size cho món có size (xem openOption), nhưng giao
             // diện không phải chốt chặn.
-            if ($item->has_size ?? false) {
-                $fail('Món "' . $item->name . '" phải chọn size.');
+            if ($product->has_size ?? false) {
+                $fail('Món "' . $product->name . '" phải chọn size.');
             }
-            $unitPrice = (float) $item->base_price;
+            $unitPrice = (float) $product->base_price;
         }
 
-        $quantity    = (int) $itemData['quantity'];
+        $quantity    = (int) $productData['quantity'];
         $itemSubtotal = $unitPrice * $quantity;
 
         $toppingTotal = 0.0;
         $toppingRows  = [];
 
-        $dsTopping = $itemData['toppings'] ?? [];
+        $dsTopping = $productData['toppings'] ?? [];
 
         // Món không nhận topping thì không nhận dòng topping nào.
         //
@@ -538,14 +538,14 @@ class OrderController extends Controller
         // `allowedToppingIds`, món tắt cờ thì không có gì để chọn), nhưng lọc để hiển
         // thị không phải là ràng buộc — gọi thẳng API vẫn gắn được trân châu vào ổ
         // bánh mì và cộng tiền topping vào hóa đơn của nó.
-        if ($dsTopping !== [] && !($item->allow_topping ?? false)) {
-            $fail('Món "' . $item->name . '" không nhận topping.');
+        if ($dsTopping !== [] && !($product->has_topping ?? false)) {
+            $fail('Món "' . $product->name . '" không nhận topping.');
         }
 
         foreach ($dsTopping as $topData) {
             $topping = Topping::find($topData['topping_id']);
             // Topping phải tồn tại, thuộc quán này và còn bán (xem chú thích ở phần món)
-            if (!$topping || (string) $topping->cafe_id !== (string) $cafe->id) {
+            if (!$topping || (string) $topping->shop_id !== (string) $shop->id) {
                 $fail('Topping không hợp lệ hoặc không thuộc quán của bạn.');
             }
             if (!($topping->is_available ?? true)) {
@@ -553,16 +553,16 @@ class OrderController extends Controller
             }
             // Và phải nằm trong danh sách topping được gắn cho CHÍNH MÓN NÀY.
             // Thuộc cùng quán là chưa đủ: mỗi món chỉ đi với một số topping nhất định,
-            // quan hệ đó nằm ở bảng nối `item_toppings` do trang Thực đơn dựng lên.
-            $duocGan = ItemTopping::where('item_id', (string) $item->id)
+            // quan hệ đó nằm ở bảng nối `product_toppings` do trang Thực đơn dựng lên.
+            $duocGan = ProductTopping::where('product_id', (string) $product->id)
                 ->where('topping_id', (string) $topData['topping_id'])
                 ->exists();
             if (!$duocGan) {
-                $fail('Topping "' . $topping->name . '" không dùng được cho món "' . $item->name . '", vui lòng bỏ khỏi đơn.');
+                $fail('Topping "' . $topping->name . '" không dùng được cho món "' . $product->name . '", vui lòng bỏ khỏi đơn.');
             }
             $toppingPrice = (float) $topping->price;
             $toppingQty   = (int) $topData['quantity'];
-            // Công thức: price_at_time * topping_qty * item_qty
+            // Công thức: price_at_time * topping_qty * product_qty
             $toppingSubtotal = $toppingPrice * $toppingQty * $quantity;
             $toppingTotal   += $toppingSubtotal;
 
@@ -580,17 +580,17 @@ class OrderController extends Controller
 
         return [
             'detail' => [
-                'item_id'            => $itemData['item_id'],
+                'product_id'            => $productData['product_id'],
                 // Snapshot tên lấy từ DB — không tin tên client gửi lên (in lên hóa đơn)
-                'item_name_snapshot' => $item->name,
-                'item_price_id'      => $itemData['item_price_id'] ?? null,
-                'size_name_snapshot' => $itemData['size_name_snapshot'] ?? null,
+                'product_name_snapshot' => $product->name,
+                'product_size_id'      => $productData['product_size_id'] ?? null,
+                'size_name_snapshot' => $productData['size_name_snapshot'] ?? null,
                 'quantity'           => $quantity,
                 'unit_price'         => $unitPrice,
                 'subtotal'           => $itemSubtotal,
                 'topping_total'      => $toppingTotal,
                 'total_price'        => $itemTotalPrice,
-                'note'               => $itemData['note'] ?? '',
+                'note'               => $productData['note'] ?? '',
             ],
             'toppings' => $toppingRows,
             'total'    => $itemTotalPrice,
@@ -604,9 +604,9 @@ class OrderController extends Controller
      *
      * @return array<int, array{detail: array, toppings: array, total: float}>
      */
-    private function chuanBiCacDong(Cafe $cafe, array $items): array
+    private function chuanBiCacDong(Shop $shop, array $items): array
     {
-        return array_map(fn ($itemData) => $this->chuanBiDong($cafe, $itemData), $items);
+        return array_map(fn ($productData) => $this->chuanBiDong($shop, $productData), $items);
     }
 
     /** Ghi một dòng đã được kiểm xong vào đơn. Không còn chỗ nào để hỏng. */

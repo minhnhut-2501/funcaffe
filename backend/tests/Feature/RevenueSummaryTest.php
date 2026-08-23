@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Order;
 use App\Models\OrderDetail;
 use App\Models\User;
@@ -26,12 +26,12 @@ use Laravel\Sanctum\Sanctum;
 class RevenueSummaryTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'orders', 'order_details', 'subscriptions', 'packages',
+        'users', 'shops', 'orders', 'order_details', 'subscriptions', 'packages',
     ];
 
     private User $user;
-    private Cafe $quanA;
-    private Cafe $quanB;
+    private Shop $quanA;
+    private Shop $quanB;
 
     protected function setUp(): void
     {
@@ -46,8 +46,8 @@ class RevenueSummaryTest extends MongoTestCase
             'role' => 'user',
             'status' => 'active',
         ]);
-        $this->quanA = $this->user->cafes()->create(['name' => 'Quán A', 'status' => 'open']);
-        $this->quanB = $this->user->cafes()->create(['name' => 'Quán B', 'status' => 'open']);
+        $this->quanA = $this->user->shops()->create(['name' => 'Quán A', 'status' => 'open']);
+        $this->quanB = $this->user->shops()->create(['name' => 'Quán B', 'status' => 'open']);
 
         Sanctum::actingAs($this->user);
     }
@@ -58,10 +58,10 @@ class RevenueSummaryTest extends MongoTestCase
         parent::tearDown();
     }
 
-    private function donDaThu(Cafe $cafe, string $ngayGio, int $tien, ?string $ten = null, int $sl = 1): Order
+    private function donDaThu(Shop $shop, string $ngayGio, int $tien, ?string $ten = null, int $sl = 1): Order
     {
         $order = Order::create([
-            'cafe_id' => (string) $cafe->id,
+            'shop_id' => (string) $shop->id,
             'code' => 'DH-' . uniqid(),
             'invoice_code' => 'HD-' . uniqid(),
             'status' => 'paid',
@@ -77,7 +77,7 @@ class RevenueSummaryTest extends MongoTestCase
         if ($ten !== null) {
             OrderDetail::create([
                 'order_id' => (string) $order->id,
-                'item_name_snapshot' => $ten,
+                'product_name_snapshot' => $ten,
                 'quantity' => $sl,
                 'unit_price' => (int) ($tien / max(1, $sl)),
                 'total_price' => $tien,
@@ -97,7 +97,7 @@ class RevenueSummaryTest extends MongoTestCase
 
         $this->assertSame(350_000, $res->json('total'));
         $this->assertSame(2, $res->json('count'));
-        $this->assertCount(2, $res->json('cafes'));
+        $this->assertCount(2, $res->json('shops'));
     }
 
     public function test_chi_dinh_mot_quan_thi_khong_lan_sang_quan_khac(): void
@@ -105,12 +105,12 @@ class RevenueSummaryTest extends MongoTestCase
         $this->donDaThu($this->quanA, '2026-08-10 09:00:00', 100_000);
         $this->donDaThu($this->quanB, '2026-08-10 09:00:00', 250_000);
 
-        $res = $this->getJson('/api/revenue/summary?cafe_id=' . $this->quanA->id);
+        $res = $this->getJson('/api/revenue/summary?shop_id=' . $this->quanA->id);
         $res->assertOk();
 
         $this->assertSame(100_000, $res->json('total'));
-        $this->assertCount(1, $res->json('cafes'));
-        $this->assertSame('Quán A', $res->json('cafes.0.cafe_name'));
+        $this->assertCount(1, $res->json('shops'));
+        $this->assertSame('Quán A', $res->json('shops.0.shop_name'));
     }
 
     public function test_khoang_ngay_lay_tron_hai_dau(): void
@@ -168,7 +168,7 @@ class RevenueSummaryTest extends MongoTestCase
         $res = $this->getJson('/api/revenue/summary');
         $res->assertOk();
 
-        $rows = collect($res->json('cafes'))->keyBy('cafe_name');
+        $rows = collect($res->json('shops'))->keyBy('shop_name');
         $this->assertArrayHasKey('Quán B', $rows->all(), 'Quán chưa bán được gì vẫn phải có hàng, với số 0.');
         $this->assertSame(0, $rows['Quán B']['total']);
         $this->assertSame(0, $rows['Quán B']['count']);
@@ -178,7 +178,7 @@ class RevenueSummaryTest extends MongoTestCase
     {
         $this->donDaThu($this->quanA, '2026-08-10 09:00:00', 100_000);
         Order::create([
-            'cafe_id' => (string) $this->quanA->id,
+            'shop_id' => (string) $this->quanA->id,
             'code' => 'DH-treo-' . uniqid(),
             'status' => 'active',
             'payment_status' => 'unpaid',
@@ -203,10 +203,10 @@ class RevenueSummaryTest extends MongoTestCase
             'role' => 'user',
             'status' => 'active',
         ]);
-        $quanLa = $nguoiLa->cafes()->create(['name' => 'Quán lạ', 'status' => 'open']);
+        $quanLa = $nguoiLa->shops()->create(['name' => 'Quán lạ', 'status' => 'open']);
         $this->donDaThu($quanLa, '2026-08-10 09:00:00', 777_000);
 
-        $res = $this->getJson('/api/revenue/summary?cafe_id=' . $quanLa->id);
+        $res = $this->getJson('/api/revenue/summary?shop_id=' . $quanLa->id);
         $res->assertNotFound();
 
         // Và không được lọt vào đường gộp mọi quán.

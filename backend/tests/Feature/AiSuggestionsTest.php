@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Category;
-use App\Models\Item;
+use App\Models\Product;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Subscription;
@@ -26,13 +26,13 @@ use Laravel\Sanctum\Sanctum;
 class AiSuggestionsTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'packages', 'subscriptions', 'categories',
-        'items', 'tables', 'orders', 'order_details',
+        'users', 'shops', 'packages', 'subscriptions', 'categories',
+        'products', 'tables', 'orders', 'order_details',
     ];
 
     private User $user;
-    private Cafe $cafe;
-    private Item $item;
+    private Shop $shop;
+    private Product $product;
     private $table;
 
     protected function setUp(): void
@@ -47,7 +47,7 @@ class AiSuggestionsTest extends MongoTestCase
             'status' => 'active',
         ]);
 
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán kiểm thử', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán kiểm thử', 'status' => 'open']);
 
         // Gói phải bật can_use_ai, nếu không middleware 'ai' chặn ở 403.
         $package = Package::create([
@@ -56,7 +56,7 @@ class AiSuggestionsTest extends MongoTestCase
         ]);
 
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $package->id,
             'package_name_snapshot' => $package->name,
             'start_date' => now()->subDay(),
@@ -66,18 +66,18 @@ class AiSuggestionsTest extends MongoTestCase
         ]);
 
         $category = Category::create([
-            'cafe_id' => (string) $this->cafe->id, 'name' => 'Cà phê', 'is_active' => true,
+            'shop_id' => (string) $this->shop->id, 'name' => 'Cà phê', 'is_active' => true,
         ]);
 
-        $this->item = Item::create([
-            'cafe_id' => (string) $this->cafe->id,
+        $this->item = Product::create([
+            'shop_id' => (string) $this->shop->id,
             'category_id' => (string) $category->id,
             'name' => 'Cà phê sữa',
             'base_price' => 30_000,
             'is_available' => true,
         ]);
 
-        $this->table = $this->cafe->tables()->create([
+        $this->table = $this->shop->tables()->create([
             'name' => 'Bàn 1', 'capacity' => 4, 'status' => 'empty',
         ]);
 
@@ -86,18 +86,18 @@ class AiSuggestionsTest extends MongoTestCase
 
     private function fetch(): array
     {
-        $res = $this->getJson("/api/cafes/{$this->cafe->id}/ai/suggestions");
+        $res = $this->getJson("/api/shops/{$this->shop->id}/ai/suggestions");
         $res->assertStatus(200);
         return $res->json('suggestions');
     }
 
     private function openOrder(): void
     {
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders", [
+        $this->postJson("/api/shops/{$this->shop->id}/orders", [
             'table_id' => (string) $this->table->id,
             'items' => [[
-                'item_id' => (string) $this->item->id,
-                'item_name_snapshot' => 'Cà phê sữa',
+                'product_id' => (string) $this->item->id,
+                'product_name_snapshot' => 'Cà phê sữa',
                 'quantity' => 1,
             ]],
         ])->assertStatus(201);
@@ -135,7 +135,7 @@ class AiSuggestionsTest extends MongoTestCase
 
         // Mô phỏng đúng ca lệnh ghi thứ hai bị hỏng: đơn đã đóng nhưng `tables.status`
         // còn kẹt ở 'serving'. Gợi ý phải đi theo ĐƠN, không theo bàn.
-        Order::where('cafe_id', (string) $this->cafe->id)->update(['status' => 'cancelled']);
+        Order::where('shop_id', (string) $this->shop->id)->update(['status' => 'cancelled']);
         $this->table->update(['status' => 'serving']);
 
         $this->assertStringNotContainsString(
@@ -148,8 +148,8 @@ class AiSuggestionsTest extends MongoTestCase
     public function test_goi_hoi_mon_ban_chay_sau_khi_da_co_doanh_thu(): void
     {
         $this->openOrder();
-        $orderId = Order::where('cafe_id', (string) $this->cafe->id)->first()->id;
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+        $orderId = Order::where('shop_id', (string) $this->shop->id)->first()->id;
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", [
             'payment_method' => 'cash',
             // Bắt buộc từ khi tiền mặt phải ghi số khách đưa; bài này không soi tiền thối.
             'cash_received' => 1_000_000,
@@ -165,7 +165,7 @@ class AiSuggestionsTest extends MongoTestCase
     {
         Package::query()->update(['can_use_ai' => false]);
 
-        $this->getJson("/api/cafes/{$this->cafe->id}/ai/suggestions")->assertStatus(403);
+        $this->getJson("/api/shops/{$this->shop->id}/ai/suggestions")->assertStatus(403);
     }
 
     /**
@@ -190,7 +190,7 @@ class AiSuggestionsTest extends MongoTestCase
 
         $lot = [];
         foreach ($duongAi as $route) {
-            $duong = '/' . ltrim(str_replace('{cafe}', (string) $this->cafe->id, $route->uri()), '/');
+            $duong = '/' . ltrim(str_replace('{shop}', (string) $this->shop->id, $route->uri()), '/');
             $cach = collect($route->methods())->first(fn ($m) => !in_array($m, ['HEAD', 'OPTIONS'], true));
             $res = $this->json($cach, $duong, ['message' => 'xin chào']);
             if ($res->getStatusCode() !== 403) {
@@ -204,9 +204,9 @@ class AiSuggestionsTest extends MongoTestCase
     /** Gói có quyền nhưng ĐÃ HẾT HẠN cũng không được dùng AI. */
     public function test_goi_het_han_thi_khong_dung_duoc_ai_du_goi_do_co_quyen(): void
     {
-        Subscription::where('cafe_id', (string) $this->cafe->id)
+        Subscription::where('shop_id', (string) $this->shop->id)
             ->update(['end_date' => now()->subDay()]);
 
-        $this->getJson("/api/cafes/{$this->cafe->id}/ai/suggestions")->assertStatus(403);
+        $this->getJson("/api/shops/{$this->shop->id}/ai/suggestions")->assertStatus(403);
     }
 }

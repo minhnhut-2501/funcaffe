@@ -15,7 +15,7 @@ class PackagePayment extends Model
     protected $connection = 'mongodb';
     protected $collection = 'package_payments';
     protected $fillable = [
-        'user_id', 'cafe_id', 'package_id', 'time_subscription_id', 'subscription_id',
+        'user_id', 'shop_id', 'package_id', 'time_subscription_id', 'subscription_id',
         // subtotal = giá gói chưa VAT; amount = số tiền thực trả (đã gồm VAT)
         'subtotal', 'vat_rate', 'vat_amount',
         'amount', 'payment_method', 'payment_status', 'transaction_code',
@@ -63,8 +63,8 @@ class PackagePayment extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function cafe()
+    public function shop()
     {
-        return $this->belongsTo(Cafe::class, 'cafe_id');
+        return $this->belongsTo(Shop::class, 'shop_id');
     }
 }

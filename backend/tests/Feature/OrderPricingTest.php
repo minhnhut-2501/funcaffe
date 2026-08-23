@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\Cafe;
+use App\Models\Shop;
 use App\Models\Category;
-use App\Models\Item;
-use App\Models\ItemPrice;
-use App\Models\ItemTopping;
+use App\Models\Product;
+use App\Models\ProductSize;
+use App\Models\ProductTopping;
 use App\Models\Order;
 use App\Models\Package;
 use App\Models\Subscription;
@@ -24,14 +24,14 @@ use Laravel\Sanctum\Sanctum;
 class OrderPricingTest extends MongoTestCase
 {
     protected array $collections = [
-        'users', 'cafes', 'packages', 'subscriptions', 'categories',
-        'items', 'item_prices', 'toppings', 'item_toppings', 'tables', 'orders',
+        'users', 'shops', 'packages', 'subscriptions', 'categories',
+        'products', 'product_sizes', 'toppings', 'product_toppings', 'tables', 'orders',
         'order_details', 'order_detail_toppings',
     ];
 
     private User $user;
-    private Cafe $cafe;
-    private Item $item;
+    private Shop $shop;
+    private Product $product;
     private Topping $topping;
     private $table;
 
@@ -47,7 +47,7 @@ class OrderPricingTest extends MongoTestCase
             'status' => 'active',
         ]);
 
-        $this->cafe = $this->user->cafes()->create(['name' => 'Quán kiểm thử', 'status' => 'open']);
+        $this->shop = $this->user->shops()->create(['name' => 'Quán kiểm thử', 'status' => 'open']);
 
         $package = Package::create([
             'name' => 'Pro Max', 'type' => 'promax', 'level' => 2,
@@ -56,7 +56,7 @@ class OrderPricingTest extends MongoTestCase
 
         // Bán hàng đi qua middleware 'subscription' nên quán phải có gói còn hiệu lực.
         Subscription::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'package_id' => (string) $package->id,
             'package_name_snapshot' => $package->name,
             'start_date' => now()->subDay(),
@@ -66,33 +66,33 @@ class OrderPricingTest extends MongoTestCase
         ]);
 
         $category = Category::create([
-            'cafe_id' => (string) $this->cafe->id, 'name' => 'Cà phê', 'is_active' => true,
+            'shop_id' => (string) $this->shop->id, 'name' => 'Cà phê', 'is_active' => true,
         ]);
 
-        $this->item = Item::create([
-            'cafe_id' => (string) $this->cafe->id,
+        $this->item = Product::create([
+            'shop_id' => (string) $this->shop->id,
             'category_id' => (string) $category->id,
             'name' => 'Cà phê sữa',
             'base_price' => 30_000,
             'is_available' => true,
-            'allow_topping' => true,
+            'has_topping' => true,
         ]);
 
         $this->topping = Topping::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'name' => 'Trân châu',
             'price' => 5_000,
             'is_available' => true,
         ]);
 
         // Gắn topping vào món. Cùng quán là CHƯA ĐỦ để bán kèm — phải có dòng nối
-        // trong `item_toppings`, đúng thứ trang Thực đơn dựng lên khi lưu món.
-        ItemTopping::create([
-            'item_id' => (string) $this->item->id,
+        // trong `product_toppings`, đúng thứ trang Thực đơn dựng lên khi lưu món.
+        ProductTopping::create([
+            'product_id' => (string) $this->item->id,
             'topping_id' => (string) $this->topping->id,
         ]);
 
-        $this->table = $this->cafe->tables()->create([
+        $this->table = $this->shop->tables()->create([
             'name' => 'Bàn 1', 'capacity' => 4, 'status' => 'empty',
         ]);
 
@@ -101,17 +101,17 @@ class OrderPricingTest extends MongoTestCase
 
     private function createOrder(array $items): \Illuminate\Testing\TestResponse
     {
-        return $this->postJson("/api/cafes/{$this->cafe->id}/orders", [
+        return $this->postJson("/api/shops/{$this->shop->id}/orders", [
             'table_id' => (string) $this->table->id,
             'items' => $items,
         ]);
     }
 
-    private function oneItem(array $overrides = []): array
+    private function oneProduct(array $overrides = []): array
     {
         return array_merge([
-            'item_id' => (string) $this->item->id,
-            'item_name_snapshot' => 'Cà phê sữa',
+            'product_id' => (string) $this->item->id,
+            'product_name_snapshot' => 'Cà phê sữa',
             'quantity' => 2,
         ], $overrides);
     }
@@ -119,8 +119,8 @@ class OrderPricingTest extends MongoTestCase
     public function test_gia_lay_tu_csdl_chu_khong_lay_tu_client(): void
     {
         // Client cố gửi giá 1.000đ và tên món khác. Cả hai phải bị bỏ qua.
-        $res = $this->createOrder([$this->oneItem([
-            'item_name_snapshot' => 'Món giá rẻ',
+        $res = $this->createOrder([$this->oneProduct([
+            'product_name_snapshot' => 'Món giá rẻ',
             'unit_price' => 1_000,
             'subtotal' => 2_000,
         ])]);
@@ -128,13 +128,13 @@ class OrderPricingTest extends MongoTestCase
         $res->assertStatus(201);
         // 30.000 x 2 = 60.000, không phải 2.000
         $this->assertSame(60_000.0, (float) $res->json('subtotal'));
-        $this->assertSame('Cà phê sữa', $res->json('order_details.0.item_name_snapshot'));
+        $this->assertSame('Cà phê sữa', $res->json('order_details.0.product_name_snapshot'));
     }
 
     public function test_topping_nhan_theo_ca_so_luong_topping_lan_so_luong_mon(): void
     {
         // 2 ly, mỗi ly 2 phần trân châu: 30.000x2 + 5.000x2x2 = 80.000
-        $res = $this->createOrder([$this->oneItem([
+        $res = $this->createOrder([$this->oneProduct([
             'toppings' => [[
                 'topping_id' => (string) $this->topping->id,
                 'quantity' => 2,
@@ -151,29 +151,29 @@ class OrderPricingTest extends MongoTestCase
         // và lúc chốt đơn.
         $this->item->update(['is_available' => false]);
 
-        $this->createOrder([$this->oneItem()])
+        $this->createOrder([$this->oneProduct()])
             ->assertStatus(422)
             ->assertJsonPath('message', 'Món "Cà phê sữa" đã ngừng bán, vui lòng bỏ khỏi đơn.');
     }
 
     public function test_khong_dung_duoc_mon_cua_quan_khac(): void
     {
-        $khac = $this->user->cafes()->create(['name' => 'Quán khác', 'status' => 'open']);
-        $monCuaQuanKhac = Item::create([
-            'cafe_id' => (string) $khac->id,
+        $khac = $this->user->shops()->create(['name' => 'Quán khác', 'status' => 'open']);
+        $monCuaQuanKhac = Product::create([
+            'shop_id' => (string) $khac->id,
             'name' => 'Món quán khác', 'base_price' => 1_000, 'is_available' => true,
         ]);
 
-        $this->createOrder([$this->oneItem(['item_id' => (string) $monCuaQuanKhac->id])])
+        $this->createOrder([$this->oneProduct(['product_id' => (string) $monCuaQuanKhac->id])])
             ->assertStatus(422);
     }
 
     public function test_giam_gia_khong_the_vuot_tam_tinh(): void
     {
-        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+        $orderId = $this->createOrder([$this->oneProduct()])->json('id');
 
         // Tạm tính 60.000, xin giảm 999.000 -> phải bị kẹp về 60.000, tổng = 0 (không âm).
-        $res = $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+        $res = $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", [
             'payment_method' => 'cash',
             'discount_amount' => 999_000,
             'cash_received' => 0,
@@ -186,9 +186,9 @@ class OrderPricingTest extends MongoTestCase
 
     public function test_khach_dua_thieu_tien_thi_khong_thanh_toan_duoc(): void
     {
-        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+        $orderId = $this->createOrder([$this->oneProduct()])->json('id');
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", [
             'payment_method' => 'cash',
             'cash_received' => 50_000,   // cần 60.000
         ])->assertStatus(422);
@@ -204,9 +204,9 @@ class OrderPricingTest extends MongoTestCase
      */
     public function test_tien_mat_ma_khong_ghi_so_khach_dua_thi_bi_tu_choi(): void
     {
-        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+        $orderId = $this->createOrder([$this->oneProduct()])->json('id');
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", [
             'payment_method' => 'cash',
         ])->assertStatus(422)->assertJsonValidationErrors('cash_received');
 
@@ -216,18 +216,18 @@ class OrderPricingTest extends MongoTestCase
     /** ĐỐI CHỨNG: chuyển khoản thì không có tiền khách đưa, và đó là bình thường. */
     public function test_chuyen_khoan_khong_can_so_tien_khach_dua(): void
     {
-        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+        $orderId = $this->createOrder([$this->oneProduct()])->json('id');
 
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", [
             'payment_method' => 'vietqr',
         ])->assertStatus(200);
     }
 
     public function test_thanh_toan_tra_ve_tien_thoi_dung(): void
     {
-        $orderId = $this->createOrder([$this->oneItem()])->json('id');
+        $orderId = $this->createOrder([$this->oneProduct()])->json('id');
 
-        $res = $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+        $res = $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", [
             'payment_method' => 'cash',
             'cash_received' => 100_000,
         ]);
@@ -247,12 +247,12 @@ class OrderPricingTest extends MongoTestCase
      */
     public function test_danh_sach_gon_bo_dong_mon_nhung_giu_du_thu_bang_can(): void
     {
-        $orderId = $this->createOrder([$this->oneItem()])->json('id');
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+        $orderId = $this->createOrder([$this->oneProduct()])->json('id');
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", [
             'payment_method' => 'cash', 'cash_received' => 100_000,
         ])->assertStatus(200);
 
-        $gon = $this->getJson("/api/cafes/{$this->cafe->id}/orders?status=paid&slim=1")
+        $gon = $this->getJson("/api/shops/{$this->shop->id}/orders?status=paid&slim=1")
             ->assertStatus(200)->json();
 
         $this->assertCount(1, $gon);
@@ -269,27 +269,27 @@ class OrderPricingTest extends MongoTestCase
      */
     public function test_khong_co_co_gon_thi_van_tra_du_dong_mon(): void
     {
-        $orderId = $this->createOrder([$this->oneItem()])->json('id');
-        $this->postJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay", [
+        $orderId = $this->createOrder([$this->oneProduct()])->json('id');
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$orderId}/pay", [
             'payment_method' => 'cash', 'cash_received' => 100_000,
         ])->assertStatus(200);
 
-        $day = $this->getJson("/api/cafes/{$this->cafe->id}/orders?status=paid")
+        $day = $this->getJson("/api/shops/{$this->shop->id}/orders?status=paid")
             ->assertStatus(200)->json();
 
         $this->assertNotEmpty($day[0]['order_details'] ?? [], 'Danh sách đầy đủ lại không có dòng món.');
 
         // Và đường `show` — nơi hộp thoại chi tiết đi lấy món — luôn phải đủ.
         $this->assertNotEmpty(
-            $this->getJson("/api/cafes/{$this->cafe->id}/orders/{$orderId}")->assertStatus(200)->json('order_details'),
+            $this->getJson("/api/shops/{$this->shop->id}/orders/{$orderId}")->assertStatus(200)->json('order_details'),
             'Xem một hóa đơn mà không có dòng món thì bản in ra tờ phiếu trống.',
         );
     }
 
     public function test_don_da_thanh_toan_khong_thanh_toan_lai_duoc(): void
     {
-        $orderId = $this->createOrder([$this->oneItem()])->json('id');
-        $url = "/api/cafes/{$this->cafe->id}/orders/{$orderId}/pay";
+        $orderId = $this->createOrder([$this->oneProduct()])->json('id');
+        $url = "/api/shops/{$this->shop->id}/orders/{$orderId}/pay";
 
         $this->postJson($url, ['payment_method' => 'cash', 'cash_received' => 100_000])->assertStatus(200);
         $this->postJson($url, ['payment_method' => 'cash', 'cash_received' => 100_000])->assertStatus(400);
@@ -307,13 +307,13 @@ class OrderPricingTest extends MongoTestCase
     {
         // Topping này của CÙNG QUÁN và đang bán, nhưng không được gắn cho món.
         $khac = Topping::create([
-            'cafe_id' => (string) $this->cafe->id,
+            'shop_id' => (string) $this->shop->id,
             'name' => 'Thạch dừa',
             'price' => 7_000,
             'is_available' => true,
         ]);
 
-        $res = $this->createOrder([$this->oneItem([
+        $res = $this->createOrder([$this->oneProduct([
             'toppings' => [['topping_id' => (string) $khac->id, 'quantity' => 1]],
         ])]);
 
@@ -321,14 +321,14 @@ class OrderPricingTest extends MongoTestCase
         $this->assertStringContainsString('không dùng được cho món', (string) $res->json('message'));
 
         // Và không được để lại dấu vết nào: đơn phải bị chặn TRƯỚC khi ghi.
-        $this->assertSame(0, Order::where('cafe_id', (string) $this->cafe->id)->count());
+        $this->assertSame(0, Order::where('shop_id', (string) $this->shop->id)->count());
     }
 
     public function test_mon_khong_nhan_topping_thi_bi_tu_choi(): void
     {
-        $this->item->update(['allow_topping' => false]);
+        $this->item->update(['has_topping' => false]);
 
-        $res = $this->createOrder([$this->oneItem([
+        $res = $this->createOrder([$this->oneProduct([
             'toppings' => [['topping_id' => (string) $this->topping->id, 'quantity' => 1]],
         ])]);
 
@@ -339,17 +339,17 @@ class OrderPricingTest extends MongoTestCase
     public function test_mon_co_size_thi_bat_buoc_chon_size(): void
     {
         // Đây là một đường NÉ GIÁ, không chỉ là lỗi dữ liệu lệch: `base_price` vẫn nằm
-        // trên món kể cả khi has_size bật, nên bỏ trống item_price_id là mua ly cỡ lớn
+        // trên món kể cả khi has_size bật, nên bỏ trống product_size_id là mua ly cỡ lớn
         // theo giá gốc.
         $this->item->update(['has_size' => true, 'base_price' => 10_000]);
-        ItemPrice::create([
-            'item_id' => (string) $this->item->id,
+        ProductSize::create([
+            'product_id' => (string) $this->item->id,
             'size_name' => 'Lớn',
             'price' => 45_000,
             'is_active' => true,
         ]);
 
-        $res = $this->createOrder([$this->oneItem()]);  // cố ý KHÔNG gửi item_price_id
+        $res = $this->createOrder([$this->oneProduct()]);  // cố ý KHÔNG gửi product_size_id
 
         $res->assertStatus(422);
         $this->assertStringContainsString('phải chọn size', (string) $res->json('message'));
@@ -358,15 +358,15 @@ class OrderPricingTest extends MongoTestCase
     public function test_khong_ban_duoc_size_da_tat(): void
     {
         $this->item->update(['has_size' => true]);
-        $size = ItemPrice::create([
-            'item_id' => (string) $this->item->id,
+        $size = ProductSize::create([
+            'product_id' => (string) $this->item->id,
             'size_name' => 'Lớn',
             'price' => 45_000,
             'is_active' => false,
         ]);
 
-        $res = $this->createOrder([$this->oneItem([
-            'item_price_id' => (string) $size->id,
+        $res = $this->createOrder([$this->oneProduct([
+            'product_size_id' => (string) $size->id,
             'size_name_snapshot' => 'Lớn',
         ])]);
 
@@ -378,7 +378,7 @@ class OrderPricingTest extends MongoTestCase
     {
         // Đối chứng cho ba bài trên: luật siết thêm KHÔNG được chặn nhầm đường bán
         // hàng bình thường. 30.000x2 + 5.000x1x2 = 70.000
-        $res = $this->createOrder([$this->oneItem([
+        $res = $this->createOrder([$this->oneProduct([
             'toppings' => [['topping_id' => (string) $this->topping->id, 'quantity' => 1]],
         ])]);
 

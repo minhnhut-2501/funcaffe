@@ -3,53 +3,53 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
-use App\Models\Cafe;
-use App\Http\Controllers\Concerns\ChecksCafeOwnership;
-use App\Http\Controllers\Concerns\ChecksCafeStatus;
+use App\Models\Shop;
+use App\Http\Controllers\Concerns\ChecksShopAccess;
+use App\Http\Controllers\Concerns\ChecksShopStatus;
 use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
-    use ChecksCafeOwnership, ChecksCafeStatus;
+    use ChecksShopAccess, ChecksShopStatus;
 
     public function __construct()
     {
         $this->middleware('auth:sanctum');
     }
 
-    public function index(Request $request, Cafe $cafe)
+    public function index(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
-        return response()->json($cafe->categories);
+        $this->authorizeShop($shop);
+        return response()->json($shop->categories);
     }
 
-    public function store(Request $request, Cafe $cafe)
+    public function store(Request $request, Shop $shop)
     {
-        $this->authorizeCafe($cafe);
-        $this->guardSuaDoi($cafe);
+        $this->authorizeShop($shop);
+        $this->guardSuaDoi($shop);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);
 
-        if ($this->trungTen($cafe, $validated['name'])) {
+        if ($this->trungTen($shop, $validated['name'])) {
             return response()->json([
                 'message' => 'Quán đã có danh mục tên "' . trim($validated['name']) . '".',
                 'errors'  => ['name' => ['Tên danh mục bị trùng với một danh mục đang có.']],
             ], 422);
         }
 
-        $category = $cafe->categories()->create($validated + ['is_active' => true]);
+        $category = $shop->categories()->create($validated + ['is_active' => true]);
         return response()->json($category, 201);
     }
 
-    public function update(Request $request, Cafe $cafe, Category $category)
+    public function update(Request $request, Shop $shop, Category $category)
     {
-        $this->authorizeCafe($cafe);
-        $this->guardSuaDoi($cafe);
+        $this->authorizeShop($shop);
+        $this->guardSuaDoi($shop);
 
-        if ((string) $category->cafe_id !== (string) $cafe->id) {
+        if ((string) $category->shop_id !== (string) $shop->id) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
@@ -59,7 +59,7 @@ class CategoryController extends Controller
             'is_active' => 'sometimes|boolean',
         ]);
 
-        if (isset($validated['name']) && $this->trungTen($cafe, $validated['name'], (string) $category->id)) {
+        if (isset($validated['name']) && $this->trungTen($shop, $validated['name'], (string) $category->id)) {
             return response()->json([
                 'message' => 'Quán đã có danh mục tên "' . trim($validated['name']) . '".',
                 'errors'  => ['name' => ['Tên danh mục bị trùng với một danh mục đang có.']],
@@ -75,11 +75,11 @@ class CategoryController extends Controller
      * chủ quán không biết món mới rơi vào ô nào. Tính cả danh mục đang ẩn: nó vẫn
      * chiếm tên đó và có thể được bật lại bất cứ lúc nào.
      */
-    private function trungTen(Cafe $cafe, string $ten, ?string $boQuaId = null): bool
+    private function trungTen(Shop $shop, string $ten, ?string $boQuaId = null): bool
     {
         $chuan = mb_strtolower(trim($ten));
 
-        return $cafe->categories()->get()->contains(
+        return $shop->categories()->get()->contains(
             fn ($dm) => (string) $dm->id !== $boQuaId
                 && mb_strtolower(trim((string) $dm->name)) === $chuan
         );

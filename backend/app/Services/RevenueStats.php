@@ -31,7 +31,7 @@ class RevenueStats
     /**
      * Gộp doanh thu của một hoặc nhiều quán trong một khoảng ngày.
      *
-     * @param  string[]     $cafeIds  Danh sách quán. Rỗng thì trả về bộ số 0.
+     * @param  string[]     $shopIds  Danh sách quán. Rỗng thì trả về bộ số 0.
      * @param  string|null  $from     'Y-m-d' giờ địa phương, tính từ 00:00:00.
      * @param  string|null  $to       'Y-m-d' giờ địa phương, tính hết 23:59:59.
      * @param  int          $topItems 0 = bỏ qua top món, không nạp dòng món (rẻ hơn hẳn).
@@ -40,29 +40,29 @@ class RevenueStats
      *   total:int, count:int,
      *   by_day:array<string,int>, by_month:array<string,int>,
      *   top_items:list<array{name:string,count:int,revenue:int}>,
-     *   by_cafe:array<string,array{total:int,count:int}>
+     *   by_shop:array<string,array{total:int,count:int}>
      * }
      */
-    public function forCafes(array $cafeIds, ?string $from = null, ?string $to = null, int $topItems = self::TOP_ITEMS): array
+    public function forShops(array $shopIds, ?string $from = null, ?string $to = null, int $topItems = self::TOP_ITEMS): array
     {
-        $cafeIds = array_values(array_unique(array_map('strval', $cafeIds)));
+        $shopIds = array_values(array_unique(array_map('strval', $shopIds)));
 
-        // Mọi quán đều có mặt trong `by_cafe`, kể cả quán không bán được gì. Thiếu
+        // Mọi quán đều có mặt trong `by_shop`, kể cả quán không bán được gì. Thiếu
         // hàng thì bảng so sánh bên trình duyệt phải tự đoán quán nào bị rớt, và
         // "chưa có doanh thu" trông y hệt "tải hỏng".
-        $perCafe = [];
-        foreach ($cafeIds as $cid) {
-            $perCafe[$cid] = ['total' => 0, 'count' => 0];
+        $perShop = [];
+        foreach ($shopIds as $cid) {
+            $perShop[$cid] = ['total' => 0, 'count' => 0];
         }
 
-        if ($cafeIds === []) {
+        if ($shopIds === []) {
             return [
                 'total' => 0, 'count' => 0,
-                'by_day' => [], 'by_month' => [], 'top_items' => [], 'by_cafe' => [],
+                'by_day' => [], 'by_month' => [], 'top_items' => [], 'by_shop' => [],
             ];
         }
 
-        $query = Order::whereIn('cafe_id', $cafeIds)
+        $query = Order::whereIn('shop_id', $shopIds)
             ->where('status', 'paid')
             ->where('payment_status', 'paid');
 
@@ -74,7 +74,7 @@ class RevenueStats
         if ($topItems > 0) {
             $query->with('orderDetails');
         }
-        $orders = $query->get(['_id', 'cafe_id', 'total_amount', 'paid_at', 'created_at']);
+        $orders = $query->get(['_id', 'shop_id', 'total_amount', 'paid_at', 'created_at']);
 
         $byDay = [];
         $byMonth = [];
@@ -87,10 +87,10 @@ class RevenueStats
             $total += $tien;
             $count++;
 
-            $cid = (string) $order->cafe_id;
-            if (isset($perCafe[$cid])) {
-                $perCafe[$cid]['total'] += $tien;
-                $perCafe[$cid]['count'] += 1;
+            $cid = (string) $order->shop_id;
+            if (isset($perShop[$cid])) {
+                $perShop[$cid]['total'] += $tien;
+                $perShop[$cid]['count'] += 1;
             }
 
             $moc = $this->toCarbon($order->paid_at ?? $order->created_at);
@@ -106,7 +106,7 @@ class RevenueStats
             }
 
             foreach ($order->orderDetails as $dong) {
-                $ten = $dong->item_name_snapshot ?? 'Khác';
+                $ten = $dong->product_name_snapshot ?? 'Khác';
                 $sl = (int) ($dong->quantity ?? 0);
                 // total_price đã gồm topping; đơn cũ chưa có trường đó thì dựng lại
                 // từ đơn giá — thiếu phần topping, nhưng đúng hơn là bỏ trắng.
@@ -131,7 +131,7 @@ class RevenueStats
             'by_day' => $byDay,
             'by_month' => $byMonth,
             'top_items' => array_slice($monMua, 0, max(0, $topItems)),
-            'by_cafe' => $perCafe,
+            'by_shop' => $perShop,
         ];
     }
 

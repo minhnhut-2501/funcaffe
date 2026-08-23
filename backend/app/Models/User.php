@@ -56,11 +56,11 @@ class User extends Authenticatable
         'reset_token_expires_at' => 'datetime',
     ];
 
-    public function cafes()
+    public function shops()
     {
-        return $this->hasMany(Cafe::class);
+        return $this->hasMany(Shop::class);
     }
 
-    // Không có quan hệ subscriptions(): gói gắn với QUÁN, đi qua cafes.
-    // $user->cafes->pluck('id') rồi lọc Subscription theo cafe_id.
+    // Không có quan hệ subscriptions(): gói gắn với QUÁN, đi qua shops.
+    // $user->shops->pluck('id') rồi lọc Subscription theo shop_id.
 }
