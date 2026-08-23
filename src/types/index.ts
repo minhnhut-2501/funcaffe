@@ -60,6 +60,11 @@ export interface ShopTable {
   capacity: number;
   status: TableStatus;
   currentOrderId?: string;
+  /**
+   * Còn dùng hay đã ẩn. Bàn KHÔNG xóa được (hóa đơn cũ còn trỏ tới), chỉ ẩn —
+   * giống danh mục, món, topping. Bàn ẩn không hiện ở màn Bán hàng.
+   */
+  isActive: boolean;
 }
 
 export interface OrderItemTopping {

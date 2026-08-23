@@ -11,10 +11,16 @@ use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 
 /**
- * Bàn là thứ DUY NHẤT trong hệ thống còn xóa cứng được (món, topping, danh mục chỉ ẩn).
+ * Bàn nay chỉ ẨN chứ không xóa — thống nhất với món, topping, danh mục và quán.
  *
- * Điều đang được bảo vệ: xóa một cái bàn đang có khách ngồi sẽ bỏ rơi đơn hàng của
- * họ — đơn còn đó nhưng không còn bàn nào trỏ tới, tiền không ai thu.
+ * Xóa cứng một cái bàn là bỏ rơi mọi hóa đơn cũ từng gắn với nó: `orders.table_id` trỏ
+ * vào document không còn tồn tại, cột Bàn ở bảng Hóa đơn trống trơn cho những đơn đã
+ * bán xong từ lâu. Còn ẩn một cái bàn ĐANG CÓ KHÁCH thì làm mất lối thu tiền của chính
+ * đơn đang mở — bàn biến khỏi màn Bán hàng trong khi đơn vẫn còn đó.
+ *
+ * Bài kiểm ở đây khóa cả hai điều đó lại, cộng thêm hai điều nữa: đường xóa phải thật
+ * sự không còn, và `status` không được sửa qua API (nó là giá trị DẪN XUẤT từ đơn đang
+ * mở, xem `tablesLive` ở màn Bán hàng).
  */
 class TableGuardTest extends MongoTestCase
 {
@@ -70,34 +76,79 @@ class TableGuardTest extends MongoTestCase
         ]);
     }
 
-    public function test_khong_xoa_duoc_ban_dang_co_don_chua_thanh_toan(): void
+    public function test_khong_an_duoc_ban_dang_co_don_chua_thanh_toan(): void
     {
         $table = $this->taoBan();
         $this->taoDon($table, 'active');
 
-        $this->deleteJson("/api/shops/{$this->shop->id}/tables/{$table->id}")
-            ->assertStatus(400)
-            ->assertJsonPath('message', 'Không thể xóa bàn đang có order chưa thanh toán');
+        $this->putJson("/api/shops/{$this->shop->id}/tables/{$table->id}", ['is_active' => false])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Bàn đang có đơn chưa thanh toán, không ẩn được. Thanh toán hoặc hủy đơn trước đã.');
 
-        $this->assertSame(1, $this->shop->tables()->count(), 'Bàn phải còn nguyên.');
+        $this->assertNotFalse($table->fresh()->is_active, 'Bàn phải còn đang dùng.');
     }
 
-    public function test_xoa_duoc_ban_trong(): void
+    public function test_an_duoc_ban_trong(): void
     {
         $table = $this->taoBan();
 
-        $this->deleteJson("/api/shops/{$this->shop->id}/tables/{$table->id}")->assertStatus(200);
-        $this->assertSame(0, $this->shop->tables()->count());
+        $this->putJson("/api/shops/{$this->shop->id}/tables/{$table->id}", ['is_active' => false])
+            ->assertStatus(200);
+
+        $this->assertFalse($table->fresh()->is_active);
+        // Ẩn KHÁC xóa: bản ghi phải còn nguyên để hóa đơn cũ vẫn tra được tên bàn.
+        $this->assertSame(1, $this->shop->tables()->count());
     }
 
-    /** Đơn đã thanh toán xong thì bàn trống trở lại — không có lý do gì giữ nó lại. */
-    public function test_xoa_duoc_ban_chi_con_don_da_thanh_toan(): void
+    /** Đơn đã thanh toán xong thì bàn trống trở lại — không có lý do gì cấm ẩn. */
+    public function test_an_duoc_ban_chi_con_don_da_thanh_toan(): void
     {
         $table = $this->taoBan();
         $this->taoDon($table, 'paid');
 
-        $this->deleteJson("/api/shops/{$this->shop->id}/tables/{$table->id}")->assertStatus(200);
-        $this->assertSame(0, $this->shop->tables()->count());
+        $this->putJson("/api/shops/{$this->shop->id}/tables/{$table->id}", ['is_active' => false])
+            ->assertStatus(200);
+        $this->assertFalse($table->fresh()->is_active);
+    }
+
+    public function test_hien_lai_duoc_ban_da_an(): void
+    {
+        $table = $this->taoBan();
+        $this->putJson("/api/shops/{$this->shop->id}/tables/{$table->id}", ['is_active' => false]);
+
+        $this->putJson("/api/shops/{$this->shop->id}/tables/{$table->id}", ['is_active' => true])
+            ->assertStatus(200);
+        $this->assertTrue($table->fresh()->is_active);
+    }
+
+    /**
+     * Đường xóa phải THẬT SỰ không còn, không chỉ là ẩn nút ở giao diện.
+     * Gỡ nút mà để nguyên route thì ai gọi thẳng API vẫn xóa được bàn.
+     */
+    public function test_khong_con_duong_xoa_ban(): void
+    {
+        $table = $this->taoBan();
+
+        $this->deleteJson("/api/shops/{$this->shop->id}/tables/{$table->id}")->assertStatus(405);
+        $this->assertSame(1, $this->shop->tables()->count());
+    }
+
+    /**
+     * `status` là giá trị DẪN XUẤT từ đơn đang mở, không phải thứ chủ quán đặt tay.
+     * Trước đây API nhận nó, nên sửa xong màn Bán hàng vẫn hiện khác — một lời hứa suông.
+     */
+    public function test_khong_dat_duoc_trang_thai_ban_qua_api(): void
+    {
+        $table = $this->taoBan();
+
+        $this->putJson("/api/shops/{$this->shop->id}/tables/{$table->id}", ['status' => 'serving'])
+            ->assertStatus(200);
+        $this->assertSame('empty', $table->fresh()->status, 'status gửi lên phải bị bỏ qua.');
+
+        // Cả lúc tạo mới cũng vậy.
+        $this->postJson("/api/shops/{$this->shop->id}/tables", [
+            'name' => 'Bàn mới', 'capacity' => 4, 'status' => 'serving',
+        ])->assertStatus(201)->assertJsonPath('status', 'empty');
     }
 
     public function test_khong_dong_duoc_vao_ban_cua_quan_nguoi_khac(): void
@@ -113,7 +164,8 @@ class TableGuardTest extends MongoTestCase
         $banCuaHo = $quanKhac->tables()->create(['name' => 'Bàn A', 'capacity' => 2, 'status' => 'empty']);
 
         // Vẫn đang đăng nhập bằng tài khoản ban đầu.
-        $this->deleteJson("/api/shops/{$quanKhac->id}/tables/{$banCuaHo->id}")->assertStatus(403);
-        $this->assertSame(1, $quanKhac->tables()->count(), 'Bàn của người khác phải còn nguyên.');
+        $this->putJson("/api/shops/{$quanKhac->id}/tables/{$banCuaHo->id}", ['is_active' => false])
+            ->assertStatus(403);
+        $this->assertNotFalse($banCuaHo->fresh()->is_active, 'Bàn của người khác phải còn nguyên.');
     }
 }

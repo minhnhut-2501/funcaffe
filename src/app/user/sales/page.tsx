@@ -140,7 +140,10 @@ export default function SalesPage() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      tableService.list().then(setTables),
+      // Bàn ĐÃ ẨN không được vào màn Bán hàng: chủ quán ẩn nó đi nghĩa là bàn đó
+      // không còn phục vụ khách. Lọc ngay ở đây thay vì ở chỗ hiển thị, để không
+      // chỗ nào phía dưới lỡ tay đếm hay chọn phải nó.
+      tableService.list().then(ds => setTables(ds.filter(t => t.isActive))),
       categoryService.list().then(setCategories),
       toppingService.list().then(setAllToppings),
       // Thực đơn phải về CÙNG LÚC với order: order chỉ lưu snapshot tên/giá,

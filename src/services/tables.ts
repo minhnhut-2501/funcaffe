@@ -13,6 +13,9 @@ function mapTable(raw: RawTable): ShopTable {
     capacity: raw.capacity ?? 0,
     status: raw.status === 'serving' ? 'serving' : 'empty',
     currentOrderId: raw.current_order_id ?? undefined,
+    // Thiếu trường (dữ liệu cũ chưa chạy migration) thì coi như CÒN DÙNG. Mặc định
+    // ngược lại sẽ làm mọi bàn biến mất khỏi màn Bán hàng ngay khi mở trang.
+    isActive: raw.is_active !== false,
   };
 }
 
@@ -31,7 +34,6 @@ export const tableService = {
     const raw = await api.post<RawTable>(`/shops/${shopId}/tables`, {
       name: data.name,
       capacity: data.capacity,
-      status: data.status ?? 'empty',
     });
     return mapTable(raw);
   },
@@ -40,12 +42,10 @@ export const tableService = {
     const body: Record<string, unknown> = {};
     if (data.name !== undefined) body.name = data.name;
     if (data.capacity !== undefined) body.capacity = data.capacity;
-    if (data.status !== undefined) body.status = data.status;
+    if (data.isActive !== undefined) body.is_active = data.isActive;
     const raw = await api.put<RawTable>(`/shops/${shopId}/tables/${id}`, body);
     return mapTable(raw);
   },
-  remove: async (id: string) => {
-    const shopId = await getShopId();
-    await api.delete(`/shops/${shopId}/tables/${id}`);
-  },
+  // KHÔNG có remove(): bàn chỉ ẩn chứ không xóa — xóa là bỏ rơi mọi hóa đơn cũ trỏ
+  // tới nó (cột Bàn ở bảng Hóa đơn sẽ trống). Dùng update(id, { isActive: false }).
 };

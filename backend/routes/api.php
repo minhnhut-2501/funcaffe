@@ -102,7 +102,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('shops/{shop}/tables', [TableController::class, 'index']);
     Route::post('shops/{shop}/tables', [TableController::class, 'store'])->middleware('subscription');
     Route::put('shops/{shop}/tables/{table}', [TableController::class, 'update'])->middleware('subscription');
-    Route::delete('shops/{shop}/tables/{table}', [TableController::class, 'destroy'])->middleware('subscription');
 
     // Orders - create/pay requires subscription
     Route::get('shops/{shop}/orders', [OrderController::class, 'index']);

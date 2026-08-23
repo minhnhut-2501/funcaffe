@@ -17,31 +17,38 @@ import { formatTableStatus } from '@/lib/format';
 import { compareByName } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { ShopTable, TableStatus } from '@/types';
-import { Plus, Pencil, Trash2, Eye, RotateCcw, AlertCircle, Grid3X3 } from 'lucide-react';
+import { Plus, Pencil, Eye, EyeOff, RotateCcw, AlertCircle, Grid3X3 } from 'lucide-react';
 
-const statusOptions: { value: TableStatus | 'all'; label: string }[] = [
+/**
+ * "Đã ẩn" đứng chung danh sách với trạng thái bàn cho gọn bộ lọc, nhưng nó KHÔNG phải
+ * một trạng thái — nó là `is_active = false`. Xem `locBan` bên dưới.
+ */
+type BoLocBan = TableStatus | 'all' | 'hidden';
+
+const statusOptions: { value: BoLocBan; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
   { value: 'empty', label: 'Trống' },
   { value: 'serving', label: 'Đang phục vụ' },
+  { value: 'hidden', label: 'Đã ẩn' },
 ];
 
-const formStatusOptions: { value: TableStatus; label: string }[] = [
-  { value: 'empty', label: 'Trống' },
-  { value: 'serving', label: 'Đang phục vụ' },
-];
+// KHÔNG có ô chọn trạng thái trong form thêm/sửa. `status` là giá trị DẪN XUẤT từ
+// đơn đang mở (xem `tablesLive` ở màn Bán hàng) — `tables.status` chỉ là bộ nhớ đệm
+// hiển thị. Cho chủ quán đặt tay là hứa suông: đặt "Đang phục vụ" xong sang màn Bán
+// hàng vẫn thấy bàn trống, vì nơi đó không đọc trường này. Backend cũng đã bỏ nhận.
 
 export default function TablesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [tables, setTables] = useState<ShopTable[]>([]);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState<TableStatus | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<BoLocBan>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [viewTarget, setViewTarget] = useState<ShopTable | null>(null);
   const [editTarget, setEditTarget] = useState<ShopTable | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ShopTable | null>(null);
+  const [hideTarget, setHideTarget] = useState<ShopTable | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<Partial<ShopTable>>({ name: '', capacity: 4, status: 'empty' });
+  const [form, setForm] = useState<Partial<ShopTable>>({ name: '', capacity: 4 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -51,9 +58,16 @@ export default function TablesPage() {
   };
   useEffect(() => { load(); }, []);
 
+  // "Tất cả" CÓ hiện bàn đã ẩn (kèm nhãn) — ẩn chúng khỏi cả danh sách quản lý thì
+  // chủ quán không còn đường nào tìm lại để hiện lên. Lọc theo trạng thái thì chỉ
+  // xét bàn còn dùng, vì bàn đã ẩn không tham gia bán hàng nên không có trạng thái thật.
+  const locBan = (t: ShopTable) =>
+    filterStatus === 'all' ? true
+      : filterStatus === 'hidden' ? !t.isActive
+      : t.isActive && t.status === filterStatus;
+
   const filtered = tables.filter(t =>
-    (filterStatus === 'all' || t.status === filterStatus) &&
-    t.name.toLowerCase().includes(search.toLowerCase())
+    locBan(t) && t.name.toLowerCase().includes(search.toLowerCase())
   ).sort((a, b) => compareByName(a.name, b.name));
 
   // Cắt trang SAU khi đã lọc và tìm kiếm.
@@ -73,7 +87,7 @@ export default function TablesPage() {
   const atTableLimit = hasTableCap && tables.length >= limits.maxTables;
 
   const resetFilters = () => { setSearch(''); setFilterStatus('all'); };
-  const openAdd = () => { setEditTarget(null); setForm({ name: '', capacity: 4, status: 'empty' }); setModalOpen(true); };
+  const openAdd = () => { setEditTarget(null); setForm({ name: '', capacity: 4 }); setModalOpen(true); };
   const openEdit = (t: ShopTable) => { setEditTarget(t); setForm({ ...t }); setModalOpen(true); };
 
   const handleSave = async () => {
@@ -104,15 +118,22 @@ export default function TablesPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
+  /**
+   * Ẩn bàn (KHÔNG xóa). Hiện lại thì làm thẳng, không hỏi — thao tác đó vô hại.
+   *
+   * Backend từ chối ẩn bàn đang có đơn chưa thanh toán và trả 422 kèm lời giải thích;
+   * hiện đúng câu đó ra thay vì một dòng "Thất bại" chung chung, vì người dùng cần
+   * biết phải thanh toán đơn trước rồi mới ẩn được.
+   */
+  const doiTrangThaiDung = async (ban: ShopTable, conDung: boolean) => {
     try {
-      await tableService.remove(deleteTarget.id);
-      setTables(prev => prev.filter(t => t.id !== deleteTarget.id));
-      setDeleteTarget(null);
-      toast({ description: 'Đã xóa bàn' });
-    } catch {
-      toast({ description: 'Xóa thất bại', variant: 'destructive' });
+      const moi = await tableService.update(ban.id, { isActive: conDung });
+      setTables(prev => prev.map(t => (t.id === ban.id ? moi : t)));
+      setHideTarget(null);
+      toast({ description: conDung ? `Đã hiện lại bàn "${ban.name}"` : `Đã ẩn bàn "${ban.name}"` });
+    } catch (e: unknown) {
+      const loi = e instanceof Error ? e.message : '';
+      toast({ description: loi || 'Không đổi được trạng thái bàn', variant: 'destructive' });
     }
   };
 
@@ -160,7 +181,7 @@ export default function TablesPage() {
 
       <FilterBar>
         <SearchInput value={search} onChange={setSearch} placeholder="Tìm bàn..." />
-        <select className="input-funcafe !w-auto min-w-[150px]" value={filterStatus} onChange={e => setFilterStatus(e.target.value as TableStatus | 'all')}>
+        <select className="input-funcafe !w-auto min-w-[150px]" value={filterStatus} onChange={e => setFilterStatus(e.target.value as BoLocBan)}>
           {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <button onClick={resetFilters} className="btn-secondary"><RotateCcw className="w-3.5 h-3.5" />Đặt lại</button>
@@ -180,19 +201,29 @@ export default function TablesPage() {
           </thead>
           <tbody className="stagger divide-y divide-line/70">
             {paging.pageRows.map(t => (
-              <tr key={t.id} className="hover:bg-sand/50 transition-colors">
+              <tr key={t.id} className={`hover:bg-sand/50 transition-colors ${t.isActive ? '' : 'opacity-55'}`}>
                 <td className="px-5 py-3 font-semibold text-ink">{t.name}</td>
                 <td className="px-5 py-3 text-cafe-600">{t.capacity} người</td>
-                <td className="px-5 py-3"><StatusBadge tone={tableStatusTone[t.status]}>{formatTableStatus(t.status)}</StatusBadge></td>
+                <td className="px-5 py-3">
+                  {t.isActive
+                    ? <StatusBadge tone={tableStatusTone[t.status]}>{formatTableStatus(t.status)}</StatusBadge>
+                    : <StatusBadge tone="neutral">Đã ẩn</StatusBadge>}
+                </td>
                 <td className="px-5 py-3 text-cafe-500 text-xs font-mono">{t.currentOrderId ?? '—'}</td>
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-1 justify-end">
                     <button onClick={() => setViewTarget(t)} title="Xem" className="p-2 text-cafe-400 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Eye className="w-4 h-4" /></button>
                     <button onClick={() => openEdit(t)} title="Sửa" className="p-2 text-cafe-500 hover:text-bean hover:bg-sand rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
                     {managable ? (
-                      <button onClick={() => setDeleteTarget(t)} title="Xóa" className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      t.isActive ? (
+                        <button onClick={() => setHideTarget(t)} title="Ẩn bàn"
+                          className="p-2 text-cafe-400 hover:text-gold-deep hover:bg-gold/10 rounded-lg transition-colors"><EyeOff className="w-4 h-4" /></button>
+                      ) : (
+                        <button onClick={() => doiTrangThaiDung(t, true)} title="Hiện lại bàn"
+                          className="p-2 text-pine hover:bg-pine/10 rounded-lg transition-colors"><RotateCcw className="w-4 h-4" /></button>
+                      )
                     ) : (
-                      <LockedButton variant="danger" className="p-2 text-xs"><Trash2 className="w-3.5 h-3.5" /></LockedButton>
+                      <LockedButton className="p-2 text-xs"><EyeOff className="w-3.5 h-3.5" /></LockedButton>
                     )}
                   </div>
                 </td>
@@ -257,17 +288,14 @@ export default function TablesPage() {
             <NumberInput className="input-funcafe" min={1} max={50}
               value={form.capacity ?? null} onChange={v => setForm({ ...form, capacity: v ?? undefined })} />
           </div>
-          <div>
-            <label className="label-funcafe">Trạng thái</label>
-            <select className="input-funcafe" value={form.status ?? 'empty'} onChange={e => setForm({ ...form, status: e.target.value as TableStatus })}>
-              {formStatusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
         </div>
       </Modal>
 
-      <ConfirmModal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
-        title="Xóa bàn" message={`Bạn có chắc muốn xóa bàn "${deleteTarget?.name}" không?`} confirmLabel="Xóa" danger loading={saving} />
+      <ConfirmModal open={!!hideTarget} onClose={() => setHideTarget(null)}
+        onConfirm={() => hideTarget && doiTrangThaiDung(hideTarget, false)}
+        title="Ẩn bàn"
+        message={`Ẩn bàn "${hideTarget?.name}" khỏi màn Bán hàng? Hóa đơn cũ của bàn này vẫn giữ nguyên, và bạn hiện lại được bất cứ lúc nào.`}
+        confirmLabel="Ẩn bàn" loading={saving} />
       </>)}
     </div>
   );

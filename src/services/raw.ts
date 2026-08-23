@@ -102,4 +102,5 @@ export interface RawTable extends RawId {
   capacity?: number;
   status?: string;
   current_order_id?: string;
+  is_active?: boolean;
 }

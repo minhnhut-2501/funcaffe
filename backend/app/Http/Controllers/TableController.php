@@ -30,12 +30,17 @@ class TableController extends Controller
         $this->guardSuaDoi($shop);
         $this->enforcePackageLimit($shop, 'tables', $shop->tables()->count());
 
+        // KHÔNG nhận `status`. Trạng thái bàn được DẪN XUẤT từ đơn đang mở (xem
+        // `tablesLive` ở màn Bán hàng); `tables.status` chỉ là bộ nhớ đệm để hiển thị.
+        // Cho sửa tay ở đây là hứa một điều không có thật: chủ quán đặt "đang phục vụ"
+        // xong quay sang màn Bán hàng vẫn thấy bàn trống, vì nơi đó không đọc trường này.
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
-            'status' => 'sometimes|string|in:empty,serving',
             'display_order' => 'nullable|integer|min:0',
         ]);
+        $validated['status'] = 'empty';
+        $validated['is_active'] = true;
 
         if ($this->trungTen($shop, $validated['name'])) {
             return response()->json([
@@ -57,10 +62,11 @@ class TableController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
+        // `status` không nhận ở đây — xem lý do ở store().
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'capacity' => 'sometimes|integer|min:1',
-            'status' => 'sometimes|string|in:empty,serving',
+            'is_active' => 'sometimes|boolean',
             'display_order' => 'nullable|integer|min:0',
         ]);
 
@@ -71,8 +77,25 @@ class TableController extends Controller
             ], 422);
         }
 
+        // Ẩn bàn đang có khách là làm mất lối thanh toán của chính đơn đó: bàn biến khỏi
+        // màn Bán hàng trong khi đơn vẫn mở, không ai bấm vào đâu để thu tiền được nữa.
+        // (Chốt chặn này trước đây nằm ở destroy(), nay chuyển sang đường ẩn.)
+        if (($validated['is_active'] ?? true) === false && $this->dangCoKhach($shop, $table)) {
+            return response()->json([
+                'message' => 'Bàn đang có đơn chưa thanh toán, không ẩn được. Thanh toán hoặc hủy đơn trước đã.',
+            ], 422);
+        }
+
         $table->update($validated);
         return response()->json($table);
+    }
+
+    private function dangCoKhach(Shop $shop, ShopTable $table): bool
+    {
+        return $shop->orders()
+            ->where('table_id', (string) $table->id)
+            ->where('status', 'active')
+            ->exists();
     }
 
     /**
@@ -91,21 +114,4 @@ class TableController extends Controller
         );
     }
 
-    public function destroy(Shop $shop, ShopTable $table)
-    {
-        $this->authorizeShop($shop);
-        $this->guardSuaDoi($shop);
-
-        if ((string) $table->shop_id !== (string) $shop->id) {
-            return response()->json(['message' => 'Not found'], 404);
-        }
-
-        $hasActiveOrder = $shop->orders()->where('table_id', $table->id)->where('status', 'active')->exists();
-        if ($hasActiveOrder) {
-            return response()->json(['message' => 'Không thể xóa bàn đang có order chưa thanh toán'], 400);
-        }
-
-        $table->delete();
-        return response()->json(['message' => 'Deleted']);
-    }
 }
