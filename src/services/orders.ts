@@ -200,6 +200,25 @@ export const orderService = {
       ...(data.cash_received !== undefined ? { cash_received: data.cash_received } : {}),
     });
   },
+  /**
+   * Xin liên kết thanh toán VNPay cho một đơn đang phục vụ.
+   *
+   * Trả về `pay_url` để màn Bán hàng vẽ thành mã QR. Đơn KHÔNG được chốt ở đây —
+   * nó chỉ chốt khi VNPay gọi ngược về IPN (đường server-to-server có chữ ký), nên
+   * sau khi hiện QR thì giao diện phải hỏi lại trạng thái đơn cho tới lúc thấy 'paid'.
+   */
+  xinLienKetVnpay: async (orderId: string) => {
+    const shopId = await getShopId();
+    return api.post<{ pay_url: string; txn_ref: string; amount: number; order_id: string }>(
+      `/shops/${shopId}/orders/${orderId}/vnpay`, {},
+    );
+  },
+  /** Trạng thái hiện tại của một đơn — dùng để hỏi lại trong lúc chờ khách quét mã. */
+  trangThai: async (orderId: string) => {
+    const shopId = await getShopId();
+    const raw = await api.get<RawOrder>(`/shops/${shopId}/orders/${orderId}`);
+    return mapOrder(raw);
+  },
   pay: async (orderId: string, data: { payment_method: string; discount_amount?: number; cash_received?: number }) => {
     const shopId = await getShopId();
     const raw = await api.post<RawOrder>(`/shops/${shopId}/orders/${orderId}/pay`, data);

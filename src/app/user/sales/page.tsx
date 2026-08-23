@@ -11,6 +11,7 @@ import { buildVietQrImageUrl } from '@/lib/banks';
 import Link from 'next/link';
 import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, ShoppingBag, Receipt, Banknote } from 'lucide-react';
 import { VietQrMark } from '@/components/ui/PaymentLogos';
+import QRCode from 'qrcode';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import MoneyInput from '@/components/ui/MoneyInput';
@@ -46,6 +47,16 @@ export default function SalesPage() {
    * tắt cờ này, bật cờ này thì bỏ chọn bàn.
    */
   const [banMangVe, setBanMangVe] = useState(false);
+  /**
+   * Phiên chờ khách quét mã VNPay.
+   *
+   * `orderId` là đơn đang chờ tiền. Với bán tại quán đó là đơn nháp sẵn có; với mang
+   * về là đơn vừa tạo riêng cho lượt này — mang về + VNPay KHÔNG gộp một lượt gọi
+   * được như tiền mặt, vì phải có đơn trước thì cổng mới có gì để tham chiếu.
+   */
+  const [phienVnpay, setPhienVnpay] = useState<{
+    orderId: string; qr: string; soTien: number; laMangVe: boolean;
+  } | null>(null);
   const [carts, setCarts] = useState<Record<string, CartItem[]>>({});
   const [catFilter, setCatFilter] = useState('all');
   const [menuSearch, setMenuSearch] = useState('');
@@ -562,6 +573,136 @@ export default function SalesPage() {
     setClearConfirm(true);
   };
 
+  /**
+   * Mở phiên thu tiền qua VNPay: bảo đảm có đơn, xin liên kết, vẽ mã QR.
+   *
+   * KHÔNG chốt đơn ở đây. Đơn chỉ chốt khi VNPay gọi ngược về IPN — đường
+   * server-to-server có chữ ký. Sau khi hiện mã, giao diện hỏi lại trạng thái đơn
+   * cho tới lúc thấy 'paid' (xem useEffect bên dưới).
+   */
+  const moPhienVnpay = async () => {
+    let orderId = selectedTable ? draftOrderIds[selectedTable.id] : undefined;
+    const laMangVe = !selectedTable;
+
+    // Mang về chưa có đơn nào trên máy chủ (giỏ chỉ nằm trong máy) — phải tạo trước,
+    // vì cổng cần một đơn cụ thể để tham chiếu. Đơn này sống ở trạng thái đang phục
+    // vụ cho tới khi khách trả xong; hủy hộp thoại là hủy luôn nó, không để lại đơn ma.
+    if (laMangVe) {
+      const bs = cart.reduce((s, c) => s + calcItemBase(c), 0);
+      const ts = cart.reduce((s, c) => s + calcItemTopping(c), 0);
+      const moi = await orderService.create({
+        orderType: 'takeaway',
+        items: cartToOrderItems(cart),
+        subtotal: bs,
+        totalAmount: bs + ts,
+        status: 'active',
+        paymentStatus: 'unpaid',
+        createdAt: new Date().toISOString(),
+      });
+      orderId = moi.id;
+    }
+
+    if (!orderId) {
+      showToast('Không tìm thấy order, vui lòng thêm món lại.');
+      return;
+    }
+
+    const lienKet = await orderService.xinLienKetVnpay(orderId);
+    // Mức sửa lỗi THẤP ('L') là cố ý: liên kết VNPay dài hơn 500 ký tự, mức cao hơn
+    // đẩy mã lên nhiều ô hơn nữa và điện thoại quét rất chật vật. Mã hiện trên màn
+    // hình sạch sẽ, không phải giấy in nhoè, nên không cần dự phòng sửa lỗi nhiều.
+    const qr = await QRCode.toDataURL(lienKet.pay_url, {
+      errorCorrectionLevel: 'L', margin: 1, width: 320,
+    });
+
+    setPhienVnpay({ orderId, qr, soTien: lienKet.amount, laMangVe });
+    setPaymentModal(false);
+  };
+
+  /**
+   * Hỏi lại trạng thái đơn 3 giây một lần trong lúc chờ khách quét mã.
+   *
+   * Không dùng WebSocket cho một việc kéo dài vài chục giây và chỉ xảy ra lúc thu
+   * tiền — thêm cả một hạ tầng để tiết kiệm mươi lượt gọi là không đáng.
+   */
+  useEffect(() => {
+    if (!phienVnpay) return;
+    let dungLai = false;
+
+    const hoi = async () => {
+      try {
+        const don = await orderService.trangThai(phienVnpay.orderId);
+        if (dungLai || don.status !== 'paid') return;
+        chotXongVnpay(don.totalAmount);
+      } catch {
+        // Mạng chập một nhịp thì bỏ qua, lượt sau hỏi lại.
+      }
+    };
+
+    const dinhKy = setInterval(hoi, 3000);
+    return () => { dungLai = true; clearInterval(dinhKy); };
+  }, [phienVnpay]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Dọn dẹp sau khi đơn VNPay đã được chốt (dù tự động hay xác nhận tay). */
+  const chotXongVnpay = (tongDaTra: number) => {
+    if (!phienVnpay) return;
+    const { orderId, laMangVe } = phienVnpay;
+
+    if (laMangVe) {
+      clearCartForTable(KHOA_MANG_VE);
+      setBanMangVe(false);
+    } else if (selectedTable) {
+      setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
+      clearCartForTable(selectedTable.id);
+      setSelectedTable(null);
+    }
+    setActiveOrders(prev => prev.filter(o => o.id !== orderId));
+    setPhienVnpay(null);
+    setCashGiven(null);
+    setDiscountInput(0);
+    setSuccessModal({ code: '', orderId, total: tongDaTra, method: 'vnpay' });
+  };
+
+  /**
+   * Thu ngân xác nhận TAY khi thấy khách đã trả xong trên điện thoại mà IPN chưa về.
+   *
+   * Đây là phao cứu sinh chứ không phải đường chính: mạng hội trường chập hay máy chủ
+   * đang ngủ dậy thì IPN tới muộn, mà khách thì không đứng chờ được. VietQR vốn đã
+   * hoàn toàn xác nhận tay từ trước, nên đây không phải nới lỏng gì mới.
+   */
+  const xacNhanTayVnpay = async () => {
+    if (!phienVnpay) return;
+    setProcessing(true);
+    try {
+      const kq = await orderService.pay(phienVnpay.orderId, { payment_method: 'vnpay' });
+      chotXongVnpay(Number(kq?.total_amount ?? phienVnpay.soTien));
+    } catch {
+      showToast('Không chốt được đơn. Kiểm tra lại rồi thử tiếp.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  /**
+   * Đóng phiên VNPay giữa chừng (khách đổi ý, muốn trả tiền mặt).
+   *
+   * Đơn MANG VỀ vừa tạo riêng cho lượt này phải bị HỦY, nếu không nó nằm lại ở trạng
+   * thái đang phục vụ mà không gắn bàn nào — màn hình này dẫn xuất mọi thứ theo bàn
+   * nên không ai còn thấy nó để thu tiền hay dọn đi. Đơn TẠI QUÁN thì giữ nguyên: nó
+   * là đơn nháp của bàn, thu ngân quay lại chọn cách trả khác.
+   */
+  const dongPhienVnpay = async () => {
+    if (!phienVnpay) return;
+    const { orderId, laMangVe } = phienVnpay;
+    setPhienVnpay(null);
+    if (!laMangVe) return;
+    try {
+      await orderService.cancel(orderId);
+    } catch {
+      showToast('Đã đóng mã, nhưng chưa hủy được đơn mang về. Kiểm tra ở trang Hóa đơn.');
+    }
+  };
+
   const handlePayment = async () => {
     if (!khoaGio || cart.length === 0) return;
 
@@ -578,6 +719,13 @@ export default function SalesPage() {
 
     setProcessing(true);
     try {
+      // VNPay đi đường riêng: mở phiên chờ khách quét mã, không chốt đơn ở đây.
+      if (paymentMethod === 'vnpay') {
+        await moPhienVnpay();
+        setProcessing(false);
+        return;
+      }
+
       /*
        * MANG VỀ: tạo đơn VÀ thu tiền trong MỘT lượt gọi.
        *
@@ -1148,6 +1296,7 @@ export default function SalesPage() {
               {[
                 { value: 'cash', label: 'Tiền mặt', Icon: Banknote },
                 { value: 'vietqr', label: 'VietQR', Icon: VietQrMark },
+                { value: 'vnpay', label: 'VNPay', Icon: CreditCard },
               ].map(m => (
                 <button key={m.value} onClick={() => setPaymentMethod(m.value)}
                   className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
@@ -1177,6 +1326,13 @@ export default function SalesPage() {
               {chuaNhapTien && <p className="text-sm text-cafe-500 mt-1.5">Nhập số tiền khách đưa, hoặc bấm <strong>Vừa đủ</strong>.</p>}
               {thieuTien && <p className="text-sm text-red-500 mt-1.5">Chưa đủ {formatCurrency(conThieu)}</p>}
               {!chuaNhapTien && !thieuTien && <p className="text-sm text-pine font-semibold mt-1.5">Tiền thối: {formatCurrency(cashChange)}</p>}
+            </div>
+          )}
+
+          {paymentMethod === 'vnpay' && (
+            <div className="bg-sand/70 border border-line rounded-2xl p-4 text-xs text-cafe-600 leading-relaxed">
+              Bấm <strong className="text-bean">Xác nhận thanh toán</strong> để hiện mã QR cho khách quét.
+              Khách trả xong thì đơn <strong className="text-bean">tự chốt</strong>, không phải bấm gì thêm.
             </div>
           )}
 
@@ -1237,6 +1393,39 @@ export default function SalesPage() {
         confirmLabel="Hủy order"
         danger
       />
+
+      {/* Chờ khách quét mã VNPay. Đơn tự chốt khi cổng gọi ngược về IPN; nút xác nhận
+          tay bên dưới là phao khi IPN tới muộn. */}
+      <Modal
+        open={!!phienVnpay}
+        onClose={dongPhienVnpay}
+        title="Khách quét mã để thanh toán"
+        size="sm"
+        footer={
+          <div className="flex gap-2 w-full">
+            <button onClick={dongPhienVnpay} className="btn-secondary flex-1">Đổi cách trả</button>
+            <button onClick={xacNhanTayVnpay} disabled={processing} className="btn-primary flex-1 justify-center">
+              {processing ? 'Đang chốt...' : 'Khách đã trả — xác nhận'}
+            </button>
+          </div>
+        }
+      >
+        {phienVnpay && (
+          <div className="flex flex-col items-center gap-3">
+            <img src={phienVnpay.qr} alt="Mã QR thanh toán VNPay"
+              className="w-64 h-64 bg-white rounded-xl border border-line p-2" />
+            <p className="text-lg font-bold text-bean">{formatCurrency(phienVnpay.soTien)}</p>
+            <p className="text-xs text-cafe-500 text-center leading-relaxed">
+              Khách dùng camera điện thoại quét mã này, rồi chọn cách trả trên máy của họ.<br />
+              Trả xong đơn <strong className="text-bean">tự chốt</strong> — màn hình sẽ tự chuyển.
+            </p>
+            <div className="flex items-center gap-2 text-xs text-cafe-400">
+              <span className="w-2 h-2 rounded-full bg-gold animate-pulse" />
+              Đang chờ khách thanh toán...
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Success Modal */}
       <Modal

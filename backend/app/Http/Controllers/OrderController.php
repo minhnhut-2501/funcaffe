@@ -397,8 +397,14 @@ class OrderController extends Controller
             return response()->json(['message' => 'Đơn chưa có món nào, không thể thanh toán.'], 422);
         }
 
+        // 'vnpay' được phép ở đây để thu ngân XÁC NHẬN TAY khi cổng đã báo thành công
+        // trên điện thoại khách mà IPN chưa về (mạng hội trường chập, Render đang ngủ
+        // dậy). Không phải lỗ hổng: người bấm là chủ quán hoặc nhân viên của chính quán
+        // đó, và họ vốn đã tự chốt được đơn tiền mặt — VietQR cũng hoàn toàn xác nhận
+        // tay từ trước tới giờ. Đường TỰ ĐỘNG vẫn là IPN, có chữ ký, xem
+        // PaymentGatewayController@vnpayOrderIpn.
         $validated = $request->validate([
-            'payment_method'  => 'required|string|in:cash,vietqr',
+            'payment_method'  => 'required|string|in:cash,vietqr,vnpay',
             'discount_amount' => 'nullable|numeric|min:0',
             'cash_received'   => 'nullable|numeric|min:0',
         ]);
