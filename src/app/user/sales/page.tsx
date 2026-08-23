@@ -9,7 +9,7 @@ import type { ShopTable, Product, ProductSize, Topping, Order, OrderItem, ShopIn
 import { calcItemBase, calcItemTopping, calcCartItem, clampDiscount, calcChange, isSameCartLine, type CartItem } from '@/lib/cart';
 import { buildVietQrImageUrl } from '@/lib/banks';
 import Link from 'next/link';
-import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, Receipt, Banknote } from 'lucide-react';
+import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, ShoppingBag, Receipt, Banknote } from 'lucide-react';
 import { VietQrMark } from '@/components/ui/PaymentLogos';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -41,6 +41,11 @@ export default function SalesPage() {
   const [allToppings, setAllToppings] = useState<Topping[]>([]);
   const [selectedTable, setSelectedTable] = useState<ShopTable | null>(null);
   const [tableFilter, setTableFilter] = useState('all');
+  /**
+   * Đang bán MANG VỀ (không gắn bàn). Loại trừ nhau với `selectedTable`: chọn bàn thì
+   * tắt cờ này, bật cờ này thì bỏ chọn bàn.
+   */
+  const [banMangVe, setBanMangVe] = useState(false);
   const [carts, setCarts] = useState<Record<string, CartItem[]>>({});
   const [catFilter, setCatFilter] = useState('all');
   const [menuSearch, setMenuSearch] = useState('');
@@ -109,19 +114,34 @@ export default function SalesPage() {
     note: string;
   }>({ size: null, toppings: [], qty: 1, note: '' });
 
-  const cart = selectedTable ? carts[selectedTable.id] ?? [] : [];
+  /**
+   * Giỏ hàng đánh khóa theo BÀN. Đơn mang về không có bàn nên mượn một khóa riêng —
+   * chuỗi này không thể trùng id của bàn nào (id Mongo là 24 ký tự hex).
+   */
+  const KHOA_MANG_VE = '__mang_ve__';
+  const khoaGio = banMangVe ? KHOA_MANG_VE : selectedTable?.id ?? null;
+
+  const cart = khoaGio ? carts[khoaGio] ?? [] : [];
 
   const setCart = (updater: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
-    if (!selectedTable) return;
+    if (!khoaGio) return;
     setCarts(prev => {
-      const current = prev[selectedTable.id] ?? [];
+      const current = prev[khoaGio] ?? [];
       const next = typeof updater === 'function' ? updater(current) : updater;
       if (next.length === 0) {
-        const { [selectedTable.id]: _, ...rest } = prev;
+        const { [khoaGio]: _, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [selectedTable.id]: next };
+      return { ...prev, [khoaGio]: next };
     });
+  };
+
+  /** Bật chế độ mang về: bỏ chọn bàn, giỏ chuyển sang khóa riêng. */
+  const chonMangVe = () => {
+    setBanMangVe(true);
+    setSelectedTable(null);
+    setQtyDraft({});
+    setMobileTab('menu');
   };
 
   const clearCartForTable = (tableId: string) => {
@@ -254,8 +274,8 @@ export default function SalesPage() {
       showToast('Gói đã hết hạn — chỉ có thể xem. Vui lòng gia hạn để bán hàng.');
       return;
     }
-    if (!selectedTable) {
-      showToast('Vui lòng chọn bàn trước khi thêm món.');
+    if (!khoaGio) {
+      showToast('Chọn bàn hoặc bấm Mang về trước khi thêm món.');
       return;
     }
     setEditCartItemId(null);
@@ -300,7 +320,7 @@ export default function SalesPage() {
     optForm.qty;
 
   const handleSaveCartItem = async () => {
-    if (!optionModal || !selectedTable) return;
+    if (!optionModal || !khoaGio) return;
     if (savingItem) return; // chống tạo trùng order khi bấm liên tiếp
     setSavingItem(true);
     const { item } = optionModal;
@@ -317,7 +337,7 @@ export default function SalesPage() {
         }, []),
       note: optForm.note,
     };
-    const cur = carts[selectedTable.id] ?? [];
+    const cur = carts[khoaGio] ?? [];
     // Khi thêm mới, nếu đã có dòng trùng khớp hoàn toàn thì cộng dồn số lượng thay vì tách riêng
     const mergeTarget = editCartItemId ? undefined : cur.find(c => isSameCartLine(c, newItem));
     const updatedCart = editCartItemId
@@ -329,6 +349,16 @@ export default function SalesPage() {
     const newToppingSubtotal = updatedCart.reduce((s, c) => s + calcItemTopping(c), 0);
     const newTotal = newBaseSubtotal + newToppingSubtotal;
     const orderItems = cartToOrderItems(updatedCart);
+
+    // MANG VỀ: chỉ cập nhật giỏ trong máy rồi dừng. Đơn được tạo và chốt cùng lúc ở
+    // bước Thanh toán, nên ở đây không có gì để lưu lên máy chủ.
+    if (!selectedTable) {
+      setCart(updatedCart);
+      setOptionModal(null);
+      setEditCartItemId(null);
+      setSavingItem(false);
+      return;
+    }
 
     try {
       const existingId = draftOrderIds[selectedTable.id];
@@ -412,6 +442,14 @@ export default function SalesPage() {
     });
   };
 
+  /**
+   * Lưu nháp giỏ lên máy chủ (đơn `active` gắn bàn).
+   *
+   * KHÔNG áp dụng cho mang về: đơn mang về được tạo VÀ chốt trong một lượt gọi lúc
+   * bấm Thanh toán. Giữ nháp cho nó nghĩa là có lúc tồn tại một đơn `active` không
+   * gắn bàn — mà giao diện này dẫn xuất mọi thứ theo bàn nên đơn đó không hiện ở đâu
+   * cả, thành đơn ma không ai thu tiền cũng không ai thấy để hủy.
+   */
   const persistCart = async (tableId: string, items: CartItem[]) => {
     const bs = items.reduce((s, c) => s + calcItemBase(c), 0);
     const ts = items.reduce((s, c) => s + calcItemTopping(c), 0);
@@ -447,11 +485,12 @@ export default function SalesPage() {
   };
 
   const removeCartItem = (id: string) => {
-    if (!selectedTable) return;
+    if (!khoaGio) return;
     clearQtyDraft(id);
     setCart(prev => {
       const next = prev.filter(c => c.id !== id);
-      persistCart(selectedTable.id, next);
+      // Chỉ giỏ của BÀN mới lưu nháp lên máy chủ (xem chú thích persistCart).
+      if (selectedTable) persistCart(selectedTable.id, next);
       return next;
     });
   };
@@ -459,7 +498,7 @@ export default function SalesPage() {
   /** Bấm nút trừ xuống dưới 1 thì xóa dòng (như cũ), còn GÕ thì không bao giờ xóa
    *  — xóa dòng chỉ bằng nút X. */
   const updateQty = (id: string, delta: number) => {
-    if (!selectedTable) return;
+    if (!khoaGio) return;
     clearQtyDraft(id);
     setCart(prev => {
       const next = prev.map(c => {
@@ -467,17 +506,17 @@ export default function SalesPage() {
         const newQty = c.quantity + delta;
         return newQty <= 0 ? null : { ...c, quantity: Math.min(MAX_QTY, newQty) };
       }).filter(Boolean) as CartItem[];
-      persistCart(selectedTable.id, next);
+      if (selectedTable) persistCart(selectedTable.id, next);
       return next;
     });
   };
 
   const setQty = (id: string, qty: number) => {
-    if (!selectedTable) return;
+    if (!khoaGio) return;
     const safe = Math.min(MAX_QTY, Math.max(1, Math.trunc(qty)));
     setCart(prev => {
       const next = prev.map(c => (c.id === id ? { ...c, quantity: safe } : c));
-      persistCart(selectedTable.id, next);
+      if (selectedTable) persistCart(selectedTable.id, next);
       return next;
     });
   };
@@ -512,15 +551,19 @@ export default function SalesPage() {
         const existingId = draftOrderIds[selectedTable.id];
         if (existingId && !await releaseTable(selectedTable.id, existingId)) return;
         clearCartForTable(selectedTable.id);
+      } else if (banMangVe) {
+        // Giỏ mang về chỉ nằm trong máy — không có đơn nào trên máy chủ để hủy.
+        clearCartForTable(KHOA_MANG_VE);
       }
       setSelectedTable(null);
+      setBanMangVe(false);
       return;
     }
     setClearConfirm(true);
   };
 
   const handlePayment = async () => {
-    if (!selectedTable || cart.length === 0) return;
+    if (!khoaGio || cart.length === 0) return;
 
     const cashReceived = paymentMethod === 'cash' ? (cashGiven ?? 0) : 0;
     // Trả tiền mặt thì phải khai số khách đưa, và số đó phải đủ (backend cũng chặn 422).
@@ -535,6 +578,42 @@ export default function SalesPage() {
 
     setProcessing(true);
     try {
+      /*
+       * MANG VỀ: tạo đơn VÀ thu tiền trong MỘT lượt gọi.
+       *
+       * Không tách thành hai lượt (tạo rồi trả tiền) vì lượt thứ hai hỏng sẽ để lại
+       * một đơn `active` không gắn bàn — màn hình này dẫn xuất mọi thứ theo bàn nên
+       * đơn đó không hiện ở đâu cả. Máy chủ cũng kiểm tiền khách đưa TRƯỚC khi tạo
+       * đơn, nên đưa thiếu thì không có gì được ghi xuống.
+       */
+      if (!selectedTable) {
+        const bs = cart.reduce((s, c) => s + calcItemBase(c), 0);
+        const ts = cart.reduce((s, c) => s + calcItemTopping(c), 0);
+        const donMangVe = await orderService.taoVaThanhToanMangVe({
+          items: cartToOrderItems(cart),
+          subtotal: bs,
+          totalAmount: bs + ts,
+          payment_method: paymentMethod,
+          cash_received: paymentMethod === 'cash' ? cashReceived : undefined,
+        });
+
+        clearCartForTable(KHOA_MANG_VE);
+        setBanMangVe(false);
+        setPaymentModal(false);
+        setCashGiven(null);
+        setDiscountInput(0);
+        setSuccessModal({
+          code: donMangVe.invoice_code ?? donMangVe.code ?? '',
+          orderId: donMangVe.id ?? donMangVe._id ?? '',
+          total: Number(donMangVe.total_amount ?? cartTotal),
+          method: paymentMethod,
+          cashGiven: donMangVe.cash_received != null ? Number(donMangVe.cash_received) : undefined,
+          change: donMangVe.change_amount != null ? Number(donMangVe.change_amount) : undefined,
+        });
+        setProcessing(false);
+        return;
+      }
+
       const orderId = draftOrderIds[selectedTable.id];
       if (!orderId) { showToast('Không tìm thấy order, vui lòng thêm món lại'); setProcessing(false); return; }
 
@@ -672,13 +751,29 @@ export default function SalesPage() {
         <div data-shot="tables" className={`${mobileTab === 'tables' ? 'flex' : 'hidden'} md:flex h-[60vh] md:h-auto w-full md:w-[26%] shrink-0 bg-white rounded-2xl border border-line shadow-soft flex-col overflow-hidden`}>
           <div className="px-3.5 py-2.5 border-b border-line bg-sand/60 space-y-2">
             <p className="text-[11px] font-bold text-bean uppercase tracking-wider">Bàn</p>
+            {/*
+              Ô MANG VỀ ghim ở header, NGOÀI vùng lọc và NGOÀI vùng cuộn bên dưới.
+              Nếu để nó trong lưới `filteredTables` thì đúng lúc quán kín bàn — nhân
+              viên lọc "Trống", lưới rỗng — nút này biến mất. Mà hết bàn lại chính là
+              tình huống cần bán mang về nhất.
+            */}
+            <button
+              onClick={chonMangVe}
+              className={`w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed py-2.5 text-xs font-bold transition-colors ${
+                banMangVe
+                  ? 'border-gold bg-gold/15 text-gold-deep'
+                  : 'border-cafe-300 text-cafe-500 hover:border-gold hover:text-gold-deep hover:bg-gold/10'
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4" />MANG VỀ
+            </button>
             <select className="input-funcafe text-xs py-1.5" value={tableFilter} onChange={e => setTableFilter(e.target.value)}>
               {tableStatusFilter.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           <div className="stagger flex-1 overflow-y-auto p-2.5 grid grid-cols-2 gap-2 content-start">
             {filteredTables.map(t => (
-              <TableTile key={t.id} table={t} selected={selectedTable?.id === t.id} onClick={() => { setSelectedTable(t); setQtyDraft({}); setMobileTab('menu'); }} />
+              <TableTile key={t.id} table={t} selected={selectedTable?.id === t.id} onClick={() => { setBanMangVe(false); setSelectedTable(t); setQtyDraft({}); setMobileTab('menu'); }} />
             ))}
             {filteredTables.length === 0 && <p className="col-span-2 text-xs text-cafe-400 text-center py-6">{tables.length === 0 ? 'Bạn chưa thêm bàn nào' : 'Không tìm thấy bàn'}</p>}
           </div>
@@ -699,9 +794,9 @@ export default function SalesPage() {
             </div>
           </div>
 
-          {!selectedTable && (
+          {!khoaGio && (
             <div className="px-3.5 py-2 bg-gold/12 border-b border-gold/20 flex items-center gap-2 text-xs text-gold-deep font-medium">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />Chọn bàn để bắt đầu thêm món
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />Chọn bàn hoặc bấm Mang về để bắt đầu
             </div>
           )}
 
@@ -719,15 +814,15 @@ export default function SalesPage() {
         <div data-shot="cart" className={`${mobileTab === 'cart' ? 'flex' : 'hidden'} md:flex h-[60vh] md:h-auto w-full md:w-[28%] shrink-0 bg-white rounded-2xl border border-line shadow-soft flex-col overflow-hidden`}>
           <div className="px-3.5 py-2.5 border-b border-line bg-sand/60 flex items-center justify-between">
             <p className="text-[11px] font-bold text-bean uppercase tracking-wider">
-              {selectedTable ? selectedTable.name : 'Order hiện tại'}
+              {selectedTable ? selectedTable.name : banMangVe ? 'Mang về' : 'Order hiện tại'}
             </p>
-            {selectedTable && <span className="text-[11px] text-cafe-500 font-medium">{cart.length} món</span>}
+            {khoaGio && <span className="text-[11px] text-cafe-500 font-medium">{cart.length} món</span>}
           </div>
 
-          {!selectedTable ? (
+          {!khoaGio ? (
             <div className="flex-1 flex flex-col items-center justify-center text-cafe-300 text-xs px-4 text-center gap-2">
               <ShoppingCart className="w-8 h-8 text-cafe-200" />
-              Vui lòng chọn bàn để bắt đầu order.
+              Chọn bàn để order tại quán, hoặc bấm <span className="font-semibold text-gold-deep">MANG VỀ</span>.
             </div>
           ) : cart.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-cafe-300 text-xs gap-2">
@@ -795,7 +890,7 @@ export default function SalesPage() {
             </div>
           )}
 
-          {selectedTable && cart.length > 0 && (
+          {khoaGio && cart.length > 0 && (
             <div className="p-3 border-t border-line space-y-2 bg-white">
               <div className="space-y-1 text-xs text-cafe-600">
                 <div className="flex justify-between"><span>Tạm tính</span><span>{formatCurrency(baseSubtotal)}</span></div>
@@ -837,7 +932,7 @@ export default function SalesPage() {
       </div>
 
       {/* Thanh giỏ hàng nổi trên mobile — luôn thấy tổng tiền dù đang ở tab Bàn/Menu */}
-      {selectedTable && cart.length > 0 && mobileTab !== 'cart' && (
+      {khoaGio && cart.length > 0 && mobileTab !== 'cart' && (
         <div className="md:hidden fixed bottom-4 left-3 right-3 z-30 bg-bean text-white rounded-2xl shadow-pop px-4 py-3 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] text-white/70 leading-tight">{cart.length} món</p>
@@ -1006,7 +1101,11 @@ export default function SalesPage() {
       >
         <div className="space-y-4">
           <div className="bg-sand/70 border border-line rounded-2xl p-4 space-y-1.5">
-            <p className="text-xs text-cafe-500">Bàn: <span className="font-semibold text-ink">{selectedTable?.name}</span></p>
+            <p className="text-xs text-cafe-500">
+              {selectedTable
+                ? <>Bàn: <span className="font-semibold text-ink">{selectedTable.name}</span></>
+                : <span className="font-semibold text-gold-deep">Mang về</span>}
+            </p>
             <div className="space-y-1 text-sm text-cafe-600">
               {cart.map(c => (
                 <div key={c.id} className="flex justify-between">
@@ -1090,7 +1189,9 @@ export default function SalesPage() {
                     accountNumber: shopInfo.bankAccountNumber,
                     accountName: shopInfo.bankAccountName,
                     amount: cartTotal,
-                    addInfo: activeOrders.find(o => o.tableId === selectedTable?.id)?.code || 'Thanh toan FunCafe',
+                    addInfo: selectedTable
+                      ? activeOrders.find(o => o.tableId === selectedTable.id)?.code || 'Thanh toan FunCafe'
+                      : 'Mang ve - Thanh toan FunCafe',
                   })}
                   alt="VietQR"
                   className="w-52 h-52 object-contain bg-white rounded-xl border border-line"
@@ -1123,8 +1224,12 @@ export default function SalesPage() {
               return;
             }
             clearCartForTable(selectedTable.id);
+          } else if (banMangVe) {
+            // Giỏ mang về chỉ nằm trong máy — không có đơn nào trên máy chủ để hủy.
+            clearCartForTable(KHOA_MANG_VE);
           }
           setSelectedTable(null);
+          setBanMangVe(false);
           setClearConfirm(false);
         }}
         title="Hủy order"

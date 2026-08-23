@@ -39,6 +39,8 @@ export interface RevenueSummary {
   byMonth: RevenueBucket[];
   topItems: { name: string; count: number; revenue: number }[];
   shops: { shopId: string; shopName: string; total: number; count: number }[];
+  /** Tách theo hình thức bán. Luôn có đủ hai khóa, kể cả khi một bên bằng 0. */
+  theoHinhThuc: { dineIn: { total: number; count: number }; takeaway: { total: number; count: number } };
 }
 
 function docMoc(raw: unknown): RevenueBucket[] {
@@ -83,6 +85,17 @@ export const revenueService = {
         total: c.total ?? 0,
         count: c.count ?? 0,
       })),
+      // `?? {}` cho máy chủ bản cũ chưa trả khóa này: hiện 0 còn hơn nổ giao diện.
+      theoHinhThuc: {
+        dineIn: {
+          total: raw.by_order_type?.dine_in?.total ?? 0,
+          count: raw.by_order_type?.dine_in?.count ?? 0,
+        },
+        takeaway: {
+          total: raw.by_order_type?.takeaway?.total ?? 0,
+          count: raw.by_order_type?.takeaway?.count ?? 0,
+        },
+      },
     };
   },
 

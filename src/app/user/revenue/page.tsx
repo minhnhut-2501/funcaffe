@@ -13,7 +13,7 @@ import { invoiceService, revenueService } from '@/services';
 import { useApi } from '@/hooks/use-api';
 import { formatCurrency, formatPaymentMethod } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
-import { Download, TrendingUp, Receipt, DollarSign, BarChart3, AlertCircle, Store, Trophy } from 'lucide-react';
+import { Download, TrendingUp, Receipt, DollarSign, BarChart3, AlertCircle, Store, ShoppingBag, Trophy } from 'lucide-react';
 import { downloadExcel, toExcelDate } from '@/lib/utils';
 import RevenueChart, { type RevenuePoint } from '@/components/user/RevenueChart';
 import ChartModePicker from '@/components/user/ChartModePicker';
@@ -129,6 +129,9 @@ export default function RevenuePage() {
   const revenue = soLieu?.total ?? 0;
   const soHoaDon = soLieu?.count ?? 0;
   const avgPerInvoice = soHoaDon > 0 ? Math.round(revenue / soHoaDon) : 0;
+  // Tách theo hình thức bán — máy chủ cộng sẵn, luôn đủ hai khóa kể cả khi bằng 0.
+  const taiQuan = soLieu?.theoHinhThuc.dineIn ?? { total: 0, count: 0 };
+  const mangVe = soLieu?.theoHinhThuc.takeaway ?? { total: 0, count: 0 };
   const todayRevenue = useMemo(() => {
     if (!tongQuan) return 0;
     if (effectiveScope === 'all') return tongQuan.today;
@@ -345,6 +348,17 @@ export default function RevenuePage() {
           <StatCard label="Tổng hóa đơn" value={soHoaDon} icon={Receipt} color="yellow" />
         )}
       </div>
+
+      {/* Tách theo hình thức bán. Chỉ vẽ khi ĐÃ bán mang về ít nhất một lần — quán
+          thuần tại quán không cần một hàng thẻ luôn hiện 0₫ chiếm chỗ. */}
+      {mangVe.count > 0 && (
+        <div className="stagger grid grid-cols-2 gap-4 mb-6">
+          <StatCard label="Bán tại quán" value={formatCurrency(taiQuan.total)} icon={Store}
+            color="blue" hint={`${taiQuan.count} hóa đơn`} />
+          <StatCard label="Bán mang về" value={formatCurrency(mangVe.total)} icon={ShoppingBag}
+            color="yellow" hint={`${mangVe.count} hóa đơn`} />
+        </div>
+      )}
 
       {/* Phân tích doanh thu bằng AI (gói Pro Max) */}
       <RevenueAiInsights />

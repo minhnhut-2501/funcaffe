@@ -91,11 +91,16 @@ export interface OrderItem {
   note?: string;
 }
 
+/** Bán tại quán (có bàn) hay mang về (không bàn). */
+export type OrderType = 'dine_in' | 'takeaway';
+
 export interface Order {
   id: string;
   code: string;
+  /** Rỗng với đơn mang về — đơn đó không gắn bàn nào. */
   tableId: string;
   tableName: string;
+  orderType: OrderType;
   items: OrderItem[];
   subtotal: number;
   discountAmount: number;
@@ -112,6 +117,7 @@ export interface Invoice {
   id: string;
   invoiceCode: string;
   orderId: string;
+  orderType: OrderType;
   shopId?: string;
   tableId?: string;
   orderCode: string;

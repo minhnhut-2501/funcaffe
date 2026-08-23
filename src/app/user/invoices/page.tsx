@@ -73,7 +73,8 @@ export default function InvoicesPage() {
     const paidDate = ngayDiaPhuong(inv.paidAt || inv.createdAt);
     return (
       matchesMethod(inv.paymentMethod) &&
-      (search === '' || inv.invoiceCode.toLowerCase().includes(search.toLowerCase()) || inv.tableName.includes(search)) &&
+      (search === '' || inv.invoiceCode.toLowerCase().includes(search.toLowerCase()) || inv.tableName.includes(search) ||
+        (inv.orderType === 'takeaway' && 'mang về'.includes(search.toLowerCase()))) &&
       (fromDate === '' || paidDate >= fromDate) &&
       (toDate === '' || paidDate <= toDate)
     );
@@ -170,7 +171,11 @@ export default function InvoicesPage() {
               <tr key={inv.id} className="hover:bg-sand/50 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs font-bold text-bean">{inv.invoiceCode}</td>
                 <td className="px-4 py-3 font-mono text-xs text-cafe-500">{inv.orderCode}</td>
-                <td className="px-4 py-3 text-ink">{inv.tableName}</td>
+                <td className="px-4 py-3 text-ink">
+                  {inv.orderType === 'takeaway'
+                    ? <span className="font-semibold text-gold-deep">Mang về</span>
+                    : inv.tableName}
+                </td>
                 <td className="px-4 py-3 font-semibold text-ink text-right">{formatCurrency(inv.totalAmount)}</td>
                 <td className="px-4 py-3 text-cafe-600">{formatPaymentMethod(inv.paymentMethod)}</td>
                 <td className="px-4 py-3">
@@ -256,7 +261,11 @@ export default function InvoicesPage() {
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
               <div className="text-cafe-500">Mã hóa đơn: <span className="font-bold text-cafe-800 font-mono">{viewInvoice.invoiceCode}</span></div>
               <div className="text-cafe-500">Mã order: <span className="font-medium text-cafe-700 font-mono">{viewInvoice.orderCode}</span></div>
-              <div className="text-cafe-500">Bàn: <span className="font-medium text-cafe-800">{viewInvoice.tableName}</span></div>
+              <div className="text-cafe-500">
+                {viewInvoice.orderType === 'takeaway'
+                  ? <span className="font-semibold text-cafe-800">MANG VỀ</span>
+                  : <>Bàn: <span className="font-medium text-cafe-800">{viewInvoice.tableName}</span></>}
+              </div>
               <div className="text-cafe-500">Ngày: <span className="font-medium text-cafe-800">{formatDate(viewInvoice.paidAt)}</span></div>
               <div className="text-cafe-500">Giờ TT: <span className="font-medium text-cafe-800">{formatDateTime(viewInvoice.paidAt)}</span></div>
               <div className="text-cafe-500">Thanh toán: <span className="font-medium text-cafe-800">{formatPaymentMethod(viewInvoice.paymentMethod)}</span></div>

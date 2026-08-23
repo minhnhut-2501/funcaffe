@@ -33,6 +33,8 @@ function mapOrder(raw: RawOrder): Order {
     code: raw.code ?? '',
     tableId: raw.table_id ?? '',
     tableName: raw.table?.name ?? '',
+    // Đơn cũ (có trước khi bán mang về) không mang trường này — coi là tại quán.
+    orderType: raw.order_type === 'takeaway' ? 'takeaway' : 'dine_in',
     items: (raw.order_details ?? []).map(mapOrderItem),
     subtotal: raw.subtotal ?? 0,
     discountAmount: raw.discount_amount ?? 0,
@@ -63,6 +65,7 @@ function mapInvoice(raw: RawOrder): Invoice {
     tableId: raw.table_id ?? undefined,
     orderCode: raw.code ?? '',
     tableName: raw.table?.name ?? '',
+    orderType: raw.order_type === 'takeaway' ? 'takeaway' : 'dine_in',
     shopName: undefined,
     shopAddress: undefined,
     shopPhone: undefined,
@@ -121,7 +124,11 @@ function orderQueryString(q: OrderQuery): string {
  */
 function orderBody(data: Partial<Order>) {
   return {
-    table_id: data.tableId,
+    // Gửi TƯỜNG MINH kể cả khi là 'dine_in': backend đặt mặc định rồi mới validate,
+    // nhưng để client nói rõ ý mình vẫn hơn là dựa vào mặc định của phía kia.
+    order_type: data.orderType ?? 'dine_in',
+    // Đơn mang về không có bàn -> gửi null chứ không gửi chuỗi rỗng.
+    table_id: data.tableId || null,
     note: data.note,
     discount_amount: data.discountAmount,
     items: (data.items ?? []).map((item) => ({
@@ -161,6 +168,37 @@ export const orderService = {
     const shopId = await getShopId();
     const raw = await api.post<RawOrder>(`/shops/${shopId}/orders`, orderBody(data));
     return mapOrder(raw);
+  },
+  /**
+   * Bán MANG VỀ: tạo đơn và thu tiền trong MỘT lượt gọi.
+   *
+   * Máy chủ kiểm tiền khách đưa TRƯỚC khi tạo đơn, nên đưa thiếu là 422 bay về lúc
+   * cơ sở dữ liệu còn chưa có gì — không có đơn nào nằm lại. Đó là lý do gộp một
+   * lượt thay vì gọi create() rồi pay(): lượt thứ hai hỏng sẽ để lại đơn `active`
+   * không gắn bàn, mà màn hình Bán hàng dẫn xuất mọi thứ theo bàn nên đơn đó không
+   * hiện ở đâu để ai đó thu tiền hay hủy đi.
+   *
+   * Trả về RAW để nơi gọi đọc thẳng `invoice_code` / `change_amount` — hai trường
+   * này không có trong kiểu `Order` của giao diện.
+   */
+  taoVaThanhToanMangVe: async (data: {
+    items: OrderItem[];
+    subtotal: number;
+    totalAmount: number;
+    payment_method: string;
+    cash_received?: number;
+  }) => {
+    const shopId = await getShopId();
+    return api.post<RawOrder>(`/shops/${shopId}/orders`, {
+      ...orderBody({
+        orderType: 'takeaway',
+        items: data.items,
+        subtotal: data.subtotal,
+        totalAmount: data.totalAmount,
+      }),
+      payment_method: data.payment_method,
+      ...(data.cash_received !== undefined ? { cash_received: data.cash_received } : {}),
+    });
   },
   pay: async (orderId: string, data: { payment_method: string; discount_amount?: number; cash_received?: number }) => {
     const shopId = await getShopId();
