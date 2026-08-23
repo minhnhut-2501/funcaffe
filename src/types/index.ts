@@ -170,6 +170,7 @@ export interface Package {
   features: string[];
   maxTables?: number | null;     // null = không giới hạn
   maxMenuItems?: number | null;  // null = không giới hạn
+  maxStaff?: number | null;      // null = không giới hạn
   canUseAI?: boolean;
   vatRate?: number;              // % VAT áp khi mua gói (0 với gói trial)
 }
@@ -199,6 +200,7 @@ export interface UserSubscription {
   // Giới hạn & quyền lấy từ gói (Infinity = không giới hạn). Do admin cấu hình.
   maxTables?: number;
   maxMenuItems?: number;
+  maxStaff?: number;
   canUseAI?: boolean;
 }
 
@@ -327,6 +329,12 @@ export interface CurrentUser {
   email: string;
   phone: string;
   avatarUrl?: string;
-  role: 'user' | 'admin';
+  /**
+   * 'user' = chủ quán · 'staff' = nhân viên (chỉ dùng màn Bán hàng) · 'admin'.
+   * Nhân viên gắn với đúng MỘT quán, id nằm ở `shopId` bên dưới.
+   */
+  role: 'user' | 'admin' | 'staff';
+  /** Chỉ nhân viên có: quán họ làm việc. Chủ quán và admin để trống. */
+  shopId?: string;
   subscription: UserSubscription;
 }

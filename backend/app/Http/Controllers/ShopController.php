@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ChecksShopAccess;
 use App\Models\Shop;
 use App\Models\Subscription;
 use Illuminate\Http\Request;
 
 class ShopController extends Controller
 {
+    use ChecksShopAccess;
+
     public function __construct()
     {
         $this->middleware('auth:sanctum');
@@ -20,7 +23,20 @@ class ShopController extends Controller
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        $shops = $user->shops;
+        /*
+         * NHÂN VIÊN cũng phải thấy quán mình làm ở đây.
+         *
+         * `$user->shops` chỉ trả về quán NGƯỜI ĐÓ SỞ HỮU, nên với nhân viên nó rỗng —
+         * và giao diện hiểu "rỗng" là "chưa có quán nào", rồi ép họ sang màn hình tạo
+         * quán đầu tiên (thứ họ không có quyền làm). Từ đó `getShopId()` cũng không
+         * biết hỏi dữ liệu của quán nào.
+         *
+         * Trả về đúng MỘT quán: quán ghi ở `users.shop_id`. Nhân viên không có gì để
+         * chọn, nhưng phần còn lại của ứng dụng vẫn chạy y như với chủ quán.
+         */
+        $shops = $user->laNhanVien()
+            ? Shop::where('_id', (string) $user->shop_id)->get()
+            : $user->shops;
 
         // Đính kèm gói MỚI NHẤT của TỪNG quán. Không có phần này thì frontend chỉ biết
         // hạn của quán đang chọn, nên không thể cảnh báo "quán khác của bạn sắp hết
@@ -74,17 +90,24 @@ class ShopController extends Controller
 
     public function show(Request $request, Shop $shop)
     {
-        if ($shop->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
+        /*
+         * Dùng authorizeShop() chứ KHÔNG tự kiểm quyền sở hữu tại chỗ.
+         *
+         * Trước đây hai method ở đây chép tay điều kiện `shop->user_id === user->id ||
+         * admin`. Nó đúng cho tới ngày có thêm vai trò NHÂN VIÊN — lúc đó bản chép tay
+         * không biết gì về vai trò mới, và nhân viên bị chặn ở chính lượt gọi mà màn
+         * Bán hàng cần để in hóa đơn và dựng mã VietQR. Luật phân quyền phải nằm ĐÚNG
+         * MỘT chỗ, nếu không nó sẽ trôi mỗi nơi một kiểu.
+         */
+        $this->authorizeShop($shop);
         return response()->json($shop);
     }
 
     public function update(Request $request, Shop $shop)
     {
-        if ($shop->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
+        // Nhân viên đã bị middleware `chu-quan` chặn từ vòng ngoài; authorizeShop() ở
+        // đây lo phần "quán này có phải của bạn không". Xem chú thích ở show().
+        $this->authorizeShop($shop);
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',

@@ -15,5 +15,6 @@ export * from './payments';
 export * from './revenue';
 export * from './reviews';
 export * from './subscriptions';
+export * from './staff';
 export * from './tables';
 export * from './users';

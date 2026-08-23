@@ -28,11 +28,17 @@ export default function LoginPage() {
   // không cùng bắn lệnh chuyển trang trên một tick (trước đây form vừa push,
   // effect vừa replace, hai lệnh chồng nhau nên có lúc đứng lại ở /login).
   const navigated = useRef(false);
-  const goToArea = useCallback((role: 'user' | 'admin') => {
+  const goToArea = useCallback((role: 'user' | 'admin' | 'staff') => {
     if (navigated.current) return;
     navigated.current = true;
     // replace: đã vào trong rồi thì nút Back không nên quay lại form đăng nhập.
-    router.replace(role === 'admin' ? '/admin/dashboard' : '/user/dashboard');
+    // Nhân viên vào thẳng màn Bán hàng — đó là màn duy nhất họ dùng. Đưa họ về
+    // Tổng quan trước rồi mới đá sang là một nhịp nháy vô nghĩa.
+    router.replace(
+      role === 'admin' ? '/admin/dashboard'
+        : role === 'staff' ? '/user/sales'
+        : '/user/dashboard',
+    );
   }, [router]);
 
   // Đã đăng nhập sẵn -> tự động vào khu vực tương ứng, không hiện lại form

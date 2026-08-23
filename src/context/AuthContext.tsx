@@ -20,8 +20,8 @@ interface AuthContextType {
   activeShopId: string | null;
   setActiveShop: (id: string) => Promise<void>;
   reloadShops: () => Promise<ShopInfo[]>;
-  login: (email: string, password: string, remember?: boolean) => Promise<'user' | 'admin'>;
-  register: (data: { fullName: string; email: string; phone: string; password: string }) => Promise<'user' | 'admin'>;
+  login: (email: string, password: string, remember?: boolean) => Promise<CurrentUser['role']>;
+  register: (data: { fullName: string; email: string; phone: string; password: string }) => Promise<CurrentUser['role']>;
   logout: () => Promise<void>;
   refreshUser?: () => Promise<void>;
 }
@@ -87,7 +87,13 @@ function mapUser(u: AuthUser, subscription: UserSubscription): CurrentUser {
     email: u.email,
     phone: u.phone || '',
     avatarUrl: u.avatar ?? undefined,
-    role: u.role === 'admin' ? 'admin' : 'user',
+    // Đọc vai trò theo DANH SÁCH TRẮNG, không phải "khác admin thì là user": vai trò
+    // lạ (dữ liệu hỏng, backend mới thêm giá trị) phải rơi về `user`... KHÔNG — phải
+    // rơi về vai trò HẸP NHẤT. Nhưng ở đây hẹp nhất là 'staff', mà gán nhầm ai đó
+    // thành nhân viên thì họ mất quyền vào chính quán mình. Nên giữ 'user' làm mặc
+    // định và để backend quyết định thật — mọi chốt chặn đều nằm ở đó.
+    role: u.role === 'admin' ? 'admin' : u.role === 'staff' ? 'staff' : 'user',
+    shopId: u.shop_id ? String(u.shop_id) : undefined,
     subscription,
   };
 }
@@ -142,7 +148,9 @@ async function subscriptionOf(shopId: string | null, shops: ShopInfo[]): Promise
 }
 
 // Tải danh sách quán + xác định quán đang chọn (admin không có quán -> bỏ qua).
-async function loadShops(role: 'user' | 'admin'): Promise<{ shops: ShopInfo[]; activeShopId: string | null; failed: boolean }> {
+async function loadShops(role: CurrentUser['role']): Promise<{ shops: ShopInfo[]; activeShopId: string | null; failed: boolean }> {
+  // Admin không có quán nào. Nhân viên CÓ đúng một quán và `/shops` chỉ trả về nó,
+  // nên vẫn gọi bình thường — chỉ khác là họ không có gì để chọn.
   if (role === 'admin') return { shops: [], activeShopId: null, failed: false };
   let failed = false;
   const shops = await shopService.list().catch(() => { failed = true; return [] as ShopInfo[]; });
@@ -173,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * và hỏi lại đúng quán.
    */
   const hydrate = useCallback(async (u: AuthUser): Promise<CurrentUser> => {
-    const role = u.role === 'admin' ? 'admin' : 'user';
+    const role: CurrentUser['role'] = u.role === 'admin' ? 'admin' : u.role === 'staff' ? 'staff' : 'user';
     const guessedShopId = role === 'admin' ? null : peekActiveShopId();
 
     const [{ shops, activeShopId, failed }, guessedSubs] = await Promise.all([
@@ -209,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false));
   }, [hydrate]);
 
-  const login = useCallback(async (email: string, password: string, remember = true): Promise<'user' | 'admin'> => {
+  const login = useCallback(async (email: string, password: string, remember = true): Promise<CurrentUser['role']> => {
     setIsLoading(true);
     try {
       const res = await api.post<AuthResponse>('/auth/login', { email, password });
@@ -221,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [hydrate]);
 
-  const register = useCallback(async (data: { fullName: string; email: string; phone: string; password: string }): Promise<'user' | 'admin'> => {
+  const register = useCallback(async (data: { fullName: string; email: string; phone: string; password: string }): Promise<CurrentUser['role']> => {
     setIsLoading(true);
     try {
       const res = await api.post<AuthResponse>('/auth/register', {

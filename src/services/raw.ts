@@ -82,6 +82,8 @@ export interface RawOrder extends RawId {
   shop_id?: string;
   table_id?: string;
   order_type?: string;
+  paid_by?: string;
+  created_by?: string;
   table?: { name?: string };
   order_details?: RawOrderDetail[];
   subtotal?: number;

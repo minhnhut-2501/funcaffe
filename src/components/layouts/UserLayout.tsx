@@ -6,7 +6,7 @@ import {
   Coffee, LayoutDashboard, Store, Grid3X3, UtensilsCrossed,
   CupSoda, ShoppingCart, Receipt,
   BarChart3, CreditCard, User, LogOut, Menu, X, Bell, Clock, PanelLeft,
-  ChevronDown, Check, Plus, AlertTriangle,
+  ChevronDown, Check, Plus, AlertTriangle, Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { isSubscriptionExpired, expiryState, daysLeftUntil, EXPIRY_SOON_DAYS, type ExpiryState } from '@/lib/permission';
@@ -43,10 +43,40 @@ const navGroups: NavGroup[] = [
     title: 'Tài khoản',
     items: [
       { href: '/user/shop', label: 'Quản lý quán', icon: Store },
+      { href: '/user/staff', label: 'Quản lý nhân viên', icon: Users },
       { href: '/user/profile', label: 'Hồ sơ cá nhân', icon: User },
     ],
   },
 ];
+
+/**
+ * Nav của NHÂN VIÊN — chỉ ba màn hình.
+ *
+ * Bán hàng để làm việc, Hóa đơn để đối ca cuối ngày, Hồ sơ để tự đổi mật khẩu. Không
+ * có Doanh thu, không có Thực đơn, không có Gói dịch vụ — đó là chuyện của chủ quán.
+ *
+ * Đây chỉ là lớp GIAO DIỆN. Chặn thật nằm ở backend (middleware `chu-quan`): gõ tay
+ * đường dẫn hay gọi thẳng API đều bị từ chối, không phụ thuộc vào việc menu có hiện
+ * mục đó hay không.
+ */
+const navNhanVien: NavGroup[] = [
+  {
+    title: 'Bán hàng',
+    items: [
+      { href: '/user/sales', label: 'Bán hàng', icon: ShoppingCart },
+      { href: '/user/invoices', label: 'Hóa đơn', icon: Receipt },
+    ],
+  },
+  {
+    title: 'Tài khoản',
+    items: [
+      { href: '/user/profile', label: 'Hồ sơ cá nhân', icon: User },
+    ],
+  },
+];
+
+/** Đường dẫn nhân viên được vào. Gõ tay ra ngoài danh sách này thì bị đẩy về Bán hàng. */
+const DUONG_CHO_NHAN_VIEN = ['/user/sales', '/user/invoices', '/user/profile'];
 
 const packageMeta: Record<string, { label: string; cls: string }> = {
   none:   { label: 'Chưa có gói', cls: 'bg-cafe-100 text-cafe-500' },
@@ -87,7 +117,10 @@ function ExpiryDot({ state, className = '' }: { state: ExpiryState; className?: 
 
 function Sidebar({ collapsed, mobileOpen, onClose, onToggle, onLogout }: { collapsed: boolean; mobileOpen: boolean; onClose: () => void; onToggle: () => void; onLogout: () => void }) {
   const { user } = useAuth();
-  const sub = user?.subscription;
+  const laNhanVien = user?.role === 'staff';
+  // Ô thông tin gói chỉ dành cho người MUA gói. Nhân viên thấy "còn 12 ngày" rồi
+  // tưởng mình phải lo gia hạn — việc không phải của họ và cũng không làm được.
+  const sub = laNhanVien ? null : user?.subscription;
   const handleLogout = onLogout;
 
   return (
@@ -134,7 +167,7 @@ function Sidebar({ collapsed, mobileOpen, onClose, onToggle, onLogout }: { colla
       )}
 
       {/* Nav */}
-      <SidebarNav groups={navGroups} collapsed={collapsed} onNavigate={onClose} />
+      <SidebarNav groups={laNhanVien ? navNhanVien : navGroups} collapsed={collapsed} onNavigate={onClose} />
 
       {/* Logout */}
       <div className="px-2.5 py-3 border-t border-line shrink-0">
@@ -205,7 +238,7 @@ function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, activeShopId, shops } = useAuth();
   const sub = user?.subscription;
   const pathname = usePathname();
-  const current = navGroups
+  const current = [...navGroups, ...navNhanVien]
     .flatMap((g) => g.items.map((it) => ({ ...it, group: g.title })))
     .find((it) => it.href === pathname);
   const shortName = user?.fullName.split(' ').slice(-1)[0] ?? '';
@@ -403,8 +436,17 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (isLoading || loggingOut.current) return;
     if (!user) { router.replace('/login'); return; }
-    if (user.role === 'admin') router.replace('/admin/dashboard');
-  }, [isLoading, user, router]);
+    if (user.role === 'admin') { router.replace('/admin/dashboard'); return; }
+
+    // Nhân viên gõ tay một đường dẫn ngoài phần việc của mình -> đẩy về Bán hàng.
+    //
+    // Đây CHỈ là phép lịch sự để họ không nhìn một trang đầy lỗi 403. Chặn thật nằm
+    // ở backend (middleware `chu-quan`): dữ liệu không về thì trang có mở được cũng
+    // trống trơn. Đừng bao giờ coi lớp này là phân quyền.
+    if (user.role === 'staff' && !DUONG_CHO_NHAN_VIEN.includes(pathname)) {
+      router.replace('/user/sales');
+    }
+  }, [isLoading, user, router, pathname]);
 
   // đóng drawer mobile khi đổi trang
   useEffect(() => { setMobileOpen(false); }, [pathname]);
@@ -417,6 +459,10 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const [shopReady, setShopReady] = useState<boolean | null>(null);
   useEffect(() => {
     if (isLoading || !user) return;
+    // Nhân viên không tạo quán được, và quán của họ là cố định — cổng này không dành
+    // cho họ. Đá họ sang /user/shop là đưa vào đúng màn hình họ bị cấm, và guard vai
+    // trò ở trên lại đá ngược về, thành vòng lặp.
+    if (user.role === 'staff') { setShopReady(true); return; }
     if (pathname === '/user/shop' || pathname === '/user/subscription') { setShopReady(true); return; }
     if (shopsError) { setShopReady(true); return; }
     if (shops.length === 0) { router.replace('/user/shop'); return; }
@@ -427,8 +473,18 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   // TRẮNG — trên máy chủ miễn phí vừa ngủ dậy, khoảng trắng đó kéo dài vài giây và
   // người dùng tưởng ứng dụng hỏng.
   if (isLoading) return <KhungChoPhien />;
-  if (!user || user.role !== 'user') return null; // đang chuyển hướng
-  if (shopReady === null) return null;
+  // Khu /user dành cho CHỦ QUÁN và NHÂN VIÊN. Admin rơi vào đây là đang trên đường
+  // bị đẩy sang /admin, nên trả null cho khỏi nháy.
+  if (!user || user.role === 'admin') return null; // đang chuyển hướng
+
+  /*
+   * Nhân viên KHÔNG đi qua cổng `shopReady`.
+   *
+   * Cổng đó tồn tại để ép chủ quán chưa có quán nào sang màn hình tạo quán đầu tiên.
+   * Nhân viên thì không tạo được quán, và quán của họ là cố định — bắt họ chờ cổng đó
+   * chỉ dẫn tới màn hình trắng nếu lượt gọi /shops chậm hoặc trả về khác mong đợi.
+   */
+  if (user.role !== 'staff' && shopReady === null) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper">
@@ -492,7 +548,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           <div key={pathname} className="anim-page">{children}</div>
         </main>
       </div>
-      <AiChatWidget />
+      {/* Trợ lý AI đọc doanh thu và tình hình cả quán — backend đã chặn nhân viên ở
+          middleware `chu-quan`, ẩn luôn widget để họ không bấm vào rồi ăn 403. */}
+      {user?.role !== 'staff' && <AiChatWidget />}
     </div>
   );
 }

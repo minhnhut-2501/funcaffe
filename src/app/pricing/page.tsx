@@ -110,7 +110,10 @@ export default function PricingPage() {
       period: '7 ngày dùng thử',
       badge: 'Dùng thử',
       desc: 'Trải nghiệm trước khi quyết định.',
-      features: freePkg?.features ?? ['Trải nghiệm TOÀN BỘ tính năng Pro Max trong 7 ngày', 'Không giới hạn bàn & món', 'Có thống kê doanh thu', 'Chỉ dùng thử 1 lần / tài khoản'],
+      // Bản dự phòng khi lượt gọi API gói hỏng. PHẢI khớp với packages.json — để lệch là
+      // trang Bảng giá quảng cáo một đằng còn máy chủ chặn một nẻo, và lúc dễ xảy ra
+      // nhất chính là sáng sớm khi máy chủ miễn phí vừa ngủ dậy.
+      features: freePkg?.features ?? ['Trải nghiệm gói Pro trong 7 ngày', 'Tối đa 20 bàn & 40 món', 'Trợ lý AI & phân tích doanh thu tự động', 'Tối đa 2 tài khoản nhân viên', 'Chỉ dùng thử 1 lần / tài khoản'],
       moiNgay: null,
       highlight: false,
     },
@@ -121,7 +124,7 @@ export default function PricingPage() {
       period: periodLabel,
       badge: 'Phù hợp quán nhỏ',
       desc: 'Đủ dùng cho vận hành hằng ngày.',
-      features: proPkg?.features ?? ['Tối đa 20 bàn, 40 món', 'Size và topping', 'Bán hàng theo bàn', 'In hóa đơn', 'Có thống kê doanh thu'],
+      features: proPkg?.features ?? ['Tối đa 20 bàn, 40 món', 'Tối đa 2 tài khoản nhân viên', 'Size và topping', 'Bán tại quán và mang về', 'In hóa đơn', 'Có thống kê doanh thu'],
       moiNgay: proPkg ? giaMoiNgay(getPrice(proPkg, timeSubsMap[proPkg.id] ?? [], dur), dur) : null,
       highlight: false,
     },
@@ -132,7 +135,7 @@ export default function PricingPage() {
       period: periodLabel,
       badge: 'Đầy đủ báo cáo',
       desc: 'Quản lý sâu bằng số liệu.',
-      features: promaxPkg?.features ?? ['Tất cả chức năng của gói Pro', 'Thống kê doanh thu', 'Biểu đồ doanh thu', 'Top món bán chạy', 'Báo cáo chi tiết'],
+      features: promaxPkg?.features ?? ['Tất cả chức năng của gói Pro', 'Không giới hạn bàn & thực đơn', 'Không giới hạn tài khoản nhân viên', 'Trợ lý AI', 'Top món bán chạy', 'Báo cáo chi tiết'],
       moiNgay: promaxPkg ? giaMoiNgay(getPrice(promaxPkg, timeSubsMap[promaxPkg.id] ?? [], dur), dur) : null,
       highlight: true,
     },

@@ -26,37 +26,44 @@ function sub(patch: Partial<UserSubscription> = {}): UserSubscription {
 
 describe('defaultPackageLimits — bảng dự phòng theo loại gói', () => {
   it('chưa có gói thì không được gì', () => {
-    expect(defaultPackageLimits('none')).toEqual({ maxTables: 0, maxMenuItems: 0, canUseAI: false });
+    expect(defaultPackageLimits('none')).toEqual({ maxTables: 0, maxMenuItems: 0, maxStaff: 0, canUseAI: false });
   });
 
-  it('Fun Free là bản dùng thử Pro Max nên mở hết, kể cả AI', () => {
-    expect(defaultPackageLimits('free')).toEqual({ maxTables: Infinity, maxMenuItems: Infinity, canUseAI: true });
+  /**
+   * Fun Free từ 08/2026 là bản dùng thử gói PRO (không phải Pro Max nữa): cùng trần
+   * bàn/món với Pro, nhưng VẪN có AI để người dùng thử được tính năng đinh trước khi
+   * quyết mua. Đổi ở đây phải đi kèm đổi `packages.json` — hai chỗ lệch nhau là bảng
+   * giá quảng cáo một đằng, máy chủ chặn một nẻo.
+   */
+  it('Fun Free = trần của Pro (20 bàn / 40 món / 2 nhân viên) nhưng CÓ AI', () => {
+    expect(defaultPackageLimits('free')).toEqual({ maxTables: 20, maxMenuItems: 40, maxStaff: 2, canUseAI: true });
   });
 
-  it('Pro: 20 bàn, 40 món, không có AI', () => {
-    expect(defaultPackageLimits('pro')).toEqual({ maxTables: 20, maxMenuItems: 40, canUseAI: false });
+  it('Pro: 20 bàn, 40 món, 2 nhân viên, không có AI', () => {
+    expect(defaultPackageLimits('pro')).toEqual({ maxTables: 20, maxMenuItems: 40, maxStaff: 2, canUseAI: false });
   });
 
-  it('Pro Max không giới hạn và có AI', () => {
-    expect(defaultPackageLimits('promax')).toEqual({ maxTables: Infinity, maxMenuItems: Infinity, canUseAI: true });
+  it('Pro Max không giới hạn gì cả và có AI', () => {
+    expect(defaultPackageLimits('promax'))
+      .toEqual({ maxTables: Infinity, maxMenuItems: Infinity, maxStaff: Infinity, canUseAI: true });
   });
 
   it('loại gói lạ rơi về "none" — KHÔNG được rơi về "free"', () => {
-    // Fun Free mở khóa tối đa, nên lấy nó làm giá trị dự phòng nghĩa là dữ liệu hỏng
-    // sẽ MỞ KHÓA thay vì khóa bớt.
+    // Rơi về bất kỳ gói nào có quyền đều là MỞ KHÓA khi dữ liệu hỏng. Fun Free nay
+    // đã hẹp hơn trước, nhưng nó vẫn có AI và 20 bàn — vẫn nhiều hơn "không có gì".
     expect(defaultPackageLimits('la_hoac_hong' as UserPackageType)).toEqual(defaultPackageLimits('none'));
   });
 });
 
 describe('packageLimits — cấu hình trên gói thắng bảng dự phòng', () => {
   it('lấy đúng số admin đã cấu hình', () => {
-    expect(packageLimits(sub({ maxTables: 25, maxMenuItems: 60, canUseAI: true })))
-      .toEqual({ maxTables: 25, maxMenuItems: 60, canUseAI: true });
+    expect(packageLimits(sub({ maxTables: 25, maxMenuItems: 60, maxStaff: 9, canUseAI: true })))
+      .toEqual({ maxTables: 25, maxMenuItems: 60, maxStaff: 9, canUseAI: true });
   });
 
   it('gói thiếu trường nào thì trường đó dùng bảng dự phòng', () => {
     expect(packageLimits(sub({ maxTables: 5 })))
-      .toEqual({ maxTables: 5, maxMenuItems: 40, canUseAI: false });
+      .toEqual({ maxTables: 5, maxMenuItems: 40, maxStaff: 2, canUseAI: false });
   });
 
   it('không có gói thì trả mức của "none"', () => {

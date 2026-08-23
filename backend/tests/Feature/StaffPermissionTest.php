@@ -104,8 +104,52 @@ class StaffPermissionTest extends MongoTestCase
             $this->getJson($this->url($ep))->assertStatus(200);
         }
         $this->getJson($this->url('orders?status=active'))->assertStatus(200);
-        $this->getJson('/api/shops')->assertStatus(200);
         $this->getJson('/api/user')->assertStatus(200);
+    }
+
+    /**
+     * `/shops` phải trả về ĐÚNG quán nhân viên làm — không phải mảng rỗng.
+     *
+     * Chỉ khẳng định 200 là quá lỏng, và đã để lọt một lỗi thật: `$user->shops` chỉ
+     * trả quán NGƯỜI ĐÓ SỞ HỮU nên với nhân viên nó rỗng, giao diện hiểu là "chưa có
+     * quán nào" rồi ép họ sang màn hình tạo quán đầu tiên — thứ họ không có quyền làm.
+     */
+    public function test_nhan_vien_thay_dung_mot_quan_minh_lam(): void
+    {
+        $this->nhuNhanVien();
+
+        $ds = $this->getJson('/api/shops')->assertStatus(200)->json();
+
+        $this->assertCount(1, $ds, 'Nhân viên phải thấy đúng một quán.');
+        $this->assertSame((string) $this->shop->id, $ds[0]['id']);
+    }
+
+    /**
+     * Màn Bán hàng đọc chi tiết quán để in hóa đơn (tên, địa chỉ) và dựng mã VietQR
+     * (số tài khoản ngân hàng). Chặn nhầm GET này là nhân viên không thu được VietQR.
+     */
+    public function test_nhan_vien_doc_duoc_chi_tiet_quan_de_in_hoa_don_va_dung_VietQR(): void
+    {
+        $this->nhuNhanVien();
+
+        $this->getJson("/api/shops/{$this->shop->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('name', 'Quán có nhân viên');
+    }
+
+    public function test_nhan_vien_khong_thay_quan_khac_trong_danh_sach(): void
+    {
+        $khac = User::create([
+            'full_name' => 'Chủ khác', 'email' => 'ck-' . uniqid() . '@funcafe.test',
+            'password' => Hash::make('Password@123'), 'role' => 'user', 'status' => 'active',
+        ]);
+        $khac->shops()->create(['name' => 'Quán không liên quan', 'status' => 'open']);
+
+        $this->nhuNhanVien();
+        $ds = $this->getJson('/api/shops')->assertStatus(200)->json();
+
+        $this->assertCount(1, $ds);
+        $this->assertSame((string) $this->shop->id, $ds[0]['id']);
     }
 
     public function test_nhan_vien_ban_duoc_hang_va_thu_tien(): void

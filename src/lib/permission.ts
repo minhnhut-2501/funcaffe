@@ -3,6 +3,7 @@ import type { UserPackageType, UserSubscription } from '@/types';
 export interface PackageLimits {
   maxTables: number;    // Infinity = không giới hạn
   maxMenuItems: number; // Infinity = không giới hạn
+  maxStaff: number;     // Infinity = không giới hạn
   canUseAI: boolean;
 }
 
@@ -11,11 +12,12 @@ export interface PackageLimits {
 // (packages.max_tables / max_menu_items / can_use_ai), được nạp
 // vào user.subscription ở AuthContext và khớp backend EnforcesPackageLimits.
 const PACKAGE_LIMITS: Record<UserPackageType, PackageLimits> = {
-  none:   { maxTables: 0,        maxMenuItems: 0,        canUseAI: false },
-  // Fun Free là bản dùng thử Pro Max 7 ngày nên có luôn AI (khớp packages.can_use_ai).
-  free:   { maxTables: Infinity, maxMenuItems: Infinity, canUseAI: true  },
-  pro:    { maxTables: 20,       maxMenuItems: 40,       canUseAI: false },
-  promax: { maxTables: Infinity, maxMenuItems: Infinity, canUseAI: true  },
+  none:   { maxTables: 0,        maxMenuItems: 0,        maxStaff: 0,        canUseAI: false },
+  // Fun Free là bản dùng thử gói PRO 7 ngày — cùng trần bàn/món với Pro — nhưng CÓ
+  // kèm AI, để người dùng thử được tính năng đinh trước khi quyết mua.
+  free:   { maxTables: 20,       maxMenuItems: 40,       maxStaff: 2,        canUseAI: true  },
+  pro:    { maxTables: 20,       maxMenuItems: 40,       maxStaff: 2,        canUseAI: false },
+  promax: { maxTables: Infinity, maxMenuItems: Infinity, maxStaff: Infinity, canUseAI: true  },
 };
 
 export function defaultPackageLimits(pkg: UserPackageType): PackageLimits {
@@ -30,6 +32,7 @@ export function packageLimits(sub: UserSubscription | null | undefined): Package
   return {
     maxTables: sub.maxTables ?? fb.maxTables,
     maxMenuItems: sub.maxMenuItems ?? fb.maxMenuItems,
+    maxStaff: sub.maxStaff ?? fb.maxStaff,
     canUseAI: sub.canUseAI ?? fb.canUseAI,
   };
 }
@@ -90,6 +93,14 @@ export function canManage(sub: UserSubscription | null | undefined): boolean {
 // Trợ lý AI & phân tích doanh thu — chỉ gói có bật can_use_ai (mặc định chỉ Pro Max).
 export function canUseAI(sub: UserSubscription | null | undefined): boolean {
   return packageLimits(sub).canUseAI;
+}
+
+/**
+ * Quản lý nhân viên — chỉ CHỦ QUÁN. Nhân viên không tạo được đồng nghiệp.
+ * Backend chặn thật ở middleware `chu-quan`; chỗ này chỉ để ẩn mục khỏi sidebar.
+ */
+export function canManageStaff(role: string | undefined): boolean {
+  return role === 'user';
 }
 
 export function canPrint(pkg: UserPackageType): boolean {

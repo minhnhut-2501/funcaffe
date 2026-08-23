@@ -339,6 +339,8 @@ async function guiAnh(file: File): Promise<string> {
 }
 
 export interface AuthUser {
+  /** Chỉ nhân viên có: quán họ làm việc. */
+  shop_id?: string;
   /**
    * Laravel serialize model Mongo ra khóa `id`, KHÔNG phải `_id`. Khai cả hai và
    * để nơi dùng lấy `id ?? _id` — giống hệt cách mọi mapper khác trong services
