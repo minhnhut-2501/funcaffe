@@ -42,6 +42,7 @@ function mapOrder(raw: RawOrder): Order {
     status: raw.status === 'paid' ? 'paid' : (raw.status === 'cancelled' ? 'cancelled' : 'active'),
     paymentStatus: raw.status === 'paid' ? 'paid' : 'unpaid',
     paymentMethod: (raw.payment_method as Order['paymentMethod']) ?? undefined,
+    invoiceCode: raw.invoice_code ?? undefined,
     note: raw.note ?? undefined,
     createdAt: raw.created_at ?? '',
     paidAt: raw.paid_at ?? undefined,

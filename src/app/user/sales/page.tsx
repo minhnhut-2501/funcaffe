@@ -633,7 +633,10 @@ export default function SalesPage() {
       try {
         const don = await orderService.trangThai(phienVnpay.orderId);
         if (dungLai || don.status !== 'paid') return;
-        chotXongVnpay(don.totalAmount);
+        // Mã phiếu lấy TỪ ĐƠN vừa hỏi về, không để trống: thu ngân cần đọc nó để đối
+        // chiếu và in. Trước đây chỗ này truyền chuỗi rỗng nên ô "Mã hóa đơn" trên
+        // màn hình thành công trống trơn — lộ ra khi chạy thử trên bản deploy.
+        chotXongVnpay(don.totalAmount, don.invoiceCode ?? '');
       } catch {
         // Mạng chập một nhịp thì bỏ qua, lượt sau hỏi lại.
       }
@@ -644,7 +647,7 @@ export default function SalesPage() {
   }, [phienVnpay]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Dọn dẹp sau khi đơn VNPay đã được chốt (dù tự động hay xác nhận tay). */
-  const chotXongVnpay = (tongDaTra: number) => {
+  const chotXongVnpay = (tongDaTra: number, maPhieu = '') => {
     if (!phienVnpay) return;
     const { orderId, laMangVe } = phienVnpay;
 
@@ -660,7 +663,7 @@ export default function SalesPage() {
     setPhienVnpay(null);
     setCashGiven(null);
     setDiscountInput(0);
-    setSuccessModal({ code: '', orderId, total: tongDaTra, method: 'vnpay' });
+    setSuccessModal({ code: maPhieu, orderId, total: tongDaTra, method: 'vnpay' });
   };
 
   /**
@@ -675,7 +678,7 @@ export default function SalesPage() {
     setProcessing(true);
     try {
       const kq = await orderService.pay(phienVnpay.orderId, { payment_method: 'vnpay' });
-      chotXongVnpay(Number(kq?.total_amount ?? phienVnpay.soTien));
+      chotXongVnpay(Number(kq?.total_amount ?? phienVnpay.soTien), String(kq?.invoice_code ?? ''));
     } catch {
       showToast('Không chốt được đơn. Kiểm tra lại rồi thử tiếp.');
     } finally {

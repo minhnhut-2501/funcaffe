@@ -108,6 +108,8 @@ export interface Order {
   status: OrderStatus;
   paymentStatus: 'unpaid' | 'paid';
   paymentMethod?: PaymentMethod;
+  /** Mã phiếu, chỉ có khi đơn ĐÃ thanh toán. */
+  invoiceCode?: string;
   note?: string;
   createdAt: string;
   paidAt?: string;
