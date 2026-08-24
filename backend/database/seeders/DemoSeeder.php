@@ -123,72 +123,25 @@ class DemoSeeder extends Seeder
 
     private function seedPackages(): void
     {
-        // features lưu dạng chuỗi JSON — đúng như model Package (cast 'array') ghi xuống.
-        $pkg = fn (string $id, array $a) => array_merge([
-            '_id' => new ObjectId($id),
-            'status' => 'active',
-        ], $a, ['features' => json_encode($a['features'], JSON_UNESCAPED_UNICODE)]);
+        // ĐỌC CHUNG một tệp với ProductionSeeder thay vì chép lại danh sách gói ở đây.
+        //
+        // Trước đây hai nơi khai hạn mức song song, và bản chép ở đây đã lệch thật:
+        // Fun Free còn ghi "không giới hạn bàn/món" sau khi hạ xuống bằng gói Pro, và
+        // thiếu hẳn `max_staff`. Ai chạy lại bộ demo là kéo hạn mức cũ về.
+        //
+        // Nó cũng ghi `features` dưới dạng CHUỖI JSON — đúng thứ mà Package model đã
+        // bỏ cast 'array' để tránh (xem chú thích ở model). JSON dùng mảng thật.
+        foreach (['packages', 'time_subscriptions'] as $coll) {
+            $tep = __DIR__ . "/data/{$coll}.json";
+            $docs = json_decode(file_get_contents($tep), true);
 
-        $this->insert('packages', [
-            $pkg(self::PKG_FREE, [
-                'name' => 'Fun Free', 'type' => 'free', 'level' => 0, 'is_trial' => true,
-                'description' => 'Dùng thử toàn bộ tính năng Pro Max trong 7 ngày (1 lần/quán)',
-                'features' => [
-                    'Trải nghiệm TOÀN BỘ tính năng Pro Max trong 7 ngày',
-                    'Không giới hạn bàn & thực đơn',
-                    'Trợ lý AI & phân tích doanh thu tự động',
-                    'Quản lý size & topping',
-                    'Bán hàng theo bàn, order & hóa đơn',
-                    'Thống kê & biểu đồ doanh thu',
-                    'Chỉ dùng thử 1 lần / quán',
-                ],
-                // null = không giới hạn (khớp EnforcesPackageLimits + lib/permission.ts)
-                'max_tables' => null, 'max_menu_items' => null, 'can_use_ai' => true,
-            ]),
-            $pkg(self::PKG_PRO, [
-                'name' => 'Pro', 'type' => 'pro', 'level' => 1, 'is_trial' => false,
-                'description' => 'Đầy đủ chức năng + doanh thu (tối đa 20 bàn, 40 món)',
-                'features' => [
-                    'Quản lý thông tin quán',
-                    'Tối đa 20 bàn',
-                    'Thực đơn tối đa 40 món',
-                    'Quản lý size & topping',
-                    'Bán hàng theo bàn',
-                    'Quản lý order & hóa đơn',
-                    'In hóa đơn',
-                    'Thống kê & biểu đồ doanh thu',
-                ],
-                'max_tables' => 20, 'max_menu_items' => 40, 'can_use_ai' => false,
-            ]),
-            $pkg(self::PKG_PROMAX, [
-                'name' => 'Pro Max', 'type' => 'promax', 'level' => 2, 'is_trial' => false,
-                'description' => 'Không giới hạn + trợ lý AI',
-                'features' => [
-                    'Toàn bộ chức năng gói Pro',
-                    'Không giới hạn bàn & thực đơn',
-                    'Thống kê doanh thu chi tiết',
-                    'Top món bán chạy & báo cáo',
-                    'Trợ lý AI & phân tích doanh thu tự động',
-                ],
-                'max_tables' => null, 'max_menu_items' => null, 'can_use_ai' => true,
-            ]),
-        ]);
+            $this->insert($coll, array_map(function (array $d) {
+                $d['_id'] = new ObjectId($d['_id']['$oid']);
+                unset($d['created_at'], $d['updated_at']);   // insert() tự đóng dấu
 
-        $t = fn (string $id, string $pkgId, int $v, string $unit, int $price, string $label) => [
-            '_id' => new ObjectId($id), 'package_id' => $pkgId,
-            'duration_value' => $v, 'duration_unit' => $unit,
-            'price' => $price, 'label' => $label, 'status' => 'active',
-        ];
-
-        $this->insert('time_subscriptions', [
-            $t('6a3e50c13a064fb807035545', self::PKG_FREE, 7, 'day', 0, '7 ngày'),
-            $t('6a3e50c13a064fb807035546', self::PKG_PRO, 1, 'month', 199000, '1 tháng'),
-            $t('6a3e50c13a064fb807035547', self::PKG_PRO, 3, 'month', 549000, '3 tháng'),
-            $t('6a3e50c13a064fb807035548', self::PKG_PRO, 12, 'month', 1990000, '12 tháng'),
-            $t('6a3e50c13a064fb807035549', self::PKG_PROMAX, 1, 'month', 499000, '1 tháng'),
-            $t('6a3e50c13a064fb80703554a', self::PKG_PROMAX, 3, 'month', 1399000, '3 tháng'),
-            $t('6a3e50c13a064fb80703554b', self::PKG_PROMAX, 12, 'month', 4990000, '12 tháng'),
-        ]);
+                return $d;
+            }, $docs));
+        }
     }
 
     // ---------------------------------------------------------------- tài khoản
@@ -231,6 +184,11 @@ class DemoSeeder extends Seeder
             'NGUYEN MINH NHUT', '/quan/phin-76.jpg');
         $this->menuPhin76($c1);
         $this->makeTables($c1, 6);
+        // Gói Fun Free cũng được 2 nhân viên — để bản dùng thử trải nghiệm được cả
+        // phần phân quyền, không phải chỉ nghe kể.
+        $this->makeStaff($c1, [
+            ['Võ Thị Kim Loan', 'phin76.nv1@funcafe.vn', '0931000101'],
+        ]);
 
         // Gói Pro 3 tháng ĐÃ HẾT HẠN, nối liền ngay trước gói dùng thử hiện tại: 45 ngày
         // đơn hàng phía dưới đều nằm trong thời gian có gói hợp lệ, không có đoạn nào
@@ -252,6 +210,12 @@ class DemoSeeder extends Seeder
             'NGUYEN MINH NHUT', '/quan/ben-hien.jpg');
         $this->menuBenHien($c2);
         $this->makeTables($c2, 14);
+        // ĐÚNG BẰNG hạn mức gói Pro (2). Tạo người thứ 3 trên màn hình sẽ bị chặn kèm
+        // lời mời nâng cấp — có sẵn quán ở đúng ngưỡng thì diễn cảnh đó khỏi dựng tay.
+        $this->makeStaff($c2, [
+            ['Đặng Hoàng Long', 'benhien.nv1@funcafe.vn', '0931000201'],
+            ['Bùi Thị Thanh Trúc', 'benhien.nv2@funcafe.vn', '0931000202'],
+        ]);
         $muaGoi2 = $tuThang6->copy()->subDays(5);
         $sub2 = $this->makeSubscription($c2, self::PKG_PRO, 'Pro', '6a3e50c13a064fb807035548',
             $muaGoi2, $muaGoi2->copy()->addMonths(12), 1990000);
@@ -266,6 +230,13 @@ class DemoSeeder extends Seeder
             'NGUYEN MINH NHUT', '/quan/nang-sai-gon.jpg');
         $this->menuNangSaiGon($c3);
         $this->makeTables($c3, 18);
+        // Pro Max không giới hạn nhân viên — để 3 người cho thấy bảng phân ca thật sự
+        // có nhiều dòng, và hóa đơn cũ hiện nhiều tên thu ngân khác nhau.
+        $this->makeStaff($c3, [
+            ['Trương Gia Bảo', 'nangsg.nv1@funcafe.vn', '0931000301'],
+            ['Hồ Ngọc Yến Nhi', 'nangsg.nv2@funcafe.vn', '0931000302'],
+            ['Lâm Chí Kiệt', 'nangsg.nv3@funcafe.vn', '0931000303'],
+        ]);
 
         $muaGoi3 = $tuThang6->copy()->subDays(10);
         $sub3a = $this->makeSubscription($c3, self::PKG_PROMAX, 'Pro Max', '6a3e50c13a064fb807035549',
@@ -307,10 +278,37 @@ class DemoSeeder extends Seeder
                 '_id' => new ObjectId(), 'shop_id' => $shopId, 'name' => "Bàn {$i}",
                 'capacity' => $i <= 2 ? 2 : ($i % 4 === 0 ? 6 : 4),
                 'display_order' => $i, 'status' => 'empty', 'current_order_id' => null,
+                // Bàn ẩn = is_active false. Bàn mẫu đều đang dùng.
+                'is_active' => true,
                 'created_at' => $this->ts($this->now->copy()->subDays(120)),
             ];
         }
         $this->insert('tables', $docs);
+    }
+
+    /**
+     * Nhân viên bán hàng của một quán — `users.role = 'staff'` + `users.shop_id`.
+     *
+     * Hai trường đó phải đi CÙNG NHAU, y như `StaffController@store` làm. Ghi thiếu
+     * `shop_id` là tạo ra một nhân viên không vào được quán nào (mọi chỗ đọc trường
+     * này hiểu "trống = không có quyền"), còn ghi thiếu `role` thì tài khoản đó thành
+     * chủ quán không sở hữu quán nào.
+     *
+     * @param  list<array{0:string,1:string,2:string}>  $ds  [họ tên, email, sđt]
+     */
+    private function makeStaff(string $shopId, array $ds): void
+    {
+        $docs = [];
+        foreach ($ds as [$ten, $email, $sdt]) {
+            $docs[] = [
+                '_id' => new ObjectId(), 'full_name' => $ten, 'email' => $email,
+                'password' => Hash::make(self::PASSWORD), 'phone' => $sdt,
+                'avatar' => null, 'role' => 'staff', 'status' => 'active',
+                'shop_id' => $shopId,
+                'created_at' => $this->ts($this->now->copy()->subDays(60)),
+            ];
+        }
+        $this->insert('users', $docs);
     }
 
     /**
@@ -548,6 +546,15 @@ class DemoSeeder extends Seeder
 
     // ------------------------------------------------------------------ gói/đơn
 
+    /**
+     * $actionType chỉ để đọc cho dễ ở nơi gọi — KHÔNG ghi xuống `subscriptions`.
+     *
+     * Bản cũ ghi thêm `subtotal` / `vat_rate` / `vat_amount` / `action_type` vào đây,
+     * mà `SubscriptionController` thật thì không ghi trường nào trong số đó: tiền và
+     * loại giao dịch nằm hết ở `package_payments`, đó mới là chứng từ. Dữ liệu mẫu
+     * mang thêm trường mà phần mềm không sinh ra là dữ liệu mẫu nói dối về schema —
+     * ERD chép theo nó sẽ sai.
+     */
     private function makeSubscription(string $shopId, string $pkgId, string $pkgName,
                                       string $timeSubId, Carbon $start, Carbon $end, int $subtotal,
                                       string $actionType = 'new'): string
@@ -560,9 +567,7 @@ class DemoSeeder extends Seeder
             'time_subscription_id' => $timeSubId, 'package_name_snapshot' => $pkgName,
             'start_date' => $this->ts($start), 'end_date' => $this->ts($end),
             'status' => 'active',
-            'subtotal' => $subtotal, 'vat_rate' => self::VAT, 'vat_amount' => $vat,
             'total_amount' => $subtotal + $vat,
-            'action_type' => $actionType,
             'created_at' => $this->ts($start),
         ]]);
 
@@ -609,6 +614,15 @@ class DemoSeeder extends Seeder
         $tables = iterator_to_array($this->db->selectCollection('tables')->find(['shop_id' => $shopId]), false);
         $tops = iterator_to_array($this->db->selectCollection('toppings')->find(['shop_id' => $shopId]), false);
 
+        // Ai đứng quầy: chủ quán cộng toàn bộ nhân viên của quán. Hóa đơn phải hiện
+        // đúng tên người thu, nên đơn mẫu cũng phải rải ra nhiều người — dữ liệu mà
+        // đơn nào cũng do chủ quán thu thì không nhìn ra tính năng phân ca.
+        $shop = $this->db->selectCollection('shops')->findOne(['_id' => new ObjectId($shopId)]);
+        $nguoiBan = [(string) $shop['user_id']];
+        foreach ($this->db->selectCollection('users')->find(['shop_id' => $shopId]) as $nv) {
+            $nguoiBan[] = (string) $nv['_id'];
+        }
+
         // Giá theo size, gom sẵn theo item để khỏi truy vấn trong vòng lặp.
         $priceByProduct = [];
         foreach ($this->db->selectCollection('product_sizes')->find() as $p) {
@@ -629,7 +643,11 @@ class DemoSeeder extends Seeder
             for ($n = 1; $n <= $count; $n++) {
                 $at = $day->copy()->setTime(mt_rand(7, 21), mt_rand(0, 59), mt_rand(0, 59));
                 $orderId = (string) new ObjectId();
-                $table = $this->pick($tables);
+                // Khoảng 1/5 đơn là mang về: KHÔNG có bàn. Tỉ lệ này để màn Tra cứu hóa
+                // đơn có cả hai loại ngay trang đầu, và để cột Bàn có ô trống thật —
+                // đúng thứ dễ vỡ nếu giao diện quên xử lý đơn không bàn.
+                $mangVe = mt_rand(1, 100) <= 20;
+                $table = $mangVe ? null : $this->pick($tables);
                 $seq = str_pad((string) $n, 4, '0', STR_PAD_LEFT);
                 $orderTotal = 0;
 
@@ -683,17 +701,26 @@ class DemoSeeder extends Seeder
                     $orderTotal += $sub + $lineTop;
                 }
 
-                $method = $this->pick(['cash', 'cash', 'vietqr', 'bank_transfer']);
+                // Bỏ 'bank_transfer': màn Bán hàng KHÔNG sinh ra được hình thức đó.
+                // Dữ liệu mẫu chứa thứ phần mềm không tạo nổi là dữ liệu mẫu bịa.
+                // Thay bằng 'vnpay' — nay POS thu qua cổng thật.
+                $method = $this->pick(['cash', 'cash', 'vietqr', 'vnpay']);
                 $paidAt = $at->copy()->addMinutes(mt_rand(15, 90));
+                $nguoiMo = $this->pick($nguoiBan);
                 $doc = [
                     '_id' => new ObjectId($orderId), 'shop_id' => $shopId,
-                    'table_id' => (string) $table['_id'],
+                    'table_id' => $table ? (string) $table['_id'] : null,
+                    'order_type' => $mangVe ? 'takeaway' : 'dine_in',
                     'code' => 'ORD-' . $at->format('Ymd') . '-' . $seq,
                     'status' => 'paid', 'note' => null,
                     'subtotal' => $orderTotal, 'discount_amount' => 0, 'total_amount' => $orderTotal,
                     'invoice_code' => 'INV-' . $at->format('Ymd') . '-' . $seq,
                     'payment_method' => $method, 'payment_status' => 'paid',
                     'paid_at' => $this->ts($paidAt),
+                    'created_by' => $nguoiMo,
+                    // Thu qua cổng thì KHÔNG có người thu: không ai bấm nút, tiền tự về.
+                    // Ghi bừa tên người đang mở màn hình vào đây là làm sai chứng từ.
+                    'paid_by' => $method === 'vnpay' ? null : $nguoiMo,
                     'created_at' => $this->ts($at),
                 ];
 
@@ -801,6 +828,8 @@ class DemoSeeder extends Seeder
             $subId = (string) new ObjectId();
             $vat = (int) round($price * self::VAT / 100);
 
+            // $loai chỉ để đọc ở nơi gọi. Tiền và loại giao dịch KHÔNG ghi vào
+            // `subscriptions` — chúng thuộc `package_payments`; xem makeSubscription().
             $ghiSub = function (string $id, Carbon $tu, Carbon $den, string $loai) use (&$subs, $cid, $pkgId, $timeSubId, $tenGoi, $price, $vat) {
                 $subs[] = [
                     '_id' => new ObjectId($id), 'shop_id' => $cid, 'package_id' => $pkgId,
@@ -808,9 +837,7 @@ class DemoSeeder extends Seeder
                     'package_name_snapshot' => $tenGoi,
                     'start_date' => $this->ts($tu), 'end_date' => $this->ts($den),
                     'status' => 'active',
-                    'subtotal' => $price, 'vat_rate' => self::VAT, 'vat_amount' => $vat,
                     'total_amount' => $price + $vat,
-                    'action_type' => $loai,
                     'created_at' => $this->ts($tu),
                 ];
             };
