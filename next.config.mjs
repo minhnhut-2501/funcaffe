@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Cho phép đổi thư mục dựng qua biến môi trường.
+  //
+  // `npm run dev` và `npm run build` dùng chung `.next`, nên chạy hai bản Next cùng
+  // lúc là hỏng bản đang chạy (xem CLAUDE.md). Khi cần dựng một bản thứ hai — ví dụ
+  // máy chủ nháp cho kịch bản kiểm thử đầu-cuối chạy song song với bản dev đang mở —
+  // đặt NEXT_DIST_DIR=.next-e2e là hai bản không đụng nhau nữa.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   images: {
     unoptimized: true,
   },

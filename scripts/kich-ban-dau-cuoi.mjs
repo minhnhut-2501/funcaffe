@@ -179,18 +179,25 @@ const { than: dm } = await api(`/shops/${quanId}/categories`, { token, method: '
 const dmId = dm?.id ?? dm?._id;
 ok(!!dmId, 'tạo được danh mục');
 
-const { than: mon } = await api(`/shops/${quanId}/products`, {
-  token, method: 'POST',
-  body: { category_id: dmId, name: 'Trà sữa E2E', base_price: 30000, is_available: true, allow_topping: true },
-});
-const monId = mon?.id ?? mon?._id;
-ok(!!monId, 'tạo được món giá 30.000 đ');
-
+// TOPPING TẠO TRƯỚC MÓN, cố ý: bật cờ `has_topping` là chưa đủ để bán kèm topping.
+// Máy chủ còn đòi cặp món–topping phải có trong bảng nối `product_toppings`, dựng
+// bằng cách gửi `topping_ids` lúc lưu món. Thuộc cùng quán không có nghĩa là gắn
+// được — nếu không thì gọi thẳng API là cắm trân châu vào ổ bánh mì.
 const { than: tp } = await api(`/shops/${quanId}/toppings`, {
   token, method: 'POST', body: { name: 'Trân châu E2E', price: 7000, is_available: true },
 });
 const tpId = tp?.id ?? tp?._id;
 ok(!!tpId, 'tạo được topping giá 7.000 đ');
+
+const { than: mon } = await api(`/shops/${quanId}/products`, {
+  token, method: 'POST',
+  body: {
+    category_id: dmId, name: 'Trà sữa E2E', base_price: 30000, is_available: true,
+    has_topping: true, topping_ids: [tpId],
+  },
+});
+const monId = mon?.id ?? mon?._id;
+ok(!!monId, 'tạo được món giá 30.000 đ, có gắn topping');
 
 const { than: ban } = await api(`/shops/${quanId}/tables`, { token, method: 'POST', body: { name: 'Bàn E2E', capacity: 4 } });
 const banId = ban?.id ?? ban?._id;
@@ -234,7 +241,15 @@ ok(tongDoanhThu === 70000, `doanh thu quán = đúng 70.000 (đọc được ${t
 // Nhìn tận mắt trên giao diện, không chỉ qua API.
 await dangNhapQuaGiaoDien(emailMoi, MAT_KHAU);
 await page.goto(BASE + '/user/invoices', { waitUntil: 'domcontentloaded' });
-await page.waitForTimeout(4000);
+// CHỜ THEO ĐIỀU KIỆN, không chờ theo đồng hồ. Màn Hóa đơn phải lấy id quán rồi mới
+// gọi được danh sách, nên có hai lượt gọi nối nhau; một mốc 4 giây cố định vừa đủ
+// trên máy nhanh và trượt trên máy chậm — phép kiểm hỏng lúc được lúc không, mà
+// phép kiểm lúc được lúc không thì tệ hơn không có.
+await page.waitForFunction(
+  (ma) => document.body.innerText.includes(ma),
+  hoaDon.invoice_code,
+  { timeout: 30000 },
+).catch(() => {});
 const chuHoaDon = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
 ok(chuHoaDon.includes(hoaDon.invoice_code), 'hóa đơn hiện ra ở màn hình Hóa đơn');
 ok(/70\.000/.test(chuHoaDon), 'số tiền trên màn hình khớp 70.000');
@@ -363,6 +378,136 @@ const { than: hd1 } = await api(`/shops/${quanId}/orders?status=paid`, { token }
 const { than: hd2 } = await api(`/shops/${quanHaiId}/orders?status=paid`, { token });
 const tongTay = [...hd1, ...hd2].reduce((s, h) => s + Number(h.total_amount ?? 0), 0);
 ok(tongGop === tongTay, `doanh thu gộp (${tongGop}) = tổng cộng tay hai quán (${tongTay})`);
+
+// ═══ 8.6.7 ═══ bán mang về: KHÔNG chọn bàn, gọi xong thanh toán luôn ══════════
+batDau('8.6.7', 'Bán mang về — quán kín bàn vẫn thu được tiền');
+
+// Không truyền table_id, và gửi kèm payment_method ngay trong lượt tạo đơn: đây là
+// luồng "gọi xong trả luôn" ở quầy mang đi, một lượt gọi thay vì hai.
+const { ma: maMangVe, than: donMangVe } = await api(`/shops/${quanId}/orders`, {
+  token, method: 'POST',
+  body: {
+    order_type: 'takeaway',
+    items: [{ product_id: monId, product_name_snapshot: 'Trà sữa E2E', quantity: 1 }],
+    payment_method: 'cash', cash_received: 50000,
+  },
+});
+ok(maMangVe === 201, `tạo và chốt đơn mang về trong MỘT lượt (nhận ${maMangVe})`);
+ok(donMangVe?.order_type === 'takeaway', 'đơn được ghi đúng loại mang về');
+ok(!donMangVe?.table_id, 'đơn mang về KHÔNG giữ bàn nào');
+ok(donMangVe?.status === 'paid' && !!donMangVe?.invoice_code,
+  `đã thanh toán và có mã phiếu (${donMangVe?.invoice_code ?? '—'})`);
+ok(Number(donMangVe?.change_amount) === 50000 - Number(donMangVe?.total_amount),
+  `tiền thối đúng (${donMangVe?.change_amount} đ)`);
+
+// Đơn ma: nếu bước tạo thành công mà bước chốt hỏng, sẽ còn lại một đơn `active`
+// không gắn bàn — không màn hình nào thấy nó, nhưng doanh thu thì lệch mãi mãi.
+const { than: donDangMo } = await api(`/shops/${quanId}/orders?status=active`, { token });
+ok(!donDangMo.some((d) => !d.table_id), 'không còn đơn ma: không đơn `active` nào thiếu bàn');
+
+// ═══ 8.6.8 ═══ thu tiền qua cổng VNPay NGAY TẠI QUẦY ═════════════════════════
+batDau('8.6.8', 'Thu tiền đơn hàng qua cổng VNPay — khách quét mã, đơn tự chốt');
+
+const { than: banVnpay } = await api(`/shops/${quanId}/tables`, {
+  token, method: 'POST', body: { name: 'Bàn VNPay', capacity: 2 },
+});
+const banVnpayId = banVnpay?.id ?? banVnpay?._id;
+const { than: donCong } = await api(`/shops/${quanId}/orders`, {
+  token, method: 'POST', body: { table_id: banVnpayId, items: [{ product_id: monId, product_name_snapshot: 'Trà sữa E2E', quantity: 2 }] },
+});
+const donCongId = donCong?.id ?? donCong?._id;
+
+const { ma: maLienKet, than: lienKet } = await api(`/shops/${quanId}/orders/${donCongId}/vnpay`, {
+  token, method: 'POST',
+});
+ok(maLienKet === 200 && typeof lienKet?.pay_url === 'string' && lienKet.pay_url.includes('vnpayment'),
+  'máy chủ sinh được đường dẫn sang cổng cho ĐƠN HÀNG');
+ok(String(lienKet?.txn_ref ?? '').startsWith('OD'),
+  `mã gửi sang cổng mang tiền tố OD (${lienKet?.txn_ref}) — một địa chỉ IPN phục vụ cả mua gói lẫn bán hàng nên phải rẽ được theo tiền tố`);
+
+const { than: donChoTra } = await api(`/shops/${quanId}/orders/${donCongId}`, { token });
+ok(donChoTra?.status === 'active' && donChoTra?.payment_status === 'pending',
+  'chờ khách trả: đơn VẪN là active, chỉ payment_status là pending');
+
+// Cổng gọi về, KÝ THẬT bằng khóa trong .env — chữ ký sai là bị từ chối.
+const tsCong = {
+  vnp_Amount: String(Number(donChoTra?.total_amount ?? 0) * 100), vnp_BankCode: 'NCB', vnp_CardType: 'ATM',
+  vnp_OrderInfo: `Thanh toan don ${donChoTra?.code}`, vnp_PayDate: '20260824120000',
+  vnp_ResponseCode: '00', vnp_TmnCode: doc('VNPAY_TMN_CODE'),
+  vnp_TransactionNo: '88888888', vnp_TransactionStatus: '00', vnp_TxnRef: lienKet?.txn_ref,
+};
+const kyCong = Object.keys(tsCong).sort().map((k) => `${k}=${encodeURIComponent(tsCong[k]).replace(/%20/g, '+')}`).join('&');
+const hashCong = createHmac('sha512', doc('VNPAY_HASH_SECRET')).update(kyCong).digest('hex');
+
+const veCong = await fetch(`${API}/payments/vnpay/order/return?${kyCong}&vnp_SecureHash=${hashCong}`);
+ok(veCong.status < 400, `cổng gọi về được chấp nhận (HTTP ${veCong.status})`);
+
+const { than: donSauTra } = await api(`/shops/${quanId}/orders/${donCongId}`, { token });
+ok(donSauTra?.status === 'paid' && !!donSauTra?.invoice_code,
+  `đơn TỰ CHỐT khi cổng báo về (${donSauTra?.invoice_code ?? '—'})`);
+ok(!donSauTra?.paid_by,
+  'paid_by để TRỐNG — tiền vào qua cổng thì không có người thu nào để ghi tên');
+
+const { than: banSauTra } = await api(`/shops/${quanId}/tables`, { token });
+ok(banSauTra.find((b) => (b.id ?? b._id) === banVnpayId)?.status === 'empty', 'bàn trở về trống');
+
+// Return và IPN đều về cho cùng một giao dịch — lần hai không được cấp mã phiếu mới.
+const maPhieuLan1 = donSauTra?.invoice_code;
+await fetch(`${API}/payments/vnpay/order/return?${kyCong}&vnp_SecureHash=${hashCong}`);
+const { than: donLanHai } = await api(`/shops/${quanId}/orders/${donCongId}`, { token });
+ok(donLanHai?.invoice_code === maPhieuLan1, 'cổng gọi về lần hai KHÔNG cấp mã phiếu thứ hai');
+
+// Chữ ký sai phải bị từ chối — nếu không thì ai cũng chốt đơn hộ được.
+const { than: donGia } = await api(`/shops/${quanId}/orders`, {
+  token, method: 'POST', body: { table_id: banVnpayId, items: [{ product_id: monId, product_name_snapshot: 'Trà sữa E2E', quantity: 1 }] },
+});
+const donGiaId = donGia?.id ?? donGia?._id;
+const { than: lkGia } = await api(`/shops/${quanId}/orders/${donGiaId}/vnpay`, { token, method: 'POST' });
+const kyGia = kyCong.replace(/vnp_TxnRef=[^&]*/, `vnp_TxnRef=${lkGia?.txn_ref}`);
+await fetch(`${API}/payments/vnpay/order/return?${kyGia}&vnp_SecureHash=${'0'.repeat(128)}`);
+const { than: donVanMo } = await api(`/shops/${quanId}/orders/${donGiaId}`, { token });
+ok(donVanMo?.status === 'active', 'chữ ký sai KHÔNG chốt được đơn');
+await api(`/shops/${quanId}/orders/${donGiaId}/cancel`, { token, method: 'POST' });
+
+// ═══ 8.6.9 ═══ nhân viên chỉ dùng được trang bán hàng ════════════════════════
+batDau('8.6.9', 'Tài khoản nhân viên — bán được hàng, không xem được doanh thu');
+
+const emailNv = `e2e-nv-${duy}@funcafe.test`;
+const { ma: maTaoNv } = await api(`/shops/${quanId}/staff`, {
+  token, method: 'POST',
+  body: { full_name: 'Nhân viên E2E', email: emailNv, phone: '0900000001', password: MAT_KHAU },
+});
+ok(maTaoNv === 201, `chủ quán tạo được tài khoản nhân viên (nhận ${maTaoNv})`);
+
+const { than: dnNv } = await api('/auth/login', { method: 'POST', body: { email: emailNv, password: MAT_KHAU } });
+const tokenNv = dnNv?.token;
+ok(!!tokenNv, 'nhân viên đăng nhập được');
+
+if (tokenNv) {
+  const { ma: maQuanCuaNv, than: quanCuaNv } = await api('/shops', { token: tokenNv });
+  ok(maQuanCuaNv === 200 && quanCuaNv.length === 1 && (quanCuaNv[0].id ?? quanCuaNv[0]._id) === quanId,
+    'nhân viên chỉ thấy ĐÚNG một quán — quán mình làm');
+
+  const { ma: maBanHang } = await api(`/shops/${quanId}/orders?status=paid`, { token: tokenNv });
+  ok(maBanHang === 200, 'nhân viên vào được dữ liệu bán hàng của quán mình');
+
+  const { ma: maDoanhThu } = await api('/revenue/overview', { token: tokenNv });
+  ok(maDoanhThu === 403, `gọi thẳng API doanh thu bằng token nhân viên bị chặn (nhận ${maDoanhThu})`);
+
+  const { ma: maSuaMon } = await api(`/shops/${quanId}/products`, {
+    token: tokenNv, method: 'POST', body: { name: 'Món nhân viên không được thêm', base_price: 1000, category_id: dmId },
+  });
+  ok(maSuaMon === 403, `nhân viên KHÔNG sửa được thực đơn (nhận ${maSuaMon})`);
+
+  const { ma: maTaoNvKhac } = await api(`/shops/${quanId}/staff`, {
+    token: tokenNv, method: 'POST',
+    body: { full_name: 'Không được phép', email: `x-${duy}@funcafe.test`, password: MAT_KHAU },
+  });
+  ok(maTaoNvKhac === 403, `nhân viên KHÔNG tự tạo thêm nhân viên được (nhận ${maTaoNvKhac})`);
+
+  const { ma: maQuanKhac } = await api(`/shops/${quanHaiId}/orders`, { token: tokenNv });
+  ok(maQuanKhac >= 400, `nhân viên KHÔNG với sang được quán khác của cùng chủ (nhận ${maQuanKhac})`);
+}
 
 // ═══ 8.6.5 ═══ quản trị khóa tài khoản → phiên của người đó dừng ngay ══════════
 batDau('8.6.5', 'Quản trị khóa tài khoản → phiên đang mở dừng ngay lập tức');
