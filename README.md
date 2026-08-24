@@ -7,10 +7,27 @@ Hệ thống gồm ba khu vực: **Public Website** (giới thiệu, bảng giá
 ## Chức năng chính
 
 - **Bán hàng theo bàn** — sơ đồ bàn, lên order, thêm món và topping, thanh toán tiền mặt hoặc mã VietQR sinh từ tài khoản ngân hàng của quán.
+- **Bán mang về** — bán không cần chọn bàn, nên quán kín bàn vẫn thu được tiền cho khách mua mang đi. Gọi món xong thanh toán luôn trong một lượt.
+- **Thu tiền qua cổng VNPay ngay tại quầy** — khách quét mã bằng điện thoại của mình; đơn tự chốt khi cổng báo về và màn hình Bán hàng tự chuyển sang phiếu thành công.
 - **Thực đơn** — danh mục, món, size và giá theo từng size, topping gắn cho món.
+- **Tài khoản nhân viên** — chủ quán tạo tài khoản bán hàng cho từng quán; nhân viên chỉ vào được Bán hàng, Tra cứu hóa đơn và Hồ sơ cá nhân. Ranh giới do máy chủ giữ, không phải do ẩn mục trong menu.
 - **Hóa đơn và doanh thu** — tra cứu, in lại, biểu đồ theo thời gian, top món bán chạy, xuất Excel, tổng hợp doanh thu nhiều quán.
 - **Gói dịch vụ** — Fun Free (7 ngày) / Pro / Pro Max, thanh toán qua VNPay hoặc MoMo, nâng cấp giữa kỳ tự cấn trừ phần chưa dùng của gói cũ.
-- **Trợ lý AI** (gói Pro Max) — hỏi đáp về tình hình quán và phân tích doanh thu bằng Google Gemini.
+- **Trợ lý AI** — hỏi đáp về tình hình quán và phân tích doanh thu bằng Google Gemini (gói Pro Max, và cả bản dùng thử Fun Free).
+
+### Hạn mức theo gói
+
+| | Bàn | Món | Nhân viên | Trợ lý AI |
+|---|---|---|---|---|
+| Fun Free (7 ngày, 1 lần/quán) | 20 | 40 | 2 | ✅ |
+| Pro | 20 | 40 | 2 | — |
+| Pro Max | ∞ | ∞ | ∞ | ✅ |
+
+Chặn thật ở máy chủ (`EnforcesPackageLimits`), không chỉ ẩn nút. Bàn đã ẩn và nhân viên
+đã khóa **vẫn tính** vào hạn mức — hạn mức đếm thứ đã tạo, không đếm thứ đang bật.
+
+Hạn mức và mốc giá **chỉ khai một nơi**: `backend/database/seeders/data/*.json`. Cả
+`ProductionSeeder` lẫn `DemoSeeder` đều đọc từ đó.
 
 ## Công nghệ
 
@@ -59,6 +76,17 @@ php artisan db:seed --class=DemoSeeder
 > dữ liệu đang có dữ liệu thật. Muốn thử an toàn thì trỏ sang CSDL khác:
 > `MONGODB_DATABASE=funcafe_thu php artisan db:seed --class=DemoSeeder`
 
+Tài khoản trong bộ demo — mật khẩu đều là `12345678`:
+
+| Vai trò | Tài khoản |
+|---|---|
+| Quản trị | `adminfuncafe@gmail.com` |
+| Chủ quán (3 quán: Fun Free / Pro / Pro Max) | `nphec4007@gmail.com` |
+| Nhân viên | `phin76.nv1@funcafe.vn` · `benhien.nv1@` · `benhien.nv2@` · `nangsg.nv1@` … `nangsg.nv3@` |
+
+Quán gói Pro trong bộ demo có **đúng 2 nhân viên** — bằng hạn mức — nên tạo người thứ ba
+sẽ bị chặn kèm lời mời nâng cấp, khỏi phải dựng tay khi muốn xem cảnh đó.
+
 > `php artisan db:indexes` là lệnh **bắt buộc**, không phải tuỳ chọn. MongoDB không đi qua hệ thống migration của Laravel nên chỉ mục phải khai báo và tạo bằng lệnh riêng. Bỏ qua bước này thì hệ thống vẫn chạy, nhưng mọi truy vấn phải quét toàn bộ collection. Lệnh chạy lại được nhiều lần mà không hỏng gì.
 
 Các biến trong `backend/.env` cần chú ý:
@@ -106,10 +134,21 @@ php artisan db:normalize-money # đưa mọi trường tiền về số nguyên 
 php artisan sanctum:prune-expired --hours=24  # dọn token đã quá hạn
 ```
 
+Dựng lại ảnh sơ đồ cho báo cáo (cả hai **cũng là bước kiểm cú pháp** — sơ đồ hỏng thì
+thoát khác 0 chứ không lặng lẽ ghi ra một tấm ảnh lỗi):
+
+```bash
+node scripts/ve-erd.mjs    # 4 sơ đồ ERD từ doc/erd-drawio.mmd
+node scripts/ve-puml.mjs   # use case + biểu đồ trạng thái (gửi sang plantuml.com)
+```
+
 > **`npm run build` xóa sạch thư mục `.next`, mà `npm run dev` cũng dùng chung thư mục
 > đó.** Dựng lại trong lúc server dev đang chạy sẽ làm hỏng nó theo kiểu khó đoán: những
 > gì đã nạp vào trình duyệt vẫn chạy, nhưng gói mã nạp động (`exceljs` — nút Xuất Excel)
 > không sinh ra được nữa, nên chỉ mình nút đó hỏng. Gặp thì: `rm -rf .next && npm run dev`.
+>
+> Cần chạy **hai bản Next cùng lúc** (ví dụ máy chủ nháp cho kịch bản đầu–cuối) thì đặt
+> `NEXT_DIST_DIR=.next-e2e` — `next.config.mjs` đọc biến đó nên hai bản không tranh nhau.
 
 ### Kịch bản kiểm trên trình duyệt
 
@@ -123,6 +162,11 @@ node scripts/doi-chieu-doanh-thu.mjs  # doanh thu ở năm nơi phải ra cùng 
 ```
 
 Cả ba chỉ đọc, không tạo hay sửa bản ghi nào.
+
+Ngoài ra có **kịch bản đầu–cuối**: 9 kịch bản nghiệp vụ, 68 phép khẳng định, đi xuyên
+giao diện → API → CSDL → cổng thanh toán. Kịch bản này **ghi dữ liệu** nên chỉ chạy trên
+một CSDL nháp, và tự dừng nếu bị trỏ nhầm vào dữ liệu thật. Cách chạy đầy đủ nằm ở
+[doc/kiem-thu-dau-cuoi.md](doc/kiem-thu-dau-cuoi.md).
 
 ### Chuyển dữ liệu MongoDB sang máy khác
 
@@ -176,7 +220,9 @@ clone về cũng có, không phụ thuộc vào máy đã dùng trước đó.
 
 ## Kiểm thử
 
-**195 bài máy chủ** (PHPUnit) và **126 bài frontend** (Vitest), tập trung vào các quy tắc liên quan tới **tiền** và tới **quyền** — những chỗ sai sót không hiện ra trên giao diện:
+**301 bài máy chủ** (PHPUnit, 913 khẳng định) và **149 bài frontend** (Vitest), tập trung
+vào các quy tắc liên quan tới **tiền** và tới **quyền** — những chỗ sai sót không hiện ra
+trên giao diện:
 
 | Bộ | Nội dung |
 |---|---|
@@ -188,6 +234,9 @@ clone về cũng có, không phụ thuộc vào máy đã dùng trước đó.
 | `AdminPanelTest` · `AdminUserGuardTest` | Ranh giới quyền quản trị; không xóa cứng thứ đã bán |
 | `CatalogRulesTest` · `PackageLimitTest` · `TableGuardTest` · `ShopStatusTest` | Hạn mức gói, trạng thái quán, quy tắc thực đơn |
 | `ReviewRulesTest` · `AiSuggestionsTest` | Đánh giá không lộ thông tin cá nhân; chặn AI theo gói |
+| `TakeawayOrderTest` | Đơn mang về không gắn bàn, tạo và chốt một lượt, không để lại đơn ma |
+| `OrderVnpayTest` | Thu tiền đơn hàng qua cổng: chữ ký, mã tiền tố, gọi về hai lần không cấp hai mã phiếu |
+| `StaffPermissionTest` | Ranh giới quyền nhân viên. Bài này **quét cả bảng tuyến**, nên thêm tuyến mới cho khu `/user` mà chưa phân loại là test đỏ ngay |
 
 Các bài kiểm thử ghi vào cơ sở dữ liệu riêng `funcafe_testing` và **từ chối chạy nếu bị trỏ nhầm vào dữ liệu thật**. Máy không chạy MongoDB thì các bài Feature tự bỏ qua thay vì báo đỏ.
 
@@ -211,8 +260,21 @@ backend/app/
   Services/                   VNPay, MoMo, Gemini, kích hoạt gói
   Console/Commands/           db:indexes và các lệnh chạy tay khác
 
-doc/                          Báo cáo đồ án, sơ đồ ERD và Use Case
+doc/
+  ERD.md                      17 collection, mọi trường kèm ý nghĩa và ràng buộc
+  erd-drawio.mmd              4 sơ đồ ERD: 1 tổng quan + 3 cụm (mermaid)
+  usecase-user.puml           Use case chủ quán
+  usecase-nhanvien.puml       Use case nhân viên và ranh giới quyền
+  usecase-admin.puml          Use case quản trị
+  statechart-order.puml       Vòng đời một đơn hàng
+  kiem-thu-dau-cuoi.md        9 kịch bản đầu–cuối, 68 phép khẳng định
+  report-shots/               Ảnh sơ đồ và ảnh màn hình dùng trong báo cáo
 ```
+
+> Sơ đồ ERD chia làm **bốn** thay vì một. Vẽ đủ mọi trường của cả 17 collection trên một
+> hình thì in ra A4 chữ nhỏ tới mức không đọc nổi, và điều người xem cần biết — bảng nào
+> nối bảng nào — chìm nghỉm giữa hàng trăm dòng trường. Nay mỗi thực thể chỉ hiện khóa
+> chính, khóa ngoại và 2–3 trường định danh; chi tiết đầy đủ để ở `doc/ERD.md`.
 
 ## Triển khai
 
