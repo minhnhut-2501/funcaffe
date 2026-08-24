@@ -56,6 +56,19 @@ kịch bản đầu–cuối) thì đặt `NEXT_DIST_DIR=.next-e2e` — `next.co
   nào thấy để hủy.
 - **`orders.paid_by` để TRỐNG khi thu qua cổng VNPay** — không có con người nào bấm nút
   thu; ghi tên người đang mở màn hình vào đó là làm sai chứng từ.
+- **KHÔNG có đường chốt tay cho đơn VNPay.** Tuyến `/pay` chỉ nhận `cash` và `vietqr`.
+  Thu ngân kiểm được tiền mặt (cầm tiền) và VietQR (mở app ngân hàng của quán), nhưng
+  KHÔNG kiểm được VNPay — tiền vào ví thương nhân, không hiện ở đâu trên quầy. Một nút
+  "khách đã trả" ở đó chỉ là tin lời khách nói mà ghi thẳng vào doanh thu.
+- **Mật khẩu nhân viên do CHỦ QUÁN nắm.** `PUT /user/password` từ chối `role='staff'`, và
+  `forgot-password` không cấp token cho họ (trả lời y hệt trường hợp email không tồn tại
+  — khác đi một chữ là thành công cụ dò tài khoản). Tài khoản nhân viên không thuộc về
+  người dùng nó: email thường do chủ quán nghĩ ra, và họ nghỉ việc thì chủ quán vẫn phải
+  vào được.
+- **Giỏ hàng của bàn ghi lên máy chủ theo lối NỀN + NỐI ĐUÔI.** Mỗi lượt gửi giỏ nguyên
+  trạng (máy chủ xóa hết dòng cũ rồi ghi lại), nên hai lượt chạy chồng nhau là mất món.
+  Và id đơn nháp phải đọc qua **ref**, không qua state — lượt sau có thể chạy trước khi
+  React vẽ lại, đọc state cũ là tạo đơn thứ hai cho cùng một bàn.
 - **VNPay chỉ gọi MỘT địa chỉ IPN** đã khai trong cổng thương nhân, không gửi kèm theo
   từng giao dịch như Return URL. Vì vậy luồng mua gói và luồng bán hàng **nhận chung một
   cửa** rồi rẽ theo tiền tố mã (`TXN-` vs `OD`). Đừng tách tuyến riêng — tuyến đó sẽ
