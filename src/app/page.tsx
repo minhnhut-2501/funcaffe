@@ -9,7 +9,7 @@ import CtaPanel from '@/components/public/CtaPanel';
 import AppShot from '@/components/public/AppShot';
 import Link from 'next/link';
 import {
-  PencilLine, HelpCircle, Layers, Calculator,
+  PencilLine, HelpCircle, Layers, Calculator, ShoppingBag, Users,
   Check, ArrowRight, UserPlus, Store, ListPlus, Play, Sparkles,
   Building2, ArrowLeftRight, Wallet, Gift, Zap, Crown,
 } from 'lucide-react';
@@ -25,6 +25,8 @@ const problems = [
   { icon: PencilLine, text: 'Ghi order bằng giấy dễ nhầm món, sai số lượng.' },
   { icon: HelpCircle, text: 'Khó nhớ bàn nào đã thanh toán, bàn nào còn order.' },
   { icon: Layers, text: 'Thực đơn, size và topping nhiều nên dễ bị rối.' },
+  { icon: ShoppingBag, text: 'Kín bàn là không biết ghi đơn cho khách mua mang đi vào đâu.' },
+  { icon: Users, text: 'Giao ca cho nhân viên phải đưa luôn tài khoản chủ quán.' },
   { icon: Calculator, text: 'Cuối ngày mất thời gian ngồi cộng lại doanh thu.' },
 ];
 
@@ -34,7 +36,7 @@ const showcases = [
     tag: 'Bán hàng theo bàn',
     title: 'Cả quán gọn trên một màn hình',
     desc: 'Thấy ngay bàn nào trống, bàn nào đang phục vụ. Chọn bàn, chọn món và lên order chỉ trong vài chạm.',
-    points: ['Sơ đồ bàn theo màu trạng thái', 'Phiếu order tính tiền tự động', 'Thanh toán tiền mặt / VietQR'],
+    points: ['Sơ đồ bàn theo màu trạng thái', 'Phiếu order tính tiền tự động', 'Thu tiền mặt, VietQR hoặc VNPay', 'In phiếu ngay khi thu xong'],
     img: '/product/pos-full.png', label: 'FunCafe · Bán hàng',
     float: '/product/pos-cart.png', glow: 'bg-bean/10',
   },
@@ -46,6 +48,22 @@ const showcases = [
     img: '/product/pos-menu.png', label: 'FunCafe · Thực đơn',
     imgSize: [1118, 1584] as [number, number],
     float: null, glow: 'bg-gold/12',
+  },
+  {
+    tag: 'Bán mang về',
+    title: 'Kín bàn vẫn bán được cho khách mua mang đi',
+    desc: 'Bấm MANG VỀ là lên order ngay, không cần chọn bàn. Gọi xong thanh toán luôn trong một lượt — khách không phải đứng đợi.',
+    points: ['Không chiếm bàn nào của quán', 'Gọi xong thu tiền một lượt', 'Phiếu in ra ghi rõ MANG VỀ'],
+    img: '/product/pos-takeaway.png', label: 'FunCafe · Bán mang về',
+    float: null, glow: 'bg-gold/12',
+  },
+  {
+    tag: 'Tài khoản nhân viên',
+    title: 'Giao ca mà không phải đưa tài khoản chủ quán',
+    desc: 'Mỗi người đứng quầy một tài khoản riêng. Họ bán hàng và tra hóa đơn được, còn thực đơn, doanh thu và gói dịch vụ vẫn là của bạn.',
+    points: ['Chỉ vào được màn Bán hàng và Hóa đơn', 'Mỗi đơn ghi rõ ai bán, ai thu tiền', 'Nghỉ việc thì khóa, hóa đơn cũ vẫn nguyên'],
+    img: '/product/staff.png', label: 'FunCafe · Quản lý nhân viên',
+    float: null, glow: 'bg-pine/10',
   },
   {
     tag: 'Doanh thu & báo cáo',
@@ -61,7 +79,7 @@ const steps = [
   { icon: UserPlus, title: 'Tạo tài khoản', desc: 'Đăng ký miễn phí, không cần thẻ tín dụng.' },
   { icon: Store, title: 'Thiết lập thông tin quán', desc: 'Nhập tên quán, địa chỉ và thông tin cơ bản.' },
   { icon: ListPlus, title: 'Thêm bàn và thực đơn', desc: 'Tạo danh sách bàn, danh mục món, size và topping.' },
-  { icon: Play, title: 'Bắt đầu bán hàng', desc: 'Chọn bàn, lên order và thanh toán cho khách.' },
+  { icon: Play, title: 'Bắt đầu bán hàng', desc: 'Chọn bàn hoặc bán mang về, lên order rồi thu tiền và in phiếu.' },
 ];
 
 const aiPoints = [
@@ -149,7 +167,7 @@ export default function HomePage() {
             <div aria-hidden className="absolute -inset-6 rounded-[2.5rem] blur-3xl bg-bean/10" />
             <AppShot src="/product/shops-multi.png" alt="Danh sách nhiều quán trên một tài khoản FunCafe" label="FunCafe · Quản lý quán" className="rotate-[1deg]" />
             <div className="anh-noi-nho absolute -bottom-6 -left-4 z-20 w-[42%] max-w-[210px] rounded-xl border border-line bg-white overflow-hidden rotate-[-5deg] hidden sm:block">
-              <img src="/product/cafe-switcher.png" alt="Bộ chọn quán để chuyển nhanh giữa các chi nhánh" className="block w-full object-cover object-left-top h-full max-h-[130px]" loading="lazy" />
+              <img src="/product/shop-switcher.png" alt="Bộ chọn quán để chuyển nhanh giữa các chi nhánh" className="block w-full object-cover object-left-top h-full max-h-[130px]" loading="lazy" />
             </div>
           </Reveal>
         </div>

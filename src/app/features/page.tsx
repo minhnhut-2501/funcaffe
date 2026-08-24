@@ -6,7 +6,7 @@ import CtaPanel from '@/components/public/CtaPanel';
 import Link from 'next/link';
 import {
   Store, UtensilsCrossed, ShoppingCart, Receipt, BarChart3, Sparkles,
-  ShieldCheck, CreditCard, Building2, ArrowRight,
+  ShieldCheck, CreditCard, Building2, ArrowRight, Users,
 } from 'lucide-react';
 
 /**
@@ -43,6 +43,7 @@ const chapters: Chapter[] = [
       { name: 'Thêm và sắp xếp bàn', desc: 'Tạo bàn theo đúng sơ đồ thật của quán, đặt tên và số chỗ ngồi cho từng bàn.' },
       { name: 'Trạng thái tự đổi', desc: 'Bàn chuyển sang “Đang phục vụ” khi có order và tự về “Trống” sau khi thanh toán xong.' },
       { name: 'Lọc theo trạng thái', desc: 'Lúc quán đông, lọc riêng bàn trống hoặc bàn đang phục vụ để khỏi phải dò cả danh sách.' },
+      { name: 'Ẩn bàn, không xóa', desc: 'Dẹp bớt bàn mùa vắng khách thì ẩn đi — bàn biến khỏi màn bán hàng nhưng hóa đơn cũ của bàn đó vẫn tra được. Bật lại lúc nào cũng xong.' },
       { name: 'Nhiều quán một tài khoản', desc: 'Nếu bạn có hơn một quán, chuyển qua lại ngay trên thanh trên cùng mà không cần đăng xuất.' },
     ],
   },
@@ -76,6 +77,7 @@ const chapters: Chapter[] = [
     imgLabel: 'FunCafe · Bán hàng',
     features: [
       { name: 'Order theo bàn', desc: 'Mở order cho bàn khách đang ngồi; quay lại thêm món bất cứ lúc nào trước khi thanh toán.' },
+      { name: 'Bán mang về', desc: 'Bấm MANG VỀ là bán được ngay mà không cần chọn bàn — quán kín bàn vẫn thu tiền cho khách mua mang đi. Gọi xong thanh toán luôn trong một lượt.' },
       { name: 'Chọn size, topping, số lượng', desc: 'Mỗi lần thêm món đều chọn được size, topping và số lượng trong cùng một hộp thoại.' },
       { name: 'Ghi chú riêng từng dòng', desc: 'Ghi “ít đá”, “không đường” cho đúng dòng món đó, không lẫn với món khác trong bàn.' },
       { name: 'Sửa lại dòng đã thêm', desc: 'Khách đổi ý thì bấm vào dòng trong phiếu để đổi size, topping hoặc ghi chú.' },
@@ -88,17 +90,37 @@ const chapters: Chapter[] = [
     id: 'thanh-toan',
     icon: Receipt,
     nav: 'Thanh toán',
-    title: 'Thanh toán tiền mặt hay QR, hóa đơn đều được lưu lại',
+    title: 'Ba cách thu tiền, phiếu in ngay tại quầy',
     blurb:
-      'Khách trả kiểu nào cũng xong trong vài giây, và mọi hóa đơn đều tra cứu lại được — không còn cảnh lục tập giấy cuối tháng.',
+      'Tiền mặt, khách quét VietQR chuyển thẳng vào tài khoản quán, hoặc trả qua cổng VNPay. Kiểu nào cũng xong trong vài giây, và mọi hóa đơn đều tra cứu lại được — không còn cảnh lục tập giấy cuối tháng.',
     img: '/product/invoices.png',
     imgLabel: 'FunCafe · Hóa đơn',
     features: [
       { name: 'Tiền mặt có tính tiền thối', desc: 'Nhập số tiền khách đưa, hệ thống tính sẵn số tiền phải trả lại.' },
       { name: 'VietQR', desc: 'Sinh mã QR theo tài khoản ngân hàng của quán kèm đúng số tiền, khách quét là chuyển.' },
+      { name: 'Cổng VNPay tại quầy', desc: 'Khách quét mã bằng điện thoại của mình và trả trên cổng VNPay. Cổng báo về là đơn tự chốt, màn hình bán hàng tự chuyển sang phiếu thành công — thu ngân không phải bấm xác nhận.' },
       { name: 'Hóa đơn đầy đủ', desc: 'Mỗi lần thanh toán tạo một hóa đơn có mã riêng, thời gian và chi tiết từng món.' },
-      { name: 'Lọc và tra cứu', desc: 'Tìm lại hóa đơn theo khoảng ngày và theo phương thức thanh toán.' },
-      { name: 'In hóa đơn', desc: 'In thẳng từ trình duyệt ra máy in nhiệt hoặc máy in thường của quán.' },
+      { name: 'Lọc và tra cứu', desc: 'Tìm lại hóa đơn theo khoảng ngày và theo phương thức thanh toán — tiền mặt, chuyển khoản hay VNPay.' },
+      { name: 'In phiếu ngay khi thu xong', desc: 'Thu tiền xong là phiếu hiện ra ngay tại màn bán hàng, bấm một cái là in — không phải rời sang trang Hóa đơn tìm lại tờ vừa lập.' },
+      { name: 'In lại bất cứ lúc nào', desc: 'Vào mục Hóa đơn mở tờ cũ ra in lại, ra máy in nhiệt hoặc máy in thường của quán.' },
+    ],
+  },
+  {
+    id: 'nhan-vien',
+    icon: Users,
+    nav: 'Nhân viên',
+    title: 'Giao ca cho nhân viên mà không phải đưa tài khoản chủ quán',
+    blurb:
+      'Mỗi người đứng quầy một tài khoản riêng. Họ bán hàng và tra hóa đơn được, nhưng không đụng tới thực đơn, doanh thu hay gói dịch vụ.',
+    img: '/product/staff.png',
+    imgLabel: 'FunCafe · Quản lý nhân viên',
+    features: [
+      { name: 'Tài khoản riêng từng người', desc: 'Chủ quán tạo tài khoản cho từng nhân viên của từng quán, đặt họ tên, email đăng nhập và mật khẩu ban đầu.' },
+      { name: 'Chỉ vào được ba màn hình', desc: 'Bán hàng, Tra cứu hóa đơn và Hồ sơ cá nhân. Doanh thu, thực đơn, gói dịch vụ và quản lý nhân viên đều nằm ngoài tầm.' },
+      { name: 'Chặn ở máy chủ, không phải ẩn nút', desc: 'Gõ thẳng đường dẫn hay gọi API bằng tài khoản nhân viên đều bị từ chối — ẩn mục trong menu chỉ là lớp ngoài.' },
+      { name: 'Biết ai bán, ai thu', desc: 'Mỗi đơn ghi lại người mở đơn và người thu tiền, nên cuối ca đối chiếu được ngay.' },
+      { name: 'Khóa khi nghỉ việc', desc: 'Khóa tài khoản là họ không đăng nhập được nữa, nhưng hóa đơn cũ vẫn giữ nguyên tên người thu — không mất dấu vết.' },
+      { name: 'Mật khẩu do chủ quán nắm', desc: 'Nhân viên không tự đổi mật khẩu; chủ quán đặt lại giúp. Nhờ vậy hôm nhân viên nghỉ, chủ quán vẫn vào được tài khoản đó.' },
     ],
   },
   {
@@ -135,6 +157,7 @@ const extras = [
       'Ghi nhớ đăng nhập trên máy quen',
       'Đổi mật khẩu trong hồ sơ cá nhân',
       'Quên mật khẩu: nhận liên kết đặt lại qua email',
+      'Tài khoản nhân viên do chủ quán tạo và đặt lại mật khẩu',
     ],
   },
   {
@@ -142,7 +165,7 @@ const extras = [
     title: 'Gói dịch vụ',
     items: [
       'Xem gói đang dùng và số ngày còn lại',
-      'Nâng cấp online, thanh toán qua VNPay',
+      'Nâng cấp online, thanh toán qua VNPay hoặc MoMo',
       'Chọn thời hạn 1, 3 hoặc 12 tháng',
       'Nâng cấp giữa kỳ được hoàn phần thời gian còn lại theo tỷ lệ',
     ],
@@ -153,6 +176,7 @@ const extras = [
     items: [
       'Trang tổng quan với lối tắt tới việc hay dùng',
       'Chuyển nhanh giữa các quán bạn quản lý',
+      'Mỗi quán có gói, hạn mức và nhân viên riêng',
       'Cập nhật hồ sơ và ảnh đại diện',
       'Dùng được trên máy tính, máy tính bảng và điện thoại',
     ],
@@ -202,7 +226,7 @@ export default function FeaturesPage() {
         image="/banners/cafe-interior.jpg"
         alt="Không gian bên trong một quán shop"
         title="Tất cả những gì FunCafe làm được"
-        subtitle="Từ khai báo bàn và thực đơn, bán hàng tại quầy, thanh toán, hóa đơn cho tới báo cáo doanh thu và trợ lý AI — đầy đủ trong một hệ thống."
+        subtitle="Từ khai báo bàn và thực đơn, bán tại quán và mang về, thu tiền ba kiểu, tài khoản cho nhân viên, cho tới báo cáo doanh thu và trợ lý AI — đầy đủ trong một hệ thống."
         align="center"
         size="lg"
         priority
@@ -243,12 +267,12 @@ export default function FeaturesPage() {
         <ChapterBlock key={c.id} c={c} index={i} />
       ))}
 
-      {/* Trợ lý AI — tách riêng vì đây là chức năng chỉ gói Pro Max mới có */}
+      {/* Trợ lý AI — tách riêng vì đây là chức năng gói cao nhất, và bản dùng thử */}
       <section id="tro-ly-ai" className="scroll-mt-32 bg-bean-tint border-y border-bean/15 overflow-x-clip">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20 grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           <Reveal>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-bean px-3 py-1 text-xs font-semibold text-white">
-              <Sparkles className="w-3.5 h-3.5" aria-hidden /> Chỉ có ở gói Pro Max
+              <Sparkles className="w-3.5 h-3.5" aria-hidden /> Gói Pro Max — và cả bản dùng thử
             </span>
             <h2 className="text-2xl md:text-3xl font-bold text-ink mt-4 mb-3 leading-snug">
               Trợ lý AI đọc được dữ liệu của chính quán bạn
@@ -313,8 +337,9 @@ export default function FeaturesPage() {
 
           <Reveal delay={200} className="mt-12 rounded-2xl border border-line bg-paper p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
             <p className="text-ink/80 leading-relaxed max-w-xl">
-              Gói Fun Free cho dùng thử <strong className="font-semibold text-ink">toàn bộ</strong> chức năng
-              trong 7 ngày. Sau đó gói Pro giới hạn số bàn và số món, gói Pro Max mở lại không giới hạn kèm trợ lý AI.
+              Gói Fun Free cho dùng thử <strong className="font-semibold text-ink">7 ngày</strong> với hạn mức
+              như gói Pro (20 bàn, 40 món, 2 nhân viên) nhưng vẫn có trợ lý AI để bạn thử thứ đáng giá nhất
+              trước khi trả tiền. Gói Pro giữ hạn mức đó lâu dài; gói Pro Max bỏ hết giới hạn và có AI.
             </p>
             <Link href="/pricing" className="btn-shop shrink-0">
               So sánh ba gói <ArrowRight className="w-4 h-4" aria-hidden />

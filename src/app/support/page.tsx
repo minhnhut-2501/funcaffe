@@ -7,7 +7,7 @@ import AppShot from '@/components/public/AppShot';
 import Link from 'next/link';
 import {
   Store, Grid3X3, UtensilsCrossed, ShoppingCart, Receipt, BarChart3, CreditCard,
-  HelpCircle, LifeBuoy,
+  HelpCircle, LifeBuoy, Users,
 } from 'lucide-react';
 
 type Section = {
@@ -40,9 +40,9 @@ const sections: Section[] = [
     intro: 'Khai báo các bàn trong quán để theo dõi bàn nào trống, bàn nào đang phục vụ.',
     steps: [
       'Mở mục “Quản lý bàn”, bấm “Thêm bàn”.',
-      'Đặt tên bàn (VD: Bàn 01), chọn sức chứa và trạng thái ban đầu.',
+      'Đặt tên bàn (VD: Bàn 01) và số chỗ ngồi. Không cần chọn trạng thái — hệ thống tự đổi khi có order hoặc sau khi thanh toán.',
       'Lặp lại cho tất cả các bàn của quán.',
-      'Trạng thái bàn sẽ tự đổi màu khi có order hoặc sau khi thanh toán.',
+      'Muốn bỏ bớt bàn thì bấm ẩn, KHÔNG xóa: bàn biến khỏi màn Bán hàng nhưng hóa đơn cũ của bàn đó vẫn tra cứu được. Bật lại lúc nào cũng xong.',
     ],
     img: '/product/pos-tables.png',
     imgLabel: 'Sơ đồ bàn theo trạng thái',
@@ -68,9 +68,10 @@ const sections: Section[] = [
     intro: 'Màn hình bán hàng gom bàn, thực đơn và phiếu order về một nơi.',
     steps: [
       'Mở “Bán hàng”, chọn bàn khách đang ngồi ở cột bên trái.',
+      'Khách mua mang đi thì bấm nút “MANG VỀ” ngay trên đầu cột bàn — không cần chọn bàn, nên quán kín bàn vẫn bán được.',
       'Bấm vào món ở giữa, chọn size/topping/số lượng rồi “Thêm vào order”.',
       'Phiếu order bên phải tự cộng tiền theo từng món.',
-      'Bấm “Thanh toán” khi khách xong để chốt đơn và in hóa đơn.',
+      'Bấm “Thanh toán” khi khách xong để chốt đơn.',
     ],
     img: '/product/pos-full.png',
     imgLabel: 'Màn hình bán hàng FunCafe',
@@ -79,13 +80,17 @@ const sections: Section[] = [
     id: 'thanh-toan',
     icon: Receipt,
     title: '5. Thanh toán & hóa đơn',
-    intro: 'Hỗ trợ tiền mặt, chuyển khoản và VietQR; hóa đơn lưu lại đầy đủ.',
+    intro: 'Ba cách thu tiền: tiền mặt, VietQR và cổng VNPay. Hóa đơn lưu lại đầy đủ.',
     steps: [
-      'Trong phiếu order, bấm “Thanh toán” và chọn phương thức.',
-      'Với tiền mặt: nhập tiền khách đưa, hệ thống tính tiền thối.',
-      'Với VietQR: khách quét mã, nhận tiền xong bấm “Xác nhận thanh toán”.',
-      'Xem lại mọi hóa đơn trong mục “Hóa đơn”, in lại bất cứ lúc nào.',
+      'Trong phiếu order, bấm “Thanh toán” và chọn cách trả.',
+      'Tiền mặt: nhập số tiền khách đưa, hệ thống tính sẵn tiền thối.',
+      'VietQR: khách quét mã chuyển thẳng vào tài khoản quán; bạn mở app ngân hàng xem tiền đã về rồi bấm xác nhận.',
+      'VNPay: khách quét mã và trả trên cổng bằng điện thoại của họ. Đơn TỰ CHỐT khi cổng báo về, màn hình tự chuyển sang phiếu thành công — không có nút xác nhận tay, vì tiền VNPay không hiện ở đâu để quầy kiểm.',
+      'Thu xong bấm “In phiếu” ngay trên màn Bán hàng để in cho khách.',
+      'Cần in lại thì vào mục “Hóa đơn”, mở tờ cũ ra in bất cứ lúc nào.',
     ],
+    img: '/product/invoices.png',
+    imgLabel: 'Tra cứu và in lại hóa đơn',
   },
   {
     id: 'doanh-thu',
@@ -102,10 +107,26 @@ const sections: Section[] = [
     imgLabel: 'Báo cáo doanh thu',
   },
   {
+    id: 'nhan-vien',
+    icon: Users,
+    title: '7. Tài khoản nhân viên',
+    intro: 'Giao ca cho nhân viên mà không phải đưa tài khoản chủ quán cho họ.',
+    steps: [
+      'Vào “Quản lý nhân viên”, bấm “Thêm nhân viên”.',
+      'Nhập họ tên, email đăng nhập và mật khẩu ban đầu rồi đưa cho nhân viên.',
+      'Nhân viên đăng nhập ở cùng trang đăng nhập, nhưng chỉ thấy Bán hàng, Hóa đơn và Hồ sơ cá nhân.',
+      'Nhân viên KHÔNG tự đổi mật khẩu được — bạn bấm biểu tượng chìa khóa để đặt lại giúp họ.',
+      'Người nghỉ việc thì bấm khóa. Họ không đăng nhập được nữa, nhưng hóa đơn cũ vẫn giữ nguyên tên người thu.',
+      'Số nhân viên tùy theo gói: Fun Free và Pro được 2, Pro Max không giới hạn.',
+    ],
+    img: '/product/staff.png',
+    imgLabel: 'Danh sách nhân viên của quán',
+  },
+  {
     id: 'goi',
     icon: CreditCard,
-    title: '7. Gói dịch vụ',
-    intro: 'Bắt đầu miễn phí, nâng cấp khi quán cần thêm tính năng.',
+    title: '8. Gói dịch vụ',
+    intro: 'Bắt đầu miễn phí, nâng cấp khi quán cần thêm tính năng. Mỗi quán có gói riêng.',
     steps: [
       'Vào “Gói đang dùng” để xem gói hiện tại và ngày hết hạn.',
       'Chọn gói phù hợp và thời hạn (1 / 3 / 12 tháng).',
