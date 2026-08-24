@@ -63,6 +63,12 @@ class RenameSchemaToShopProduct extends Command
             'item_name_snapshot' => 'product_name_snapshot',
             'item_price_id'      => 'product_size_id',
         ],
+        // Sót ở lượt chạy 24/08: `contact_messages` KHÔNG có khóa ngoại nào nên khi
+        // rà soát theo `cafe_id` thì nó không lọt vào danh sách. Nhưng nó có một
+        // trường mang chữ "cafe" theo nghĩa khác — tên quán khách tự khai. Mã đã đọc
+        // `shop_name`, dữ liệu cũ còn `cafe_name`, nên cột "Tên quán" ở khu quản trị
+        // trống trơn với mọi tin nhắn cũ.
+        'contact_messages' => ['cafe_name' => 'shop_name'],
     ];
 
     /**
