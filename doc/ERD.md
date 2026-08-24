@@ -12,13 +12,19 @@ nghiệp vụ.
 Ngoài 17 collection dưới đây còn bảng `personal_access_tokens` nằm ở **SQLite** — Laravel
 Sanctum bắt buộc một bảng quan hệ để lưu token đăng nhập, không thuộc dữ liệu nghiệp vụ.
 
+**Sơ đồ đi kèm**: [erd-drawio.mmd](erd-drawio.mmd) chứa bốn sơ đồ — một tổng quan (chỉ quan hệ,
+không trường nào) và ba sơ đồ cụm (① Tài khoản & Gói dịch vụ · ② Quán, nhân viên & Thực đơn ·
+③ Bán hàng). Ở đó mỗi thực thể chỉ hiện khóa và 2–3 trường định danh; **danh sách trường đầy
+đủ nằm ở tệp này**. Chia như vậy vì một sơ đồ vẽ đủ 17 collection với đủ mọi trường thì in ra
+A4 không đọc nổi.
+
 ---
 
 ## Danh sách collection
 
 | # | Collection | Vai trò |
 |---|---|---|
-| 1 | `users` | Tài khoản chủ quán và quản trị viên |
+| 1 | `users` | Tài khoản quản trị viên, chủ quán và nhân viên |
 | 2 | `packages` | Gói dịch vụ (Fun Free / Pro / Pro Max) |
 | 3 | `time_subscriptions` | Thời hạn và giá bán của từng gói |
 | 4 | `subscriptions` | Quyền dùng gói của một quán |
@@ -48,7 +54,8 @@ Sanctum bắt buộc một bảng quan hệ để lưu token đăng nhập, khô
 | `password` | String | NN | Mật khẩu đã băm bcrypt. Không bao giờ trả ra API |
 | `phone` | String | | Số liên lạc, chỉ để hiển thị và để admin liên hệ khi cần |
 | `avatar` | String | | Đường dẫn ảnh đại diện (Cloudinary hoặc thư mục public) |
-| `role` | String | NN | `user` = chủ quán, `admin` = quản trị viên. Quyết định vào được khu `/user` hay `/admin` |
+| `role` | String | NN | `admin` = quản trị viên · `user` = chủ quán · `staff` = nhân viên bán hàng. Quyết định vào được khu `/user` hay `/admin`, và trong khu `/user` thì thấy những màn hình nào |
+| `shop_id` | ObjectId | FK → `shops`, **không NN** | Quán mà **nhân viên** này làm việc. Chủ quán và admin **không có** trường này — quyền của chủ quán đi theo chiều ngược lại, qua `shops.user_id`, và một tài khoản chủ mở được nhiều quán nên một ô không chứa nổi. MongoDB không có `NOT NULL` để ép "hễ `role='staff'` thì phải có `shop_id`", nên ràng buộc đó nằm ở mã: chỗ **duy nhất** tạo được nhân viên là `StaffController@store` và nó đặt cả hai cùng lúc. Mọi nơi đọc trường này phải hiểu **trống = không vào được quán nào**, chứ không phải "không giới hạn" |
 | `status` | String | NN | `active` \| `locked`. Bị `locked` là không đăng nhập được nữa, dùng để khóa tài khoản vi phạm |
 | `has_used_free_trial` | Boolean | | Tài khoản này đã nhận gói dùng thử Fun Free chưa. Đi **cặp** với `shops.has_used_free_trial`: thiếu vế tài khoản thì chủ quán chỉ cần tạo quán mới là lại có 7 ngày Pro Max, lặp vô hạn |
 | `reset_token` | String | | **Bản băm SHA-256** của token đặt lại mật khẩu; bản thô chỉ đi qua email. Băm để ai đọc được CSDL cũng không chiếm được tài khoản |
@@ -67,7 +74,8 @@ Sanctum bắt buộc một bảng quan hệ để lưu token đăng nhập, khô
 | `features` | Array\<String\> | | Danh sách gạch đầu dòng hiện trên thẻ gói. Chỉ để trưng bày, không sinh ra quyền nào |
 | `max_tables` | Int \| null | | Trần số bàn quán được tạo. **null = không giới hạn**. Backend chặn thật ở `EnforcesPackageLimits` |
 | `max_menu_items` | Int \| null | | Trần số món trong thực đơn. **null = không giới hạn** |
-| `can_use_ai` | Boolean | | Cho phép dùng trợ lý AI đọc số liệu quán hay không. Middleware `RequiresAI` đọc trường này |
+| `max_staff` | Int \| null | | Trần số tài khoản nhân viên của quán. **null = không giới hạn**. Nhân viên đã bị khóa **vẫn tính** vào hạn mức — giống hệt cách bàn ẩn và món ẩn đang được tính, vì hạn mức đếm thứ đã tạo chứ không đếm thứ đang bật |
+| `can_use_ai` | Boolean | | Cho phép dùng trợ lý AI đọc số liệu quán hay không. Middleware `RequiresAI` đọc trường này. **Fun Free vẫn bật** — để người dùng thử được thứ đáng giá nhất của phần mềm trước khi trả tiền |
 | `status` | String | NN | `active` \| `inactive`. Gói `inactive` không còn hiện để mua, nhưng quán đang dùng vẫn giữ nguyên quyền |
 
 > Thuế VAT không lưu ở đây — lấy từ cấu hình `funcafe.vat_rate` lúc đọc; gói dùng thử luôn 0%.
@@ -133,6 +141,14 @@ thêm một chứng từ mới.
 
 ## 6. `shops` — Quán cà phê
 
+Giữa `users` và `shops` có **hai quan hệ ngược chiều nhau**. Đây không phải vòng lặp mà là
+hai sự thật khác nhau, và lẫn hai cái này là hiểu sai toàn bộ phần phân quyền:
+
+| Khóa | Đọc là | Ai có |
+|---|---|---|
+| `shops.user_id` | quán này **của ai** | mọi quán đều có |
+| `users.shop_id` | người này **làm ở đâu** | chỉ tài khoản `role='staff'` |
+
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh quán. Mọi dữ liệu bán hàng đều gắn với id này, đây là ranh giới tách dữ liệu giữa các quán |
@@ -148,6 +164,9 @@ thêm một chứng từ mới.
 | `bank_account_name` | String | | Tên chủ tài khoản, hiện kèm mã QR để khách đối chiếu |
 | `has_used_free_trial` | Boolean | | Quán này đã dùng Fun Free chưa. Mỗi quán chỉ một lần; đi cặp với `users.has_used_free_trial` |
 
+> **Quán không xóa được** — kể cả khi chưa bán đơn nào. Xóa quán là kéo theo bàn, danh mục,
+> món, topping, đơn và chứng từ mua gói của quán đó; chỉ đổi `status` sang `inactive`.
+
 ## 7. `tables` — Bàn
 
 | Trường | Kiểu | Ràng buộc | Ý nghĩa và tác dụng |
@@ -159,6 +178,7 @@ thêm một chứng từ mới.
 | `status` | String | NN | `empty` \| `serving`. **Chỉ là bộ nhớ đệm** cho tiện hiển thị — nguồn chân lý là "có đơn `active` nào trỏ vào bàn này không". Mongo chạy standalone nên không có transaction thật, hai lệnh ghi tách rời có thể làm trường này kẹt ở `serving`; màn Bán hàng vì vậy dẫn xuất lại trạng thái từ danh sách đơn đang mở |
 | `current_order_id` | ObjectId | FK → `orders` | Đơn đang phục vụ tại bàn, null khi bàn trống. **Cũng là bộ nhớ đệm**, cùng lý do trên |
 | `display_order` | Int | | Thứ tự bàn trên sơ đồ, để chủ quán sắp xếp cho khớp mặt bằng thật |
+| `is_active` | Boolean | | **Thay cho việc xóa bàn.** Xóa một cái bàn là bỏ rơi mọi hóa đơn cũ từng gắn với nó: `orders.table_id` trỏ vào document không còn tồn tại và cột Bàn ở màn Tra cứu hóa đơn trống trơn. Bàn ẩn **không hiện** ở màn Bán hàng nhưng **vẫn tính** vào hạn mức gói. Bản ghi cũ thiếu trường này được coi là **còn dùng** — không được để bàn đang hoạt động biến mất chỉ vì lệnh cập nhật dữ liệu chưa chạy |
 
 ## 8. `categories` — Danh mục món
 
@@ -227,7 +247,10 @@ tách hai bảng sẽ sinh nguy cơ đơn và hóa đơn lệch nhau.
 |---|---|---|---|
 | `_id` | ObjectId | PK | Định danh đơn |
 | `shop_id` | ObjectId | FK → `shops` | Đơn của quán nào — mọi thống kê doanh thu đều lọc theo trường này |
-| `table_id` | ObjectId | FK → `tables` | Đơn đang phục vụ ở bàn nào |
+| `table_id` | ObjectId | FK → `tables`, **không NN** | Đơn đang phục vụ ở bàn nào. **Trống với đơn mang về.** Trước đây trường này bắt buộc, nên quán kín bàn là không bán được cho khách mua mang đi — đúng tình huống GVHD chỉ ra |
+| `order_type` | String | NN | `dine_in` (bán tại quán) \| `takeaway` (mang về). Đây mới là **nguồn chân lý**, không suy từ `table_id` rỗng: đơn tại quán cũng có thể mất bàn nếu bàn bị ẩn giữa chừng, mà đơn đó vẫn phải in ra là bán tại quán. Mọi đơn cũ được đặt sẵn `dine_in` khi nâng cấp dữ liệu |
+| `created_by` | ObjectId | FK → `users` | Ai mở đơn — chủ quán hoặc nhân viên. Dùng để đối ca khi quán có nhiều người đứng quầy |
+| `paid_by` | ObjectId | FK → `users` | Ai thu tiền, in lên dòng **Thu ngân** của hóa đơn. **Trống khi tiền vào qua cổng thanh toán** — lúc đó không có con người nào bấm nút thu, và ghi bừa tên người đang mở màn hình vào đây là làm sai chứng từ |
 | `code` | String | UK theo quán | Mã đơn `ORD-YYYYMMDD-NNNN`, cấp ngay khi mở đơn |
 | `status` | String | NN | `active` (đang phục vụ) \| `paid` (đã thanh toán) \| `cancelled` (hủy trước khi thu tiền). Hệ thống **không có nghiệp vụ hoàn tiền**: lỡ tay thì hủy trước khi thanh toán |
 | `note` | String | | Ghi chú chung cho cả đơn |
@@ -235,8 +258,9 @@ tách hai bảng sẽ sinh nguy cơ đơn và hóa đơn lệch nhau.
 | `discount_amount` | Number | | Giảm giá do thu ngân nhập. Backend luôn kẹp lại `min(số gửi lên, subtotal)` nên tổng tiền không bao giờ âm — không tin con số client gửi |
 | `total_amount` | Number | ≥ 0 | Số tiền khách phải trả = `subtotal − discount_amount` |
 | `invoice_code` | String | UK theo quán | Mã phiếu `INV-YYYYMMDD-NNNN`, **chỉ cấp lúc thanh toán**. Là tên tệp khi in và là mã tra cứu hóa đơn |
-| `payment_method` | String | | `cash` (tiền mặt) \| `vietqr` (khách quét QR chuyển khoản). Chỉ có khi đã thanh toán |
-| `payment_status` | String | | `paid`. **Trường này chỉ xuất hiện khi đơn đã thanh toán** — đơn đang phục vụ hoàn toàn không có trường này, và doanh thu chỉ tính các đơn có nó |
+| `payment_method` | String | | `cash` (tiền mặt) \| `vietqr` (khách quét QR chuyển thẳng vào tài khoản quán) \| `vnpay` (thu qua cổng VNPay). Chỉ có khi đã chọn cách trả |
+| `payment_status` | String | | `pending` (đã sinh liên kết VNPay, đang chờ khách trả) \| `paid`. **Đơn tiền mặt không bao giờ đi qua `pending`** — thu xong mới ghi. Doanh thu chỉ tính đơn `paid` |
+| `gateway_txn_ref` | String | | Mã đơn đã gửi sang cổng VNPay, để callback tra ngược về đúng đơn. Chỉ có ở đơn trả qua cổng. Mang tiền tố `OD` để phân biệt với mã của luồng mua gói — VNPay chỉ gọi **một** địa chỉ IPN duy nhất nên hai luồng phải nhận chung một cửa rồi rẽ theo tiền tố |
 | `paid_at` | Date | | Thời điểm thu tiền. **Mốc tính doanh thu** theo ngày/tháng, không dùng `created_at` |
 | `cash_received` | Int | | Tiền khách đưa, chỉ có với thanh toán tiền mặt |
 | `change_amount` | Int | | Tiền thối lại, in trên phiếu để khách đối chiếu |

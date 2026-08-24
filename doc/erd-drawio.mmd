@@ -1,279 +1,305 @@
-%% FunCafe — ERD phản ánh ĐÚNG 100% schema MongoDB thực tế của dự án
-%% Đầy đủ mọi field (kể cả created_at/updated_at, reset_token...) và đầy đủ mọi khóa phụ.
-%% Các khóa denormalize (orders.shop_id, package_payments.shop_id/user_id...) là cố ý -
-%% giữ trong DB để truy vấn nhanh, nên ERD cũng vẽ đúng như vậy.
-%% Cách dùng: dán trọn khối vào https://mermaid.live, hoặc draw.io: + (Insert) ▸ Advanced ▸ Mermaid...
+%% ======================================================================
+%% FunCafe — ERD
+%%
+%% VÌ SAO CHIA LÀM BỐN SƠ ĐỒ
+%% Bản trước vẽ đủ mọi trường của cả 17 collection trên MỘT sơ đồ — kể cả
+%% created_at, reset_token. In ra khổ A4 thì chữ nhỏ tới mức không đọc nổi,
+%% và điều người xem cần biết (bảng nào nối bảng nào) chìm nghỉm giữa hàng
+%% trăm dòng trường. Ở đây mỗi thực thể chỉ hiện KHÓA CHÍNH, KHÓA NGOẠI và
+%% 2–3 trường đủ để nhận ra nó là gì. Danh sách trường đầy đủ, kèm ý nghĩa
+%% và ràng buộc của từng trường, nằm ở doc/ERD.md.
+%%
+%% CÁCH DÙNG: mỗi khối `erDiagram` bên dưới là một sơ đồ riêng. Dán TỪNG
+%% khối (kể từ dòng `erDiagram` tới trước dấu phân cách kế tiếp) vào
+%% https://mermaid.live, hoặc draw.io ▸ + (Insert) ▸ Advanced ▸ Mermaid...
+%%
+%% Cơ sở dữ liệu là MongoDB nên "khóa ngoại" ở đây là THAM CHIẾU LOGIC:
+%% lưu ObjectId của document bên kia, không có ràng buộc cứng như SQL.
+%% ======================================================================
+
+
+%% ======================================================================
+%% SƠ ĐỒ 0 — TỔNG QUAN: 17 collection và quan hệ giữa chúng
+%% Không vẽ trường nào cả. Sơ đồ này trả lời đúng một câu hỏi: dữ liệu nối
+%% với nhau ra sao. Chi tiết để ba sơ đồ cụm bên dưới.
+%% ======================================================================
 erDiagram
-    %% ===== Quan hệ (đầy đủ mọi khóa phụ theo DB thật) =====
-    users ||--o{ shops : "sở hữu"
-    users ||--o{ subscriptions : "đăng ký"
-    users ||--o{ package_payments : "thanh toán"
-    users ||--o{ reviews : "viết"
+    %% --- Cụm 1: Tài khoản và Gói dịch vụ ---
+    users              ||--o{ shops              : "sở hữu"
+    users              ||--o{ package_payments   : "người trả tiền"
+    users              ||--o{ reviews            : "viết"
+    packages           ||--o{ time_subscriptions : "có mốc thời hạn"
+    packages           ||--o{ subscriptions      : "cấp quyền theo"
+    packages           ||--o{ package_payments   : "được mua"
+    packages           ||--o{ reviews            : "được đánh giá"
+    time_subscriptions ||--o{ subscriptions      : "áp dụng"
+    time_subscriptions ||--o{ package_payments   : "áp dụng"
+    subscriptions      ||--o{ package_payments   : "được thanh toán bởi"
+    shops              ||--o{ subscriptions      : "gói của quán"
+    shops              ||--o{ package_payments   : "giao dịch của quán"
+    shops              ||--o{ reviews            : "đứng tên quán"
 
-    packages ||--o{ time_subscriptions : "có thời hạn"
-    packages ||--o{ subscriptions : "được đăng ký"
-    packages ||--o{ package_payments : "được trả tiền"
-    packages ||--o{ reviews : "đánh giá gói"
+    %% --- Cụm 2: Quán, nhân viên và thực đơn ---
+    shops      ||--o{ users            : "thuê nhân viên"
+    shops      ||--o{ tables           : "có bàn"
+    shops      ||--o{ categories       : "có danh mục"
+    shops      ||--o{ products         : "có món"
+    shops      ||--o{ toppings         : "có topping"
+    categories ||--o{ products         : "phân loại"
+    products   ||--o{ product_sizes    : "có giá theo size"
+    products   ||--o{ product_toppings : "cho phép topping"
+    toppings   ||--o{ product_toppings : "được cho phép ở"
 
-    time_subscriptions ||--o{ subscriptions : "áp dụng"
-    time_subscriptions ||--o{ package_payments : "áp dụng"
-
-    subscriptions ||--o{ package_payments : "thanh toán (subscription_id)"
-    subscriptions ||--o{ package_payments : "gói bị thay thế (previous_subscription_id)"
-
-    shops ||--o{ subscriptions : "gói của quán"
-    shops ||--o{ package_payments : "giao dịch của quán"
-    shops ||--o{ reviews : "thuộc về"
-    shops ||--o{ tables : "có bàn"
-    shops ||--o{ categories : "có danh mục"
-    shops ||--o{ products : "có món"
-    shops ||--o{ toppings : "có topping"
-    shops ||--o{ orders : "phát sinh đơn"
-
-    categories ||--o{ products : "phân loại"
-    products ||--o{ product_sizes : "giá theo size"
-    products ||--o{ product_toppings : "cho phép topping"
-    toppings ||--o{ product_toppings : "được gắn"
-
-    tables ||--o{ orders : "phục vụ tại (table_id)"
-    tables ||--o| orders : "đơn đang mở (current_order_id)"
-    orders ||--|{ order_details : "gồm"
-    products ||--o{ order_details : "được bán"
-    product_sizes ||--o{ order_details : "size đã chọn"
+    %% --- Cụm 3: Bán hàng ---
+    shops         ||--o{ orders                : "phát sinh"
+    tables        ||--o{ orders                : "phục vụ tại"
+    users         ||--o{ orders                : "mở đơn / thu tiền"
+    orders        ||--|{ order_details         : "gồm"
+    products      ||--o{ order_details         : "được bán"
+    product_sizes ||--o{ order_details         : "size đã chọn"
     order_details ||--o{ order_detail_toppings : "kèm"
-    toppings ||--o{ order_detail_toppings : "được chọn"
+    toppings      ||--o{ order_detail_toppings : "được chọn"
 
-    %% ===== Thực thể (đầy đủ field) =====
+    %% --- Đứng riêng: người gửi là khách vãng lai chưa có tài khoản,
+    %%     nên collection này KHÔNG có khóa ngoại nào ---
+    contact_messages {
+        ObjectId _id PK
+    }
+
+
+%% ======================================================================
+%% SƠ ĐỒ 1 — TÀI KHOẢN VÀ GÓI DỊCH VỤ
+%% Câu chuyện: ai là ai, quán nào đang dùng gói nào tới bao giờ, và tiền
+%% đã trả nằm ở chứng từ nào.
+%%
+%% Điểm dễ nhầm nhất, cũng là lý do tách `subscriptions` khỏi
+%% `package_payments`: QUYỀN DÙNG và CHỨNG TỪ TIỀN là hai chuyện khác nhau.
+%% Gia hạn dùng lại chính lượt đăng ký cũ (chỉ kéo dài end_date) và thêm
+%% một chứng từ mới — nên một subscription có NHIỀU package_payment.
+%% ======================================================================
+erDiagram
+    users              ||--o{ shops              : "sở hữu (shops.user_id)"
+    users              ||--o{ package_payments   : "là người trả tiền"
+    users              ||--o{ reviews            : "viết"
+    shops              ||--o{ subscriptions      : "gói gắn với QUÁN"
+    shops              ||--o{ package_payments   : "chứng từ của quán"
+    shops              ||--o{ reviews            : "đứng tên quán"
+    packages           ||--o{ time_subscriptions : "bán theo mốc"
+    packages           ||--o{ subscriptions      : "gói được cấp"
+    packages           ||--o{ package_payments   : "gói đã mua"
+    packages           ||--o{ reviews            : "gói được chấm điểm"
+    time_subscriptions ||--o{ subscriptions      : "thời hạn đã chọn"
+    time_subscriptions ||--o{ package_payments   : "thời hạn đã mua"
+    subscriptions      ||--o{ package_payments   : "1 lượt đăng ký, N chứng từ"
+
     users {
         ObjectId _id PK
-        string full_name
-        string email UK
-        string password
-        string phone
-        string avatar
-        string role
-        string status
-        bool has_used_free_trial
-        string reset_token
-        date reset_token_expires_at
-        date created_at
-        date updated_at
+        string   full_name
+        string   email UK
+        string   role "admin | user | staff"
+    }
+    shops {
+        ObjectId _id PK
+        ObjectId user_id FK "chủ quán"
+        string   name
+        string   status "open | closed | inactive"
     }
     packages {
         ObjectId _id PK
-        string name
-        string type
-        int level
-        bool is_trial
-        string description
-        array features
-        int max_tables
-        int max_menu_items
-        bool can_use_ai
-        string status
-        date created_at
-        date updated_at
+        string   name "Fun Free | Pro | Pro Max"
+        int      level "0 | 1 | 2"
+        int      max_staff "null = vô hạn"
     }
     time_subscriptions {
         ObjectId _id PK
         ObjectId package_id FK
-        int duration_value
-        string duration_unit
-        number price
-        string label
-        string status
-        date created_at
-        date updated_at
+        string   label "1 tháng, 12 tháng..."
+        number   price "chưa gồm VAT"
     }
     subscriptions {
         ObjectId _id PK
-        ObjectId user_id FK
-        ObjectId shop_id FK
+        ObjectId shop_id FK "KHÔNG có user_id"
         ObjectId package_id FK
         ObjectId time_subscription_id FK
-        string package_name_snapshot
-        date start_date
-        date end_date
-        string status
-        number total_amount
-        bool is_pending_review
-        date created_at
-        date updated_at
+        date     end_date
+        string   status "active | pending | cancelled"
     }
     package_payments {
         ObjectId _id PK
-        ObjectId user_id FK
         ObjectId shop_id FK
+        ObjectId user_id FK
+        ObjectId subscription_id FK
         ObjectId package_id FK
         ObjectId time_subscription_id FK
-        ObjectId subscription_id FK
-        string transaction_code UK
-        number subtotal
-        number vat_rate
-        number vat_amount
-        number amount
-        string payment_method
-        string payment_status
-        date paid_at
-        string note
-        string action_type
-        ObjectId previous_subscription_id FK
-        date previous_end_date
-        number credit_amount
-        string credit_status
-        string gateway_txn_no
-        string gateway_bank_code
-        date created_at
-        date updated_at
-    }
-    shops {
-        ObjectId _id PK
-        ObjectId user_id FK
-        string name
-        string address
-        string phone
-        string description
-        string logo
-        string status
-        string bank_bin
-        string bank_account_number
-        string bank_account_name
-        bool has_used_free_trial
-        date created_at
-        date updated_at
-    }
-    tables {
-        ObjectId _id PK
-        ObjectId shop_id FK
-        string name
-        int capacity
-        int display_order
-        string status
-        ObjectId current_order_id FK
-        date created_at
-        date updated_at
-    }
-    categories {
-        ObjectId _id PK
-        ObjectId shop_id FK
-        string name
-        string description
-        bool is_active
-        date created_at
-        date updated_at
-    }
-    products {
-        ObjectId _id PK
-        ObjectId shop_id FK
-        ObjectId category_id FK
-        string name
-        string description
-        string image
-        int base_price
-        bool has_size
-        bool has_topping
-        bool is_available
-        int display_order
-        date created_at
-        date updated_at
-    }
-    product_sizes {
-        ObjectId _id PK
-        ObjectId product_id FK
-        string size_name
-        int price
-        bool is_active
-        date created_at
-        date updated_at
-    }
-    toppings {
-        ObjectId _id PK
-        ObjectId shop_id FK
-        string name
-        number price
-        string image
-        bool is_available
-        date created_at
-        date updated_at
-    }
-    product_toppings {
-        ObjectId _id PK
-        ObjectId product_id FK
-        ObjectId topping_id FK
-        date created_at
-        date updated_at
-    }
-    orders {
-        ObjectId _id PK
-        ObjectId shop_id FK
-        ObjectId table_id FK
-        string code UK
-        string status
-        string note
-        number subtotal
-        number discount_amount
-        number total_amount
-        string invoice_code UK
-        string payment_method
-        string payment_status
-        date paid_at
-        int cash_received
-        int change_amount
-        date refunded_at
-        string refund_reason
-        date created_at
-        date updated_at
-    }
-    order_details {
-        ObjectId _id PK
-        ObjectId order_id FK
-        ObjectId product_id FK
-        ObjectId product_size_id FK
-        string product_name_snapshot
-        string size_name_snapshot
-        int quantity
-        number unit_price
-        number subtotal
-        number topping_total
-        number total_price
-        string note
-        date created_at
-        date updated_at
-    }
-    order_detail_toppings {
-        ObjectId _id PK
-        ObjectId order_detail_id FK
-        ObjectId topping_id FK
-        string topping_name_snapshot
-        int quantity
-        number price_at_time
-        number subtotal
-        date created_at
-        date updated_at
+        string   transaction_code UK
+        number   amount "thực trả, đã gồm VAT"
+        string   payment_status "pending | paid | failed"
     }
     reviews {
         ObjectId _id PK
         ObjectId user_id FK
         ObjectId shop_id FK
         ObjectId package_id FK
-        int rating
-        string title
-        string comment
-        string status
-        date created_at
-        date updated_at
+        int      rating "1..5"
+        string   status "visible | hidden"
     }
-    contact_messages {
+
+
+%% ======================================================================
+%% SƠ ĐỒ 2 — QUÁN, NHÂN VIÊN VÀ THỰC ĐƠN
+%% Câu chuyện: một quán phải khai báo những gì trước khi bán được hàng.
+%%
+%% HAI QUAN HỆ NGƯỢC CHIỀU giữa `users` và `shops` — đây KHÔNG phải vòng
+%% lặp, mà là hai sự thật khác nhau:
+%%   shops.user_id  = quán này CỦA AI      (chủ quán, luôn có)
+%%   users.shop_id  = người này LÀM Ở ĐÂU  (chỉ nhân viên mới có)
+%% Chủ quán không mang `users.shop_id`: quyền của họ đến từ chiều sở hữu,
+%% và một tài khoản chủ mở được nhiều quán nên một ô không chứa nổi.
+%% ======================================================================
+erDiagram
+    users      ||--o{ shops            : "sở hữu (shops.user_id)"
+    shops      ||--o{ users            : "thuê nhân viên (users.shop_id)"
+    shops      ||--o{ tables           : "có bàn"
+    shops      ||--o{ categories       : "có danh mục"
+    shops      ||--o{ products         : "có món"
+    shops      ||--o{ toppings         : "có topping"
+    categories ||--o{ products         : "phân loại"
+    products   ||--o{ product_sizes    : "giá theo size"
+    products   ||--o{ product_toppings : "cho phép gắn"
+    toppings   ||--o{ product_toppings : "được gắn vào"
+
+    users {
         ObjectId _id PK
-        string full_name
-        string email
-        string phone
-        string shop_name
-        string content
-        bool is_read
-        string reply
-        date replied_at
-        string replied_by
-        date created_at
-        date updated_at
+        ObjectId shop_id FK "CHỈ nhân viên mới có"
+        string   full_name
+        string   role "admin | user | staff"
+    }
+    shops {
+        ObjectId _id PK
+        ObjectId user_id FK "chủ quán"
+        string   name
+        string   status "open | closed | inactive"
+    }
+    tables {
+        ObjectId _id PK
+        ObjectId shop_id FK
+        ObjectId current_order_id FK "đệm, null khi bàn trống"
+        string   name
+        bool     is_active "false = đã ẩn, KHÔNG xóa"
+    }
+    categories {
+        ObjectId _id PK
+        ObjectId shop_id FK
+        string   name
+        bool     is_active
+    }
+    products {
+        ObjectId _id PK
+        ObjectId shop_id FK
+        ObjectId category_id FK
+        string   name
+        int      base_price "dùng khi không chia size"
+        bool     has_size
+        bool     has_topping
+    }
+    product_sizes {
+        ObjectId _id PK
+        ObjectId product_id FK
+        string   size_name "S | M | L"
+        int      price
+    }
+    toppings {
+        ObjectId _id PK
+        ObjectId shop_id FK
+        string   name
+        number   price
+    }
+    product_toppings {
+        ObjectId _id PK
+        ObjectId product_id FK
+        ObjectId topping_id FK
+    }
+
+
+%% ======================================================================
+%% SƠ ĐỒ 3 — BÁN HÀNG
+%% Câu chuyện: một đơn hàng từ lúc mở tới lúc thành hóa đơn.
+%%
+%% KHÔNG có collection `invoices`: hóa đơn CHÍNH LÀ đơn ở trạng thái đã
+%% thanh toán. Tách làm hai bảng chỉ sinh nguy cơ đơn và hóa đơn lệch nhau.
+%%
+%% `table_id` CÓ THỂ TRỐNG — đó là đơn mang về. Ràng buộc "phải chọn bàn"
+%% từng khiến quán hết bàn là không bán được cho khách mua mang đi.
+%%
+%% Các trường `*_snapshot` là ảnh chụp tên/giá LÚC BÁN, cố ý lặp dữ liệu:
+%% chủ quán đổi tên hay đổi giá món về sau thì tờ hóa đơn đã in cho khách
+%% vẫn phải giữ nguyên nội dung cũ.
+%% ======================================================================
+erDiagram
+    shops         ||--o{ orders                : "phát sinh đơn"
+    tables        ||--o{ orders                : "phục vụ tại (table_id)"
+    tables        ||--o| orders                : "đơn đang mở (current_order_id)"
+    users         ||--o{ orders                : "mở đơn (created_by)"
+    users         ||--o{ orders                : "thu tiền (paid_by)"
+    orders        ||--|{ order_details         : "gồm"
+    products      ||--o{ order_details         : "món được bán"
+    product_sizes ||--o{ order_details         : "size đã chọn"
+    order_details ||--o{ order_detail_toppings : "kèm topping"
+    toppings      ||--o{ order_detail_toppings : "topping được chọn"
+
+    shops {
+        ObjectId _id PK
+        string   name
+    }
+    tables {
+        ObjectId _id PK
+        ObjectId shop_id FK
+        string   name
+        string   status "empty | serving"
+    }
+    users {
+        ObjectId _id PK
+        string   full_name "in lên dòng Thu ngân"
+        string   role "user | staff"
+    }
+    orders {
+        ObjectId _id PK
+        ObjectId shop_id FK
+        ObjectId table_id FK "TRỐNG nếu bán mang về"
+        ObjectId created_by FK "ai mở đơn"
+        ObjectId paid_by FK "trống nếu thu qua cổng"
+        string   code UK "ORD-YYYYMMDD-NNNN"
+        string   order_type "dine_in | takeaway"
+        string   status "active | paid | cancelled"
+        int      total_amount
+        string   invoice_code UK "chỉ cấp khi thanh toán"
+        string   payment_status "pending | paid"
+    }
+    products {
+        ObjectId _id PK
+        string   name
+    }
+    product_sizes {
+        ObjectId _id PK
+        string   size_name
+    }
+    toppings {
+        ObjectId _id PK
+        string   name
+    }
+    order_details {
+        ObjectId _id PK
+        ObjectId order_id FK
+        ObjectId product_id FK
+        ObjectId product_size_id FK "null nếu món không chia size"
+        string   product_name_snapshot
+        int      quantity
+        int      total_price
+    }
+    order_detail_toppings {
+        ObjectId _id PK
+        ObjectId order_detail_id FK
+        ObjectId topping_id FK
+        string   topping_name_snapshot
+        int      subtotal
     }
