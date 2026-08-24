@@ -2,26 +2,37 @@
 ' So do TRANG THAI cua mot don hang tai quay (viec 4.6.1).
 ' draw.io -> + (Insert) -> Advanced -> PlantUML... dan tron khoi nay.
 '
-' NGUON: App\Http\Controllers\OrderController (store / update / pay / cancel) va
-' man hinh Ban hang src/app/user/sales/page.tsx. Moi mui ten o day deu co mot
-' duong di that trong ma nguon — khong ve trang thai nao chua duoc cai dat.
+' NGUON: App\Http\Controllers\OrderController (store / update / pay / cancel),
+' OrderPaymentController (taoLienKetVnpay), PaymentGatewayController
+' (vnpayOrderReturn / vnpayOrderIpn) va man hinh Ban hang src/app/user/sales/page.tsx.
+' Moi mui ten o day deu co mot duong di that trong ma nguon — khong ve trang thai
+' nao chua duoc cai dat.
 '
-' Ba trang thai luu trong CSDL: orders.status = active | paid | cancelled.
-' Khong co trang thai trung gian nao khac: don hoac dang phuc vu, hoac da chot
-' tien, hoac da huy. "Da thanh toan" va "da huy" deu la trang thai CUOI —
-' khong co duong nao di ra khoi chung.
+' Ba trang thai luu o orders.status: active | paid | cancelled.
+' "Cho VNPay" KHONG phai trang thai thu tu — don van la `active`, chi khac o
+' orders.payment_status = 'pending'. Ve tach ra vi hanh vi cua no khac han: man
+' hinh dang khoa cho tien ve, va tien co the ve MA KHONG AI bam nut nao.
 
 skinparam shadowing false
 skinparam state {
   BackgroundColor<<cuoi>> #F5EFE6
+  BackgroundColor<<cho>> #EFEAF6
   BorderColor #6F4E37
 }
 
-[*] --> DangPhucVu : **Mo don**\nPOST /orders\n(ban phai trong, quan phai **dang mo cua**)
+[*] --> DangPhucVu : **Mở đơn**\nPOST /orders\n(tại quán: bàn phải trống\nmang về: không cần bàn)
+[*] --> DaThanhToan : **Bán mang về, trả ngay**\nPOST /orders kèm payment_method\ntạo và chốt trong MỘT lượt
 
 state "Đang phục vụ\n(active)" as DangPhucVu {
-  DangPhucVu : Bàn chuyển sang "đang phục vụ"
+  DangPhucVu : Bàn chuyển sang "đang phục vụ" (đơn tại quán)
+  DangPhucVu : Đơn mang về KHÔNG giữ bàn nào
   DangPhucVu : orders.subtotal / total_amount tính lại từ CSDL sau mỗi lần sửa
+}
+
+state "Chờ khách trả qua VNPay\n(vẫn là active,\npayment_status = pending)" as ChoVnpay <<cho>> {
+  ChoVnpay : Mang gateway_txn_ref — mã cổng tra ngược về đơn
+  ChoVnpay : Màn Bán hàng hiện mã QR và hỏi lại máy chủ mỗi 3 giây
+  ChoVnpay : Bàn VẪN đang phục vụ, đơn chưa vào doanh thu
 }
 
 state "Đã thanh toán\n(paid)" as DaThanhToan <<cuoi>> {
@@ -39,9 +50,15 @@ DangPhucVu --> DangPhucVu : **Thêm / bớt / sửa món**\nPUT /orders/{id}\n(k
 DangPhucVu --> DangPhucVu : **Đặt giảm giá**\nkẹp trong [0, tạm tính]
 DangPhucVu --> DangPhucVu : **Đổi bàn**\nbàn cũ về trống, bàn mới sang phục vụ
 
-DangPhucVu --> DaThanhToan : **Thanh toán**\nPOST /orders/{id}/pay\nghi có điều kiện: chỉ khi còn là active
+DangPhucVu --> DaThanhToan : **Thu tiền mặt / VietQR**\nPOST /orders/{id}/pay\nghi có điều kiện: chỉ khi còn là active
 DangPhucVu --> DaHuy : **Hủy order**\nPOST /orders/{id}/cancel\nghi có điều kiện: chỉ khi còn là active
 DangPhucVu --> DaHuy : **Gỡ hết món khỏi giỏ**\n(màn hình Bán hàng tự gọi lệnh hủy)
+
+DangPhucVu --> ChoVnpay : **Chọn trả bằng VNPay**\nPOST /orders/{id}/vnpay\nsinh mã QR cho khách quét
+ChoVnpay --> ChoVnpay : **Bấm lại lấy mã khác**\nsinh gateway_txn_ref MỚI,\nmã cũ mất hiệu lực ngay
+ChoVnpay --> DaThanhToan : **Cổng báo trả thành công**\nGET /payments/vnpay/order/return\n(đã kiểm vnp_SecureHash)
+ChoVnpay --> DaThanhToan : **Khách đổi ý, trả tiền mặt**\nPOST /orders/{id}/pay\n(đơn vẫn là active nên vẫn thu được)
+ChoVnpay --> DaHuy : **Hủy order**
 
 DaThanhToan --> [*]
 DaHuy --> [*]
@@ -54,14 +71,29 @@ note right of DangPhucVu
   • Khách đưa thiếu tiền mặt → không thanh toán được
 end note
 
+note right of ChoVnpay
+  **Vì sao chốt đơn ngay ở trang Return**
+  Đúng bài thì IPN (cổng gọi thẳng máy chủ) mới là nơi chốt.
+  Nhưng VNPay chỉ gọi MỘT địa chỉ IPN đã khai trong cổng
+  thương nhân, và địa chỉ đó chưa được khai — IPN không hề tới.
+  "Ai cũng gọi được trang Return" không phải là lý do để bỏ:
+  gọi thì được, nhưng **không ai dựng nổi `vnp_SecureHash`**
+  hợp lệ nếu không có khóa bí mật. Kiểm chữ ký ở đây chắc chắn
+  y như ở IPN. Cả hai đường đều ghi có điều kiện nên đường nào
+  về trước cũng đúng, về sau chỉ nhận 0 dòng đổi.
+end note
+
 note bottom of DaThanhToan
   **Vì sao là ghi có điều kiện**
-  Hai request song song (bấm đúp, hai tab) đều đọc thấy
-  `active` rồi cùng đi tiếp → hai mã phiếu cho một đơn.
-  MongoDB standalone không có transaction, nên điều kiện
-  phải nằm trong chính câu lệnh ghi:
+  Hai request song song (bấm đúp, hai tab, Return và IPN cùng về)
+  đều đọc thấy `active` rồi cùng đi tiếp → hai mã phiếu cho một đơn.
+  MongoDB standalone không có transaction, nên điều kiện phải nằm
+  trong chính câu lệnh ghi:
   `where status = 'active' → update(...)`.
   Bên thua nhận 0 dòng đổi và bị từ chối.
+
+  `paid_by` để TRỐNG khi tiền về qua cổng — không có con người nào
+  bấm nút thu, ghi tên người đang mở màn hình vào là sai chứng từ.
 end note
 
 note bottom of DaHuy

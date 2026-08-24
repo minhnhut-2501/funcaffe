@@ -1,6 +1,10 @@
 @startuml FunCafe-UseCase-User
 ' So do Use Case — NGUOI DUNG (Chu quan)
 ' Hai hinh "Nguoi dung" la CUNG mot tac nhan, dat 2 ben de chia use case cho gon.
+'
+' TAC NHAN NHAN VIEN nam o so do RIENG: doc/usecase-nhanvien.puml. Nhet actor thu
+' ba vao day thi PlantUML day no xuong tan cuoi trang va moi mui ten quet ngang ca
+' so do — dung kieu "kho doc" ma GVHD da che.
 ' draw.io -> + (Insert) -> Advanced -> PlantUML... dan tron khoi nay.
 '
 ' DONG BO voi muc 2.3.2 cua bao cao: moi muc SRS 2.3.2.x co dung mot use case.
@@ -27,6 +31,7 @@ rectangle "FunCafe — Người dùng" {
   usecase "Đăng ký tài khoản" as UC_register
   usecase "Quên & đặt lại mật khẩu" as UC_forgot
   usecase "Quản lý quán shop" as UC_shop
+  usecase "Quản lý nhân viên" as UC_staff
   usecase "Chuyển đổi giữa nhiều quán" as UC_multi
   usecase "Quản lý bàn" as UC_table
   usecase "Quản lý danh mục" as UC_cat
@@ -37,8 +42,10 @@ rectangle "FunCafe — Người dùng" {
 
   ' ----- Cot phai: van hanh + goi dich vu -----
   usecase "Bán hàng theo bàn (POS)" as UC_pos
+  usecase "Bán mang về" as UC_takeaway
   usecase "Thanh toán và xuất hóa đơn" as UC_invoice
   usecase "Nhận tiền bằng mã VietQR" as UC_vietqr
+  usecase "Thu tiền qua cổng VNPay" as UC_vnpay
   usecase "Tra cứu hóa đơn" as UC_invmgmt
   usecase "Xem báo cáo doanh thu" as UC_revenue
   usecase "Xuất báo cáo doanh thu ra Excel" as UC_excel
@@ -64,6 +71,7 @@ U_L --> UC_register
 U_L --> UC_forgot
 U_L --> UC_login
 U_L --> UC_shop
+U_L --> UC_staff
 U_L --> UC_multi
 U_L --> UC_table
 U_L --> UC_cat
@@ -85,6 +93,7 @@ U_R --> UC_logout
 
 ' ===== Quan he <<include>> Dang nhap (chuc nang can xac thuc) =====
 UC_shop ..> UC_login : <<include>>
+UC_staff ..> UC_login : <<include>>
 UC_multi ..> UC_login : <<include>>
 UC_table ..> UC_login : <<include>>
 UC_cat ..> UC_login : <<include>>
@@ -104,7 +113,9 @@ UC_ai ..> UC_login : <<include>>
 ' ===== Quan he <<extend>> — hanh vi TUY CHON, lam ngay trong man hinh cha =====
 UC_size ..> UC_menu : <<extend>>
 UC_producttopping ..> UC_menu : <<extend>>
+UC_takeaway ..> UC_pos : <<extend>>
 UC_vietqr ..> UC_invoice : <<extend>>
+UC_vnpay ..> UC_invoice : <<extend>>
 UC_excel ..> UC_revenue : <<extend>>
 UC_expiry ..> UC_sub : <<extend>>
 UC_airev ..> UC_ai : <<extend>>
@@ -121,16 +132,23 @@ legend right
   - Quên & đặt lại mật khẩu: nhận liên kết qua email và đặt mật khẩu mới.
   - Đăng nhập / Đăng xuất: vào và thoát khỏi tài khoản.
   - Quản lý quán shop: thêm, sửa thông tin quán và tài khoản nhận VietQR.
+  - Quản lý nhân viên: chủ quán tạo tài khoản bán hàng cho quán, khóa/mở khóa,
+    đặt lại mật khẩu. Số nhân viên bị chặn theo gói. KHÔNG xóa được — nhân viên
+    đã bán hàng còn nằm trong hóa đơn cũ.
   - Chuyển đổi giữa nhiều quán: một tài khoản mở nhiều quán, gói tính theo TỪNG quán.
-  - Quản lý bàn: thêm, sửa, xóa bàn; theo dõi trạng thái trống / đang phục vụ.
+  - Quản lý bàn: thêm, sửa, ẩn bàn (KHÔNG xóa); theo dõi trạng thái trống / đang phục vụ.
   - Quản lý danh mục: thêm, sửa, ẩn/hiện danh mục món.
   - Quản lý thực đơn: thêm, sửa, ẩn/hiện món.
   - Quản lý size và giá theo size: đặt tên size và giá riêng, ngay trong form món.
   - Cấu hình topping cho món: tích chọn topping cho phép, ngay trong form món.
   - Quản lý topping: thêm, sửa, ẩn/hiện topping của quán.
   - Bán hàng theo bàn (POS): chọn bàn, lên order, thêm/bớt món.
+  - Bán mang về: bán KHÔNG chọn bàn — quán kín bàn vẫn thu tiền cho khách
+    mua mang đi. Gọi món xong thanh toán ngay trong một lượt.
   - Thanh toán và xuất hóa đơn: thu tiền và cấp mã phiếu ngay trên đơn hàng.
   - Nhận tiền bằng mã VietQR: sinh mã QR từ tài khoản ngân hàng đã khai của quán.
+  - Thu tiền qua cổng VNPay: khách quét mã bằng điện thoại và trả trên cổng;
+    đơn tự chốt khi cổng báo về, màn Bán hàng tự chuyển sang phiếu thành công.
   - Tra cứu hóa đơn: xem lịch sử, lọc theo ngày và hình thức trả tiền, in lại hóa đơn.
   - Xem báo cáo doanh thu: xem biểu đồ doanh thu và top món bán chạy.
   - Xuất báo cáo doanh thu ra Excel: tải số liệu đang lọc về máy dạng .xlsx.
@@ -140,10 +158,11 @@ legend right
   - Cảnh báo gói sắp hết hạn: nhắc khi còn không quá 7 ngày.
   - Quản lý tài khoản cá nhân: sửa thông tin cá nhân, đổi mật khẩu.
   - Đánh giá dịch vụ FunCafe: viết nhận xét và chấm sao cho phần mềm.
-  - Trợ lý AI: hỏi đáp về tình hình quán (chỉ gói Pro Max).
+  - Trợ lý AI: hỏi đáp về tình hình quán (gói Pro Max và bản dùng thử Fun Free).
   - Phân tích doanh thu bằng AI: máy chủ tính số liệu, AI chỉ diễn giải.
   ---
-  Ghi chú: hai hình "Người dùng" là cùng MỘT tác nhân (tách 2 bên cho gọn).
+  Ghi chú: hai hình "Người dùng" là cùng MỘT tác nhân — CHỦ QUÁN (tách 2 bên cho gọn).
+  Tác nhân NHÂN VIÊN có sơ đồ riêng: usecase-nhanvien.puml.
   <<include>>: chức năng bắt buộc phải Đăng nhập trước khi thực hiện.
   <<extend>>: hành vi tùy chọn, thao tác ngay trong màn hình của use case cha.
   Các trang công khai (Trang chủ, Xem gói, Chi tiết dịch vụ, Liên hệ, Hỗ trợ,

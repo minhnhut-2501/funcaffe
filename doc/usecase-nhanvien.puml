@@ -1,0 +1,89 @@
+@startuml FunCafe-UseCase-NhanVien
+' So do Use Case — TAC NHAN NHAN VIEN, va ranh gioi quyen giua nhan vien va chu quan.
+' draw.io -> + (Insert) -> Advanced -> PlantUML... dan tron khoi nay.
+'
+' Ve rieng chu khong nhet vao usecase-user.puml: so do kia da co gan 30 use case,
+' them mot tac nhan nua la PlantUML keo dai trang gap ba va moi mui ten quet ngang.
+' Cau hoi "nhan vien lam duoc gi, khong lam duoc gi" xung dang co mot hinh rieng.
+'
+' NGUON: middleware `chu-quan` (App\Http\Middleware\OwnerOnly) + bang tuyen trong
+' routes/api.php + DUONG_CHO_NHAN_VIEN trong src/components/layouts/UserLayout.tsx.
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+
+actor "Nhân viên" as NV
+actor "Chủ quán" as CQ
+
+rectangle "Nhân viên dùng được" {
+  usecase "Đăng nhập" as UC_login
+  usecase "Bán hàng theo bàn (POS)" as UC_pos
+  usecase "Bán mang về" as UC_takeaway
+  usecase "Thanh toán và xuất hóa đơn" as UC_invoice
+  usecase "Nhận tiền bằng mã VietQR" as UC_vietqr
+  usecase "Thu tiền qua cổng VNPay" as UC_vnpay
+  usecase "Tra cứu hóa đơn" as UC_invmgmt
+  usecase "Quản lý tài khoản cá nhân" as UC_profile
+  usecase "Đăng xuất" as UC_logout
+}
+
+rectangle "CHỈ chủ quán" #FBF3F0 {
+  usecase "Quản lý nhân viên" as UC_staff
+  usecase "Xem báo cáo doanh thu" as UC_revenue
+  usecase "Quản lý thực đơn / danh mục / topping" as UC_menu
+  usecase "Quản lý bàn" as UC_table
+  usecase "Quản lý quán shop" as UC_shop
+  usecase "Quản lý gói đang dùng" as UC_sub
+  usecase "Trợ lý AI" as UC_ai
+}
+
+NV --> UC_login
+NV --> UC_pos
+NV --> UC_invoice
+NV --> UC_invmgmt
+NV --> UC_profile
+NV --> UC_logout
+
+CQ --> UC_staff
+CQ --> UC_revenue
+CQ --> UC_menu
+CQ --> UC_table
+CQ --> UC_shop
+CQ --> UC_sub
+CQ --> UC_ai
+
+UC_takeaway ..> UC_pos : <<extend>>
+UC_vietqr ..> UC_invoice : <<extend>>
+UC_vnpay ..> UC_invoice : <<extend>>
+
+UC_pos ..> UC_login : <<include>>
+UC_invoice ..> UC_login : <<include>>
+UC_invmgmt ..> UC_login : <<include>>
+UC_profile ..> UC_login : <<include>>
+
+note bottom of UC_staff
+  Chủ quán tạo tài khoản nhân viên cho **từng quán**.
+  Số nhân viên bị chặn theo gói: Fun Free 2, Pro 2,
+  Pro Max không giới hạn. Nhân viên bị khóa VẪN tính
+  vào hạn mức — hạn mức đếm thứ đã tạo, không đếm
+  thứ đang bật.
+  KHÔNG xóa được nhân viên: người đã bán hàng còn
+  nằm trong `orders.created_by` / `paid_by`, xóa đi
+  là hóa đơn cũ mất tên người thu.
+end note
+
+legend right
+  Nhân viên là tài khoản `role = 'staff'`, gắn với đúng MỘT quán
+  qua `users.shop_id`. Chủ quán tạo, đặt lại mật khẩu và khóa được.
+
+  Ẩn bớt mục trong menu chỉ là lớp GIAO DIỆN. Chặn thật nằm ở máy
+  chủ — middleware `chu-quan` từ chối mọi tuyến ngoài danh sách trên,
+  nên gõ tay `/user/revenue` hay gọi thẳng API bằng token của nhân
+  viên đều nhận 403, không phụ thuộc vào việc menu có hiện hay không.
+
+  Nhân viên chỉ thấy hóa đơn CỦA QUÁN MÌNH: mọi tuyến đều đi qua
+  `shops/{shopId}/...` và `shop_id` của họ được kiểm ở từng lượt gọi.
+endlegend
+@enduml
