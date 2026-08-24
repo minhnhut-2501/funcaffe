@@ -179,12 +179,12 @@
     <div class="q-head"><span class="q-no">01</span><h3>Làm sao biết món này có size?</h3></div>
     <div class="q-body">
       <dl class="kv">
-        <div><dt>Sự thật ở</dt><dd><code>items.has_size</code> (boolean) và các dòng trong <code>item_prices</code></dd></div>
-        <div><dt>Quan hệ</dt><dd><code>items</code> 1—N <code>item_prices</code>. Mỗi size <strong>một dòng riêng</strong>, mang <code>size_name</code>, <code>price</code>, <code>is_active</code>.</dd></div>
-        <div><dt>Giao diện đọc</dt><dd><span class="loc">services/menu.ts:15–16</span> ánh xạ <code>has_size</code> → <code>hasSize</code>, <code>item_prices</code> → <code>sizes[]</code></dd></div>
+        <div><dt>Sự thật ở</dt><dd><code>products.has_size</code> (boolean) và các dòng trong <code>product_sizes</code></dd></div>
+        <div><dt>Quan hệ</dt><dd><code>products</code> 1—N <code>product_sizes</code>. Mỗi size <strong>một dòng riêng</strong>, mang <code>size_name</code>, <code>price</code>, <code>is_active</code>.</dd></div>
+        <div><dt>Giao diện đọc</dt><dd><span class="loc">services/menu.ts:15–16</span> ánh xạ <code>has_size</code> → <code>hasSize</code>, <code>product_sizes</code> → <code>sizes[]</code></dd></div>
         <div><dt>Dùng ở</dt><dd><span class="loc">sales/page.tsx:262</span> — <code>openOption()</code> tự chọn sẵn size đầu tiên đang bật; món không có size thì <code>size = null</code></dd></div>
       </dl>
-      <p class="why" style="margin-top:14px"><strong>Vì sao tách bảng riêng chứ không nhét mảng vào <code>items</code>?</strong> Vì mỗi dòng bán hàng cần trỏ tới <em>đúng một size cụ thể</em> bằng <code>item_price_id</code>, và máy chủ phải tra ngược lại để lấy giá. Nhét mảng vào tài liệu món thì không có id để trỏ, phải so theo tên — mà tên thì đổi được.</p>
+      <p class="why" style="margin-top:14px"><strong>Vì sao tách bảng riêng chứ không nhét mảng vào <code>products</code>?</strong> Vì mỗi dòng bán hàng cần trỏ tới <em>đúng một size cụ thể</em> bằng <code>product_size_id</code>, và máy chủ phải tra ngược lại để lấy giá. Nhét mảng vào tài liệu món thì không có id để trỏ, phải so theo tên — mà tên thì đổi được.</p>
       <p style="margin-top:14px"><strong>Ba chốt chặn ở máy chủ, cả ba nằm trong <code>chuanBiDong()</code>:</strong></p>
       <div class="tablewrap">
         <table>
@@ -192,12 +192,12 @@
           <tbody>
             <tr><td>Size của <em>món khác</em></td><td class="mono">:501</td><td><code>422</code> Size không hợp lệ cho món…</td></tr>
             <tr><td>Size đã <em>tắt</em> (<code>is_active = false</code>)</td><td class="mono">:508</td><td><code>422</code> Size … đã ngừng bán</td></tr>
-            <tr><td>Món có size nhưng <em>bỏ trống</em> <code>item_price_id</code></td><td class="mono">:521</td><td><code>422</code> Món … phải chọn size</td></tr>
+            <tr><td>Món có size nhưng <em>bỏ trống</em> <code>product_size_id</code></td><td class="mono">:521</td><td><code>422</code> Món … phải chọn size</td></tr>
           </tbody>
         </table>
       </div>
       <div class="break">
-        Chốt thứ ba là chốt về <strong>tiền</strong>, không phải về dữ liệu lệch. <code>base_price</code> vẫn nằm trên món kể cả khi <code>has_size</code> bật (<code>ItemController</code> validate nó là <code>required</code>), và chủ quán thường để đó một con số cũ. Bỏ trống <code>item_price_id</code> khi gọi API là rơi vào nhánh <code>base_price</code> và <strong>mua được ly cỡ lớn theo giá gốc</strong>. Giao diện luôn gửi size cho món có size, nhưng giao diện không phải chốt chặn.
+        Chốt thứ ba là chốt về <strong>tiền</strong>, không phải về dữ liệu lệch. <code>base_price</code> vẫn nằm trên món kể cả khi <code>has_size</code> bật (<code>ItemController</code> validate nó là <code>required</code>), và chủ quán thường để đó một con số cũ. Bỏ trống <code>product_size_id</code> khi gọi API là rơi vào nhánh <code>base_price</code> và <strong>mua được ly cỡ lớn theo giá gốc</strong>. Giao diện luôn gửi size cho món có size, nhưng giao diện không phải chốt chặn.
       </div>
     </div>
   </div>
@@ -205,8 +205,8 @@
   <div class="q">
     <div class="q-head"><span class="q-no">02</span><h3>Giá của một dòng lấy từ đâu?</h3></div>
     <div class="q-body">
-      <pre><code>if (có item_price_id) {
-    $unitPrice = ItemPrice::find(...)-&gt;price;   // giá theo size THẮNG
+      <pre><code>if (có product_size_id) {
+    $unitPrice = ProductSize::find(...)-&gt;price;   // giá theo size THẮNG
 } else {
     $unitPrice = $item-&gt;base_price;             // giá gốc của món
 }</code></pre>
@@ -224,8 +224,8 @@
     <div class="q-head"><span class="q-no">03</span><h3>Làm sao biết món này gắn được topping nào?</h3></div>
     <div class="q-body">
       <dl class="kv">
-        <div><dt>Sự thật ở</dt><dd>Cờ <code>items.allow_topping</code> <strong>và</strong> bảng nối <code>item_toppings</code></dd></div>
-        <div><dt>Quan hệ</dt><dd><code>items</code> N—N <code>toppings</code>, nối qua <code>item_toppings { item_id, topping_id }</code></dd></div>
+        <div><dt>Sự thật ở</dt><dd>Cờ <code>products.has_topping</code> <strong>và</strong> bảng nối <code>product_toppings</code></dd></div>
+        <div><dt>Quan hệ</dt><dd><code>products</code> N—N <code>toppings</code>, nối qua <code>product_toppings { product_id, topping_id }</code></dd></div>
         <div><dt>Ghi vào</dt><dd>Trang Thực đơn gửi mảng <code>topping_ids</code> <em>ngay trong thân của lệnh lưu món</em> — không có endpoint riêng. <span class="loc">ItemController:77</span> rồi <code>syncItemToppings()</code> tại <span class="loc">:195</span></dd></div>
         <div><dt>Đọc ra</dt><dd><span class="loc">services/menu.ts:25</span> gom thành <code>allowedToppingIds: string[]</code></dd></div>
         <div><dt>Lọc hiển thị</dt><dd><span class="loc">sales/page.tsx:285</span> — <code>allowedToppings</code> = topping <em>còn bán</em> <strong>và</strong> nằm trong <code>allowedToppingIds</code></dd></div>
@@ -236,7 +236,7 @@
         <table>
           <thead><tr><th>Gửi lên</th><th>Chặn ở</th><th>Báo</th></tr></thead>
           <tbody>
-            <tr><td>Topping cho món có <code>allow_topping = false</code></td><td class="mono">:541</td><td><code>422</code> Món … không nhận topping</td></tr>
+            <tr><td>Topping cho món có <code>has_topping = false</code></td><td class="mono">:541</td><td><code>422</code> Món … không nhận topping</td></tr>
             <tr><td>Topping của <em>quán khác</em></td><td class="mono">:548</td><td><code>422</code> Topping không hợp lệ hoặc không thuộc quán của bạn</td></tr>
             <tr><td>Topping đã <em>ẩn</em></td><td class="mono">:551</td><td><code>422</code> Topping … đã ngừng bán</td></tr>
             <tr><td>Topping <em>không gắn cho món này</em></td><td class="mono">:557</td><td><code>422</code> Topping … không dùng được cho món …</td></tr>
@@ -244,7 +244,7 @@
         </table>
       </div>
       <div class="break">
-        Chốt thứ tư mới thêm ngày 19/08. Trước đó máy chủ chỉ kiểm topping thuộc quán và còn bán, nên gọi thẳng API vẫn gắn được trân châu vào ổ bánh mì và cộng tiền topping vào hóa đơn của nó — hàng rào “topping nào cho món nào” khi ấy chỉ sống ở giao diện. Nay kiểm bằng <code>ItemTopping::where('item_id',…)-&gt;where('topping_id',…)-&gt;exists()</code>, có bài kiểm thử <code>test_khong_gan_duoc_topping_khong_thuoc_mon</code> canh lại.
+        Chốt thứ tư mới thêm ngày 19/08. Trước đó máy chủ chỉ kiểm topping thuộc quán và còn bán, nên gọi thẳng API vẫn gắn được trân châu vào ổ bánh mì và cộng tiền topping vào hóa đơn của nó — hàng rào “topping nào cho món nào” khi ấy chỉ sống ở giao diện. Nay kiểm bằng <code>ItemTopping::where('product_id',…)-&gt;where('topping_id',…)-&gt;exists()</code>, có bài kiểm thử <code>test_khong_gan_duoc_topping_khong_thuoc_mon</code> canh lại.
       </div>
     </div>
   </div>
@@ -257,9 +257,9 @@
         <table>
           <thead><tr><th>Điều kiện</th><th>Trường</th><th>Giao diện</th><th>Máy chủ</th></tr></thead>
           <tbody>
-            <tr><td>Món chưa bị ẩn</td><td class="mono">items.is_available</td><td class="mono">sales:234</td><td class="mono">OrderController:484</td></tr>
+            <tr><td>Món chưa bị ẩn</td><td class="mono">products.is_available</td><td class="mono">sales:234</td><td class="mono">OrderController:484</td></tr>
             <tr><td>Danh mục chưa bị ẩn</td><td class="mono">categories.is_active</td><td class="mono">sales:228–235</td><td class="mono">OrderController:491–496</td></tr>
-            <tr><td>Món thuộc đúng quán</td><td class="mono">items.cafe_id</td><td>—</td><td class="mono">OrderController:481</td></tr>
+            <tr><td>Món thuộc đúng quán</td><td class="mono">products.shop_id</td><td>—</td><td class="mono">OrderController:481</td></tr>
           </tbody>
         </table>
       </div>
@@ -269,13 +269,13 @@
   </div>
 
   <div class="q">
-    <div class="q-head"><span class="q-no">05</span><h3>Vì sao mỗi dòng bán hàng lưu lại tên và giá, trong khi đã có <code>item_id</code>?</h3></div>
+    <div class="q-head"><span class="q-no">05</span><h3>Vì sao mỗi dòng bán hàng lưu lại tên và giá, trong khi đã có <code>product_id</code>?</h3></div>
     <div class="q-body">
       <div class="tablewrap">
         <table>
           <thead><tr><th>Bảng</th><th>Trường bản chụp</th><th>Chụp cái gì</th></tr></thead>
           <tbody>
-            <tr><td class="mono">order_details</td><td class="mono">item_name_snapshot</td><td>Tên món tại thời điểm bán</td></tr>
+            <tr><td class="mono">order_details</td><td class="mono">product_name_snapshot</td><td>Tên món tại thời điểm bán</td></tr>
             <tr><td class="mono">order_details</td><td class="mono">size_name_snapshot</td><td>Tên size, ví dụ “Lớn”</td></tr>
             <tr><td class="mono">order_details</td><td class="mono">unit_price</td><td>Đơn giá đã chốt</td></tr>
             <tr><td class="mono">order_detail_toppings</td><td class="mono">topping_name_snapshot</td><td>Tên topping</td></tr>
@@ -284,9 +284,9 @@
           </tbody>
         </table>
       </div>
-      <p style="margin-top:14px"><strong>Vì hóa đơn là chứng từ, phải đứng yên.</strong> Chủ quán tăng giá cà phê từ 25.000 lên 30.000 hôm nay — hóa đơn tháng trước vẫn phải in ra 25.000. Nếu chỉ giữ <code>item_id</code> và tra ngược lúc in, thì mỗi lần đổi giá là toàn bộ lịch sử bán hàng bị viết lại, và doanh thu tháng trước cũng đổi theo.</p>
+      <p style="margin-top:14px"><strong>Vì hóa đơn là chứng từ, phải đứng yên.</strong> Chủ quán tăng giá cà phê từ 25.000 lên 30.000 hôm nay — hóa đơn tháng trước vẫn phải in ra 25.000. Nếu chỉ giữ <code>product_id</code> và tra ngược lúc in, thì mỗi lần đổi giá là toàn bộ lịch sử bán hàng bị viết lại, và doanh thu tháng trước cũng đổi theo.</p>
       <div class="note">
-        <strong>Tên bản chụp lấy từ CSDL, không lấy từ trình duyệt.</strong> <span class="loc">OrderController:585</span> ghi <code>'item_name_snapshot' =&gt; $item-&gt;name</code> — tức là tra lại từ CSDL, dù client <em>có</em> gửi kèm trường đó. Lý do: chuỗi này sẽ được in lên hóa đơn đưa cho khách; tin client là mở đường in bất cứ thứ gì lên chứng từ.
+        <strong>Tên bản chụp lấy từ CSDL, không lấy từ trình duyệt.</strong> <span class="loc">OrderController:585</span> ghi <code>'product_name_snapshot' =&gt; $item-&gt;name</code> — tức là tra lại từ CSDL, dù client <em>có</em> gửi kèm trường đó. Lý do: chuỗi này sẽ được in lên hóa đơn đưa cho khách; tin client là mở đường in bất cứ thứ gì lên chứng từ.
       </div>
     </div>
   </div>
@@ -407,7 +407,7 @@ if ($daChot === 0) {
     <div class="q-head"><span class="q-no">11</span><h3>Làm sao biết quán này được dùng trợ lý AI?</h3></div>
     <div class="q-body">
       <pre><code>$cafe   = $request-&gt;route('cafe');          // quán trong URL
-$sub    = Subscription::where('cafe_id', $cafeId)-&gt;effective()-&gt;latest()-&gt;first();
+$sub    = Subscription::where('shop_id', $shopId)-&gt;effective()-&gt;latest()-&gt;first();
 $pkg    = $sub ? Package::find($sub-&gt;package_id) : null;
 
 if (!$pkg || !($pkg-&gt;can_use_ai ?? false)) {
@@ -420,7 +420,7 @@ if (!$pkg || !($pkg-&gt;can_use_ai ?? false)) {
         <div><dt>Giao diện</dt><dd><span class="loc">lib/permission.ts:91</span> — <code>canUseAI(sub)</code>, chỉ để chọn đúng tuyến và hiện đúng nút</dd></div>
       </dl>
       <div class="break">
-        Gọi thẳng <code>POST /api/cafes/&lt;id-quán-free&gt;/ai/chat</code> bằng Postman với token hợp lệ → <code>403 "Tính năng AI chỉ có ở gói Pro Max"</code>. Giao diện không tham gia vào việc này.
+        Gọi thẳng <code>POST /api/shops/&lt;id-quán-free&gt;/ai/chat</code> bằng Postman với token hợp lệ → <code>403 "Tính năng AI chỉ có ở gói Pro Max"</code>. Giao diện không tham gia vào việc này.
       </div>
       <div class="note">
         <strong>Fun Free CÓ dùng được AI.</strong> Nó là bản dùng thử <em>toàn bộ</em> Pro Max trong 7 ngày nên <code>can_use_ai = true</code>. Gói duy nhất không có AI là <strong>Pro</strong>. Nhớ kỹ chỗ này — nói nhầm là mâu thuẫn ngay với bảng giá trên trang chủ.
@@ -457,7 +457,7 @@ if ($currentCount &gt;= $max) throw 422;</code></pre>
           <thead><tr><th>Cờ</th><th>Ý nghĩa</th><th>Vì sao cần</th></tr></thead>
           <tbody>
             <tr><td class="mono">users.has_used_free_trial</td><td>Tài khoản này đã nhận 7 ngày miễn phí</td><td>Số quán một tài khoản tạo được <strong>không giới hạn</strong>. Chỉ chặn theo quán là Pro Max miễn phí vĩnh viễn.</td></tr>
-            <tr><td class="mono">cafes.has_used_free_trial</td><td>Quán này đã nhận 7 ngày miễn phí</td><td>Lớp phòng thứ hai, phòng khi dữ liệu lệch</td></tr>
+            <tr><td class="mono">shops.has_used_free_trial</td><td>Quán này đã nhận 7 ngày miễn phí</td><td>Lớp phòng thứ hai, phòng khi dữ liệu lệch</td></tr>
           </tbody>
         </table>
       </div>
@@ -480,15 +480,15 @@ if ($currentCount &gt;= $max) throw 422;</code></pre>
       <pre><code>if (!$user)                        return KHACH_VANG_LAI;   // chưa đăng nhập
 if ($user-&gt;has_used_free_trial)     return HET_DUNG_THU;
 
-$cafeIds = Cafe::where('user_id', $user-&gt;id)-&gt;get()-&gt;pluck('id')...;
+$shopIds = Shop::where('user_id', $user-&gt;id)-&gt;get()-&gt;pluck('id')...;
 
-if ($cafeIds !== []) {
+if ($shopIds !== []) {
     // Đang có gói TRẢ PHÍ còn hạn → kích hoạt gói thử là đi lùi
-    if (Subscription::whereIn('cafe_id', $cafeIds)-&gt;effective()-&gt;exists())
+    if (Subscription::whereIn('shop_id', $shopIds)-&gt;effective()-&gt;exists())
         return HET_DUNG_THU;
 
     // Tài khoản còn sạch nhưng MỌI quán đều đã xài → mời cũng vô ích
-    $conQuanSach = Cafe::whereIn('_id', $cafeIds)-&gt;get()
+    $conQuanSach = Shop::whereIn('_id', $shopIds)-&gt;get()
         -&gt;contains(fn ($c) =&gt; !($c-&gt;has_used_free_trial ?? false));
     if (!$conQuanSach) return HET_DUNG_THU;
 }
@@ -519,7 +519,7 @@ return CON_DUNG_THU;</code></pre>
         <table>
           <thead><tr><th></th><th>Tuyến tư vấn</th><th>Tuyến trợ lý</th></tr></thead>
           <tbody>
-            <tr><td>Đường dẫn</td><td class="mono">/ai/consult/stream</td><td class="mono">/cafes/{id}/ai/chat/stream</td></tr>
+            <tr><td>Đường dẫn</td><td class="mono">/ai/consult/stream</td><td class="mono">/shops/{id}/ai/chat/stream</td></tr>
             <tr><td>Cần đăng nhập</td><td>Không</td><td>Có</td></tr>
             <tr><td>Cần gói</td><td>Không</td><td><code>can_use_ai</code></td></tr>
             <tr><td>Ngữ cảnh dựng bởi</td><td class="mono">ConsultKnowledgeService</td><td class="mono">AiController::cafeContext</td></tr>
@@ -551,12 +551,12 @@ return CON_DUNG_THU;</code></pre>
         &amp;&amp; $user-&gt;role !== 'admin')                    throw 403;
 }</code></pre>
       <dl class="kv" style="margin-top:14px">
-        <div><dt>Sự thật ở</dt><dd><code>cafes.user_id</code></dd></div>
-        <div><dt>Ở đâu</dt><dd><span class="loc">Concerns/ChecksCafeOwnership.php</span>, gọi ở <strong>dòng đầu tiên</strong> của mọi action trong <code>OrderController</code>, <code>AiController</code>, <code>SubscriptionController</code>, <code>UserRevenueController</code>…</dd></div>
+        <div><dt>Sự thật ở</dt><dd><code>shops.user_id</code></dd></div>
+        <div><dt>Ở đâu</dt><dd><span class="loc">Concerns/ChecksShopAccess.php</span>, gọi ở <strong>dòng đầu tiên</strong> của mọi action trong <code>OrderController</code>, <code>AiController</code>, <code>SubscriptionController</code>, <code>UserRevenueController</code>…</dd></div>
         <div><dt>Ép kiểu chuỗi</dt><dd><code>(string)</code> ở cả hai vế: MongoDB trả <code>ObjectId</code>, so sánh trực tiếp với chuỗi sẽ luôn <em>false</em></dd></div>
       </dl>
       <div class="break">
-        Đổi <code>cafe_id</code> trên URL sang quán của người khác → <code>403 Forbidden</code>. Đây là lỗ hổng <strong>IDOR</strong> từng có thật: trước kia chỉ <code>index()</code> kiểm, còn <code>store</code>, <code>update</code>, <code>pay</code> thì không. Gom về trait để mọi action dùng chung, không còn chỗ nào quên.
+        Đổi <code>shop_id</code> trên URL sang quán của người khác → <code>403 Forbidden</code>. Đây là lỗ hổng <strong>IDOR</strong> từng có thật: trước kia chỉ <code>index()</code> kiểm, còn <code>store</code>, <code>update</code>, <code>pay</code> thì không. Gom về trait để mọi action dùng chung, không còn chỗ nào quên.
       </div>
       <p style="margin-top:14px"><code>UserRevenueController::summary</code> làm thêm một bước tinh tế: quán không thuộc tài khoản thì trả <code>404 "Không tìm thấy quán"</code> chứ <em>không</em> lặng lẽ trả về toàn số 0 — người đọc sẽ tưởng quán mình chưa bán được gì.</p>
     </div>
@@ -565,7 +565,7 @@ return CON_DUNG_THU;</code></pre>
   <div class="q">
     <div class="q-head"><span class="q-no">17</span><h3>Làm sao biết quán còn được bán hàng?</h3></div>
     <div class="q-body">
-      <p>Ba trạng thái trong <code>cafes.status</code>, gác bởi hai hàm khác nhau ở <span class="loc">Concerns/ChecksCafeStatus.php</span>:</p>
+      <p>Ba trạng thái trong <code>shops.status</code>, gác bởi hai hàm khác nhau ở <span class="loc">Concerns/ChecksCafeStatus.php</span>:</p>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Hàm</th><th>Gọi từ</th><th>Chặn khi</th></tr></thead>
@@ -608,16 +608,16 @@ if ($daGianh === 0) return false;   // đã paid/rejected, hoặc bên kia vừa
     <table>
       <thead><tr><th>Trường</th><th>Bảng</th><th>Quyết định điều gì</th></tr></thead>
       <tbody>
-        <tr><td class="mono">has_size</td><td class="mono">items</td><td>Hộp chọn có hiện hàng size không</td></tr>
-        <tr><td class="mono">allow_topping</td><td class="mono">items</td><td>Có đồng bộ <code>item_toppings</code> khi lưu món không</td></tr>
-        <tr><td class="mono">is_available</td><td class="mono">items · toppings</td><td>Còn bán hay đã ẩn</td></tr>
-        <tr><td class="mono">is_active</td><td class="mono">categories · item_prices</td><td>Danh mục hiện hay ẩn · size còn dùng hay không</td></tr>
-        <tr><td class="mono">status</td><td class="mono">cafes</td><td><code>open</code> · <code>closed</code> · <code>inactive</code></td></tr>
+        <tr><td class="mono">has_size</td><td class="mono">products</td><td>Hộp chọn có hiện hàng size không</td></tr>
+        <tr><td class="mono">has_topping</td><td class="mono">products</td><td>Có đồng bộ <code>product_toppings</code> khi lưu món không</td></tr>
+        <tr><td class="mono">is_available</td><td class="mono">products · toppings</td><td>Còn bán hay đã ẩn</td></tr>
+        <tr><td class="mono">is_active</td><td class="mono">categories · product_sizes</td><td>Danh mục hiện hay ẩn · size còn dùng hay không</td></tr>
+        <tr><td class="mono">status</td><td class="mono">shops</td><td><code>open</code> · <code>closed</code> · <code>inactive</code></td></tr>
         <tr><td class="mono">status</td><td class="mono">orders</td><td><code>active</code> · <code>paid</code> · <code>cancelled</code> — nguồn quyết định bàn bận</td></tr>
         <tr><td class="mono">status + end_date</td><td class="mono">subscriptions</td><td>Gói còn hiệu lực không — <em>phải xét cả hai</em></td></tr>
         <tr><td class="mono">payment_status</td><td class="mono">package_payments</td><td><code>pending</code> · <code>paid</code> · <code>failed</code> · <code>rejected</code></td></tr>
         <tr><td class="mono">action_type</td><td class="mono">package_payments</td><td><code>new</code> · <code>upgrade</code> · <code>renew</code> — quyết định hệ quả khi kích hoạt</td></tr>
-        <tr><td class="mono">has_used_free_trial</td><td class="mono">users <strong>và</strong> cafes</td><td>Còn quyền dùng thử không — <em>hai cấp</em></td></tr>
+        <tr><td class="mono">has_used_free_trial</td><td class="mono">users <strong>và</strong> shops</td><td>Còn quyền dùng thử không — <em>hai cấp</em></td></tr>
         <tr><td class="mono">can_use_ai</td><td class="mono">packages</td><td>Gói có mở trợ lý AI không</td></tr>
         <tr><td class="mono">max_tables · max_menu_items</td><td class="mono">packages</td><td>Hạn mức, <code>null</code> = không giới hạn</td></tr>
         <tr><td class="mono">level</td><td class="mono">packages</td><td>Cấp bậc để so mua mới / nâng / gia hạn / hạ</td></tr>
@@ -634,10 +634,10 @@ if ($daGianh === 0) return false;   // đã paid/rejected, hoặc bên kia vừa
     <table>
       <thead><tr><th>Phép thử</th><th>Kết quả đúng</th></tr></thead>
       <tbody>
-        <tr><td>Đổi <code>cafe_id</code> trên URL sang quán người khác</td><td class="mono">403 Forbidden</td></tr>
+        <tr><td>Đổi <code>shop_id</code> trên URL sang quán người khác</td><td class="mono">403 Forbidden</td></tr>
         <tr><td>Gửi kèm <code>unit_price: 1</code> khi tạo đơn</td><td>Bị bỏ qua, giá vẫn lấy từ CSDL</td></tr>
-        <tr><td>Gửi <code>item_price_id</code> của món khác</td><td class="mono">422 Size không hợp lệ</td></tr>
-        <tr><td><strong>Bỏ trống <code>item_price_id</code> cho món có size</strong></td><td class="mono">422 Phải chọn size</td></tr>
+        <tr><td>Gửi <code>product_size_id</code> của món khác</td><td class="mono">422 Size không hợp lệ</td></tr>
+        <tr><td><strong>Bỏ trống <code>product_size_id</code> cho món có size</strong></td><td class="mono">422 Phải chọn size</td></tr>
         <tr><td><strong>Gắn topping không thuộc món đó</strong></td><td class="mono">422 Không dùng được cho món…</td></tr>
         <tr><td>Gọi <code>/ai/chat</code> trên quán gói Pro</td><td class="mono">403 Chỉ có ở Pro Max</td></tr>
         <tr><td>Gọi <code>POST /subscriptions</code> với <code>payment_method: "cash"</code></td><td class="mono">422 Chỉ thanh toán qua VNPay hoặc MoMo</td></tr>

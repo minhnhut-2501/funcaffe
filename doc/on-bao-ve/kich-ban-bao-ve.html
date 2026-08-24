@@ -411,7 +411,7 @@
         <li>Dừng ở Tổng quan: order đang hoạt động, bàn trống, hóa đơn hôm nay.</li>
         <li>Bấm bộ chọn quán trên thanh trên — cho thấy ba quán, mỗi quán một huy hiệu gói khác nhau.</li>
       </ol>
-      <p class="say">“Một tài khoản mở được nhiều quán, và <strong>gói dịch vụ gắn theo từng quán chứ không theo tài khoản</strong>. Chủ chuỗi có thể để quán lớn dùng Pro Max còn quán mới mở dùng bản miễn phí. Toàn bộ API vì thế đều mang <code>cafes/{cafe}/…</code> và kiểm quyền sở hữu ở máy chủ.”</p>
+      <p class="say">“Một tài khoản mở được nhiều quán, và <strong>gói dịch vụ gắn theo từng quán chứ không theo tài khoản</strong>. Chủ chuỗi có thể để quán lớn dùng Pro Max còn quán mới mở dùng bản miễn phí. Toàn bộ API vì thế đều mang <code>shops/{shop}/…</code> và kiểm quyền sở hữu ở máy chủ.”</p>
       <p>Chuyển sang <strong>Nắng Sài Gòn Coffee</strong> để vào chặng chính.</p>
     </div>
   </div>
@@ -465,7 +465,7 @@
         <li>Hỏi một câu về số liệu thật, ví dụ <em>“Món nào đang kéo doanh thu tuần này?”</em></li>
         <li><strong>Chứng minh cửa chặn:</strong> đổi sang quán <strong>Cà Phê Phin 76</strong> (Fun Free) → cùng chỗ đó giờ là thẻ khoá, và hộp chat lùi về chế độ tư vấn.</li>
       </ol>
-      <p class="say">“Điều em muốn nhấn là <strong>ranh giới do máy chủ giữ</strong>, không phải do giao diện ẩn nút. Tuyến <code>cafes/{cafe}/ai/*</code> đi qua middleware <code>ai</code>; gọi thẳng bằng Postman với gói không đủ vẫn nhận <code>403</code>. Giao diện chỉ chọn đúng tuyến từ đầu để người dùng khỏi ăn một lỗi vô duyên.”</p>
+      <p class="say">“Điều em muốn nhấn là <strong>ranh giới do máy chủ giữ</strong>, không phải do giao diện ẩn nút. Tuyến <code>shops/{shop}/ai/*</code> đi qua middleware <code>ai</code>; gọi thẳng bằng Postman với gói không đủ vẫn nhận <code>403</code>. Giao diện chỉ chọn đúng tuyến từ đầu để người dùng khỏi ăn một lỗi vô duyên.”</p>
       <div class="note">Gemini bậc miễn phí có hạn ngạch dùng chung. Trước buổi demo nên chạy thử đúng câu định hỏi một lần để chắc còn quota, và tránh bấm phân tích lại nhiều lần trên sân khấu.</div>
     </div>
   </div>

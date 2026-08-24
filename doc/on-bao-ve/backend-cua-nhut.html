@@ -186,7 +186,7 @@
   </div>
 
   <h4>Một request đi qua đâu</h4>
-  <pre><code>POST /api/cafes/68a1.../subscriptions
+  <pre><code>POST /api/shops/68a1.../subscriptions
         │
    1 ── bootstrap/app.php      đăng ký middleware toàn cục
    2 ── routes/api.php         khớp tuyến, gắn middleware riêng
@@ -204,19 +204,19 @@
       <p><strong>Bạn đã biết rồi.</strong> Trong Next.js, bạn tạo tệp <code>src/app/user/sales/page.tsx</code> và tự nhiên có đường dẫn <code>/user/sales</code>. Đó chính là routing — chỉ khác là Next.js suy ra đường dẫn <em>từ cấu trúc thư mục</em>.</p>
 
       <p><strong>Laravel làm ngược lại:</strong> khai tất cả trong <em>một tệp danh sách</em>. Không có thư mục nào tự thành URL. Muốn có đường dẫn thì phải viết ra:</p>
-      <pre><code>Route::post('cafes/{cafe}/subscriptions', [SubscriptionController::class, 'store']);
+      <pre><code>Route::post('shops/{shop}/subscriptions', [SubscriptionController::class, 'store']);
 //            └── đường dẫn ──┘             └── lớp xử lý ──┘        └─ tên hàm ─┘</code></pre>
 
-      <p>Đọc dòng này thành lời: <em>“ai gọi POST tới <code>/api/cafes/&lt;gì đó&gt;/subscriptions</code> thì chạy hàm <code>store()</code> trong lớp <code>SubscriptionController</code>.”</em></p>
+      <p>Đọc dòng này thành lời: <em>“ai gọi POST tới <code>/api/shops/&lt;gì đó&gt;/subscriptions</code> thì chạy hàm <code>store()</code> trong lớp <code>SubscriptionController</code>.”</em></p>
 
       <p>Hai chi tiết cần biết:</p>
       <ul class="plain">
-        <li><code>{cafe}</code> trong ngoặc nhọn là <strong>chỗ trống</strong>, khớp với bất cứ giá trị nào. Giống <code>[cafeId]</code> trong tên thư mục Next.js.</li>
-        <li>Mọi tuyến trong tệp <code>api.php</code> <strong>tự động</strong> được thêm tiền tố <code>/api</code>. Nên viết <code>'cafes/...'</code> mà URL thật là <code>/api/cafes/...</code>. Chỗ này hay làm người mới bối rối khi tra route không thấy.</li>
+        <li><code>{shop}</code> trong ngoặc nhọn là <strong>chỗ trống</strong>, khớp với bất cứ giá trị nào. Giống <code>[shopId]</code> trong tên thư mục Next.js.</li>
+        <li>Mọi tuyến trong tệp <code>api.php</code> <strong>tự động</strong> được thêm tiền tố <code>/api</code>. Nên viết <code>'shops/...'</code> mà URL thật là <code>/api/shops/...</code>. Chỗ này hay làm người mới bối rối khi tra route không thấy.</li>
       </ul>
 
       <p><strong>Vì sao Laravel chọn một tệp danh sách?</strong> Vì bạn nhìn <em>một chỗ</em> là thấy toàn bộ API và ai gác cửa nào. Trong dự án của bạn, mở <code>routes/api.php</code> là đọc được ngay “tuyến nào cần đăng nhập, tuyến nào cần gói, tuyến nào công khai” — thứ mà cấu trúc thư mục không nói được.</p>
-      <pre><code>Route::post('cafes/{cafe}/orders', [OrderController::class,'store'])
+      <pre><code>Route::post('shops/{shop}/orders', [OrderController::class,'store'])
      ->middleware('subscription');   // ← gắn thêm chốt chặn RIÊNG cho tuyến này</code></pre>
     </div>
   </div>
@@ -224,26 +224,26 @@
   <div class="concept">
     <div class="concept-head"><b>2 · Route Model Binding</b><span>thứ trông như phép thuật</span></div>
     <div class="concept-body">
-      <p><strong>Bạn đã biết một nửa.</strong> Ở Next.js, thư mục <code>[cafeId]</code> cho bạn <code>params.cafeId</code> — tức là <em>chuỗi id</em>. Muốn có dữ liệu quán thì bạn phải tự đi gọi API lấy về.</p>
+      <p><strong>Bạn đã biết một nửa.</strong> Ở Next.js, thư mục <code>[shopId]</code> cho bạn <code>params.shopId</code> — tức là <em>chuỗi id</em>. Muốn có dữ liệu quán thì bạn phải tự đi gọi API lấy về.</p>
 
       <p><strong>Laravel đi thêm một bước:</strong> nó không đưa bạn cái id, nó đưa luôn <strong>bản ghi đã lấy sẵn từ CSDL</strong>.</p>
 
-      <pre><code>// routes/api.php  — chỗ trống tên là {cafe}
-Route::get('cafes/{cafe}/orders', [OrderController::class, 'index']);
+      <pre><code>// routes/api.php  — chỗ trống tên là {shop}
+Route::get('shops/{shop}/orders', [OrderController::class, 'index']);
 
-// OrderController.php — tham số khai kiểu Cafe, TÊN trùng với {cafe}
+// OrderController.php — tham số khai kiểu Cafe, TÊN trùng với {shop}
 public function index(Request $request, Cafe $cafe)
 {
     // Tới đây $cafe ĐÃ là đối tượng quán đầy đủ.
-    // Không có dòng Cafe::find(...) nào cả — Laravel làm hộ rồi.
+    // Không có dòng Shop::find(...) nào cả — Laravel làm hộ rồi.
     $cafe->name;   // dùng được ngay
 }</code></pre>
 
-      <p><strong>Cơ chế:</strong> Laravel thấy tham số khai kiểu <code>Cafe</code> và tên <code>$cafe</code> trùng với chỗ trống <code>{cafe}</code> trên URL, nên nó tự chạy <code>Cafe::find($giaTriTrenUrl)</code> trước khi gọi hàm của bạn.</p>
+      <p><strong>Cơ chế:</strong> Laravel thấy tham số khai kiểu <code>Cafe</code> và tên <code>$cafe</code> trùng với chỗ trống <code>{shop}</code> trên URL, nên nó tự chạy <code>Shop::find($giaTriTrenUrl)</code> trước khi gọi hàm của bạn.</p>
 
       <p><strong>Nếu không tìm thấy?</strong> Laravel trả <code>404</code> ngay, hàm <code>index()</code> <em>không chạy dòng nào</em>. Nghĩa là bên trong hàm bạn không bao giờ phải viết <code>if (!$cafe) return 404</code>.</p>
 
-      <p><strong>Vấn đề nó giải quyết:</strong> dự án có hơn 20 hàm nhận <code>{cafe}</code>. Không có binding thì mỗi hàm phải lặp lại ba dòng tìm-và-kiểm — và chỉ cần một hàm quên là chỗ đó nổ khi gặp id không tồn tại.</p>
+      <p><strong>Vấn đề nó giải quyết:</strong> dự án có hơn 20 hàm nhận <code>{shop}</code>. Không có binding thì mỗi hàm phải lặp lại ba dòng tìm-và-kiểm — và chỉ cần một hàm quên là chỗ đó nổ khi gặp id không tồn tại.</p>
 
       <div class="note">
         <strong>Đây là chỗ dễ trả lời sai nhất.</strong> Binding chỉ <em>tìm đúng bản ghi</em> — nó <strong>không</strong> hỏi “quán này có phải của người đang đăng nhập không”. Với nó, quán của bạn hay quán người lạ đều là một bản ghi hợp lệ như nhau.<br><br>
@@ -305,12 +305,12 @@ response ←──────────────────────�
   <div class="concept">
     <div class="concept-head"><b>4 · Model &amp; Eloquent</b><span>app/Models/</span></div>
     <div class="concept-body">
-      <p><strong>Bạn đã biết rồi.</strong> Ở frontend, <code>src/services/orders.ts</code> là <em>nơi duy nhất</em> biết URL API và biết cách đổi <code>item_price_id</code> thành <code>sizeId</code>. Trang không bao giờ tự gọi <code>fetch</code>.</p>
+      <p><strong>Bạn đã biết rồi.</strong> Ở frontend, <code>src/services/orders.ts</code> là <em>nơi duy nhất</em> biết URL API và biết cách đổi <code>product_size_id</code> thành <code>sizeId</code>. Trang không bao giờ tự gọi <code>fetch</code>.</p>
 
       <p><strong>Model là đúng vai đó ở backend:</strong> nơi duy nhất biết collection tên gì và có trường nào. Controller không bao giờ tự viết câu lệnh truy vấn CSDL.</p>
 
       <p><strong>ORM là gì.</strong> Object–Relational Mapping: <em>một lớp PHP ứng với một collection, một đối tượng ứng với một bản ghi</em>. Bạn thao tác bằng đối tượng, thư viện tự dịch sang câu lệnh CSDL.</p>
-      <pre><code>Subscription::where('cafe_id', $id)->effective()->latest()->first();
+      <pre><code>Subscription::where('shop_id', $id)->effective()->latest()->first();
 //     ↑ lớp          ↑ lọc           ↑ lọc thêm    ↑ sắp    ↑ lấy 1</code></pre>
       <p>Cách nối đuôi này bạn quen rồi — nó giống hệt <code>arr.filter(...).sort(...)[0]</code> trong JavaScript. Mỗi lời gọi trả về <em>câu truy vấn đang dựng dở</em>, và chỉ tới <code>first()</code> / <code>get()</code> / <code>exists()</code> thì nó mới thật sự chạy xuống CSDL.</p>
 
@@ -329,7 +329,7 @@ public function scopeEffective($query) {
 }
 
 // dùng ở mọi nơi, BỎ chữ "scope" khi gọi:
-Subscription::where('cafe_id',$id)->effective()->exists();</code></pre>
+Subscription::where('shop_id',$id)->effective()->exists();</code></pre>
       <p>Nó giống hệt việc bạn tách <code>calcItemTopping()</code> ra <code>lib/cart.ts</code> thay vì viết lại công thức trong từng component.</p>
 
       <p class="say">“Em gom định nghĩa <em>gói còn hiệu lực</em> vào một scope để bốn nơi dùng chung một định nghĩa. Trước đó mỗi nơi tự viết lại điều kiện, và có nơi chỉ kiểm <code>status</code> mà quên <code>end_date</code> — nên gói đã quá hạn vẫn được coi là còn, và quán đó vẫn bán hàng được.”</p>
@@ -417,7 +417,7 @@ Http::withHeaders([...])->post($url, $body);</code></pre>
       <p>Một lớp PHP chỉ được <code>extends</code> <strong>đúng một</strong> lớp cha. Nhưng <code>OrderController</code> cần ba mẩu chức năng dùng chung. Trait là cách gỡ: một mẩu mã được “dán” vào lớp lúc biên dịch.</p>
       <pre><code>class OrderController extends Controller
 {
-    use ChecksCafeOwnership;   // cho hàm authorizeCafe()
+    use ChecksShopAccess;   // cho hàm authorizeCafe()
     use ChecksCafeStatus;      // cho guardBanHang(), guardSuaDoi()
     use RunsAtomically;        // cho atomic()
 
@@ -426,7 +426,7 @@ Http::withHeaders([...])->post($url, $body);</code></pre>
     }
 }</code></pre>
       <p><strong>Gần nhất với thứ bạn quen: custom hook.</strong> <code>useToast()</code> được nhiều component dùng mà không component nào “sở hữu” nó. Trait cũng vậy — logic dùng chung, không phải quan hệ cha–con.</p>
-      <p>Dự án có bốn trait, và đều sinh ra từ một bài học: <code>ChecksCafeOwnership</code> ra đời sau khi phát hiện mỗi hàm tự kiểm quyền một kiểu và vài hàm quên hẳn.</p>
+      <p>Dự án có bốn trait, và đều sinh ra từ một bài học: <code>ChecksShopAccess</code> ra đời sau khi phát hiện mỗi hàm tự kiểm quyền một kiểu và vài hàm quên hẳn.</p>
     </div>
   </div>
 
@@ -550,7 +550,7 @@ if ($daGianh === 0) return false;   // bên kia vừa thắng, dừng ngay</code
     <h4>Ba chi tiết đáng khoe</h4>
     <ul class="plain">
       <li><strong>Một vòng lặp, sáu con số.</strong> Sáu vòng riêng sẽ đọc lại cùng tập dữ liệu sáu lần. Quan trọng hơn: gộp về một chỗ nghĩa là <em>một định nghĩa duy nhất</em> cho “doanh thu”.</li>
-      <li><strong>Chỉ nạp bốn trường.</strong> <code>get(['_id','cafe_id','total_amount','paid_at','created_at'])</code> — ghi chú, tiền khách đưa, tiền thối không góp gì vào một con số tổng.</li>
+      <li><strong>Chỉ nạp bốn trường.</strong> <code>get(['_id','shop_id','total_amount','paid_at','created_at'])</code> — ghi chú, tiền khách đưa, tiền thối không góp gì vào một con số tổng.</li>
       <li><strong>Múi giờ.</strong> Hàm <code>toCarbon()</code> luôn đổi sang giờ Việt Nam trước khi cắt chuỗi ngày. Mongo lưu theo UTC; quên đổi thì mọi đơn bán từ 0h–7h sáng bị xếp sang <em>hôm trước</em> — mà quán cà phê mở sớm nên đây không phải trường hợp hiếm.</li>
     </ul>
 
@@ -559,7 +559,7 @@ if ($daGianh === 0) return false;   // bên kia vừa thắng, dừng ngay</code
 
     <div class="qa">
       <p><b>“Sao không để AI tự truy vấn cơ sở dữ liệu?”</b> Vì nó sẽ <em>bịa</em>. Mô hình ngôn ngữ luôn trả lời trôi chảy kể cả khi không có dữ liệu. Tách đôi thì số sai là lỗi ở code và sửa được; lời văn dở thì cũng chỉ là lời văn.</p>
-      <p><b>“AI có đọc được dữ liệu quán khác không?”</b> Không. Tuyến AI mang <code>cafes/{cafe}</code> trong URL và <code>authorizeCafe()</code> kiểm quyền sở hữu trước mọi thứ khác. Còn hộp chat ở trang giới thiệu đi tuyến riêng, ngữ cảnh chỉ có bảng gói — các hàm nạp số liệu quán <em>không hề chạy</em> ở nhánh đó.</p>
+      <p><b>“AI có đọc được dữ liệu quán khác không?”</b> Không. Tuyến AI mang <code>shops/{shop}</code> trong URL và <code>authorizeCafe()</code> kiểm quyền sở hữu trước mọi thứ khác. Còn hộp chat ở trang giới thiệu đi tuyến riêng, ngữ cảnh chỉ có bảng gói — các hàm nạp số liệu quán <em>không hề chạy</em> ở nhánh đó.</p>
     </div>
   </div>
 
@@ -574,7 +574,7 @@ if ($daGianh === 0) return false;   // bên kia vừa thắng, dừng ngay</code
       <table>
         <thead><tr><th>Vá gì</th><th>Nếu không vá</th></tr></thead>
         <tbody>
-          <tr><td><strong>IDOR</strong> — gom kiểm quyền sở hữu quán về trait <code>ChecksCafeOwnership</code></td><td>Đổi <code>cafe_id</code> trên URL là thao tác được lên quán người khác</td></tr>
+          <tr><td><strong>IDOR</strong> — gom kiểm quyền sở hữu quán về trait <code>ChecksShopAccess</code></td><td>Đổi <code>shop_id</code> trên URL là thao tác được lên quán người khác</td></tr>
           <tr><td><strong>Không tin giá client</strong> — bỏ <code>unit_price</code> khỏi validate</td><td>Sửa một con số trong request là mua ly cà phê giá 1đ</td></tr>
           <tr><td><strong>Giới hạn tần suất</strong> — <code>throttleApi()</code> cho toàn bộ <code>/api</code></td><td>Một script vòng lặp lấp đầy hạn mức 512MB của Atlas, ảnh hưởng <em>mọi</em> quán</td></tr>
           <tr><td><strong><code>APP_DEBUG=false</code></strong> khi triển khai</td><td>Một lỗi 500 bất kỳ in ra <em>toàn bộ</em> biến môi trường: khoá cổng thanh toán, chuỗi kết nối CSDL</td></tr>
@@ -587,7 +587,7 @@ if ($daGianh === 0) return false;   // bên kia vừa thắng, dừng ngay</code
     <p class="say">“Phần lớn những thứ này <em>không làm hỏng gì ngay</em> — ứng dụng vẫn chạy, không báo lỗi nào — nên rất dễ lên mạng rồi vẫn còn nguyên. Em cho ứng dụng tự ghi cảnh báo vào log khi phát hiện cấu hình sai, nhưng cách chắc hơn là kiểm bằng danh sách trước mỗi lần triển khai.”</p>
 
     <div class="qa">
-      <p><b>“IDOR là gì?”</b> Insecure Direct Object Reference — tham chiếu trực tiếp tới đối tượng mà không kiểm quyền. Cụ thể ở đây: URL mang <code>cafe_id</code>, nếu máy chủ chỉ tra bản ghi mà không hỏi “quán này có phải của người đang gọi không” thì đổi số trên URL là xem được dữ liệu người khác. Trước đây chỉ hàm <code>index()</code> kiểm, còn <code>store</code>, <code>update</code>, <code>pay</code> thì không.</p>
+      <p><b>“IDOR là gì?”</b> Insecure Direct Object Reference — tham chiếu trực tiếp tới đối tượng mà không kiểm quyền. Cụ thể ở đây: URL mang <code>shop_id</code>, nếu máy chủ chỉ tra bản ghi mà không hỏi “quán này có phải của người đang gọi không” thì đổi số trên URL là xem được dữ liệu người khác. Trước đây chỉ hàm <code>index()</code> kiểm, còn <code>store</code>, <code>update</code>, <code>pay</code> thì không.</p>
     </div>
   </div>
 
@@ -602,7 +602,7 @@ if ($daGianh === 0) return false;   // bên kia vừa thắng, dừng ngay</code
 {
     Sanctum::actingAs($this->user);              // giả lập đăng nhập
 
-    $this->postJson("/api/cafes/{$id}/orders/{$orderId}/pay", [
+    $this->postJson("/api/shops/{$id}/orders/{$orderId}/pay", [
         'payment_method' => 'cash',
         'cash_received'  => 10_000,              // đơn 60.000
     ])->assertStatus(422);                       // phải bị từ chối

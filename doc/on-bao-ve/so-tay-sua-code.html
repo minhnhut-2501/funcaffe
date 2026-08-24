@@ -246,7 +246,7 @@
       <tbody>
         <tr><td class="mono">setCart(updater)</td><td class="loc">:112</td><td>Ghi giỏ cho <em>bàn đang chọn</em>. Giỏ rỗng thì <strong>xoá hẳn khoá</strong> khỏi <code>carts</code> thay vì để mảng rỗng.</td></tr>
         <tr><td class="mono">clearCartForTable(id)</td><td class="loc">:125</td><td>Xoá giỏ của một bàn cụ thể</td></tr>
-        <tr><td class="mono">cartToOrderItems(items)</td><td class="loc">:83</td><td><strong>Cầu nối</strong> giữa kiểu của giao diện và thân JSON gửi lên API</td></tr>
+        <tr><td class="mono">cartToOrderItems(products)</td><td class="loc">:83</td><td><strong>Cầu nối</strong> giữa kiểu của giao diện và thân JSON gửi lên API</td></tr>
         <tr><td class="mono">openOption(item)</td><td class="loc">:247</td><td>Mở hộp chọn để <em>thêm mới</em>. Chặn hai điều kiện trước: gói còn hạn, và đã chọn bàn. Tự chọn sẵn size đầu tiên đang bật.</td></tr>
         <tr><td class="mono">openEditOption(c)</td><td class="loc">:272</td><td>Mở hộp chọn để <em>sửa</em> một dòng đã có — nạp lại size, topping, số lượng, ghi chú</td></tr>
         <tr><td class="mono">toggleTopping(id)</td><td class="loc">:374</td><td>Tick / bỏ tick một topping</td></tr>
@@ -267,7 +267,7 @@
       <thead><tr><th>Hàm</th><th>Dòng</th><th>Vào → Ra</th><th>Làm gì</th></tr></thead>
       <tbody>
         <tr><td class="mono">handleSaveCartItem()</td><td class="loc">:297</td><td>— → <code>Promise&lt;void&gt;</code></td><td><strong>Đường vào chính.</strong> Dựng <code>CartItem</code> từ <code>optForm</code> → gộp dòng trùng hoặc thêm mới → tính lại tổng → <code>create</code> nếu bàn chưa có đơn, <code>update</code> nếu đã có. Có cờ <code>savingItem</code> chống bấm liên tiếp tạo hai đơn.</td></tr>
-        <tr><td class="mono">persistCart(tableId, items)</td><td class="loc">:410</td><td><code>(id, CartItem[])</code> → <code>Promise&lt;void&gt;</code></td><td>Lưu giỏ sau khi <em>sửa</em> hoặc <em>xoá</em> dòng. Gỡ nốt dòng cuối thì <strong>huỷ đơn</strong> chứ không lưu đơn rỗng.</td></tr>
+        <tr><td class="mono">persistCart(tableId, products)</td><td class="loc">:410</td><td><code>(id, CartItem[])</code> → <code>Promise&lt;void&gt;</code></td><td>Lưu giỏ sau khi <em>sửa</em> hoặc <em>xoá</em> dòng. Gỡ nốt dòng cuối thì <strong>huỷ đơn</strong> chứ không lưu đơn rỗng.</td></tr>
         <tr><td class="mono">releaseTable(tableId, orderId)</td><td class="loc">:491</td><td>— → <code>Promise&lt;boolean&gt;</code></td><td>Huỷ đơn rồi trả bàn về trống. <strong>Trả <code>false</code> khi máy chủ từ chối</strong> — nơi gọi phải kiểm giá trị này.</td></tr>
         <tr><td class="mono">handleCancelOrder()</td><td class="loc">:504</td><td>— → <code>Promise&lt;void&gt;</code></td><td>Giỏ rỗng thì huỷ luôn; giỏ còn món thì mở hộp xác nhận</td></tr>
         <tr><td class="mono">handlePayment()</td><td class="loc">:517</td><td>— → <code>Promise&lt;void&gt;</code></td><td><strong>Hàm dài nhất.</strong> Kiểm tiền mặt → gọi <code>pay</code> → bắt trường hợp mất mạng → lấy số từ phản hồi máy chủ → dọn bàn → mở hộp in biên lai</td></tr>

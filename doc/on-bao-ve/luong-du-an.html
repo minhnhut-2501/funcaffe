@@ -240,13 +240,13 @@ flowchart LR
       <span class="who">AuthController · users</span></li>
     <li><b>Tạo quán</b>
       Một tài khoản mở được nhiều quán, mỗi quán có tên, địa chỉ, logo và tài khoản ngân hàng riêng để sinh mã VietQR.
-      <span class="who">CafeController · cafes</span></li>
+      <span class="who">CafeController · shops</span></li>
     <li><b>Chọn gói cho quán đó</b>
       Fun Free 7 ngày (mỗi tài khoản và mỗi quán một lần) hoặc mua Pro / Pro Max qua VNPay, MoMo. <strong>Gói gắn theo quán, không theo tài khoản.</strong>
       <span class="who">SubscriptionController · subscriptions · package_payments</span></li>
     <li><b>Dựng thực đơn</b>
       Danh mục → món → size và giá theo từng size → topping, rồi gắn topping nào được dùng cho món nào.
-      <span class="who">Category · Item · ItemPrice · Topping · ItemTopping</span></li>
+      <span class="who">Category · Item · ProductSize · Topping · ItemTopping</span></li>
     <li><b>Khai báo bàn</b>
       Số lượng bàn bị chặn theo hạn mức gói: Pro tối đa 20 bàn, Pro Max không giới hạn.
       <span class="who">TableController · tables</span></li>
@@ -282,12 +282,12 @@ sequenceDiagram
   API->>DB: Tạo users, password băm bcrypt
   API-->>FE: Token Bearer
   K->>FE: Tạo quán đầu tiên
-  FE->>API: POST /cafes
-  API->>DB: Tạo cafes, user_id là chủ
+  FE->>API: POST /shops
+  API->>DB: Tạo shops, user_id là chủ
   K->>FE: Chọn gói Fun Free
-  FE->>API: POST /cafes/{id}/subscriptions
+  FE->>API: POST /shops/{id}/subscriptions
   API->>DB: Kiểm users.has_used_free_trial
-  API->>DB: Kiểm cafes.has_used_free_trial
+  API->>DB: Kiểm shops.has_used_free_trial
   Note over API,DB: Hai cổng, hỏi cấp tài khoản trước
   API->>DB: Tạo subscriptions status active 7 ngày
   API->>DB: Đánh dấu đã dùng thử ở CẢ hai cấp
@@ -350,7 +350,7 @@ sequenceDiagram
   Note over FE,API: preview KHÔNG ghi gì vào CSDL
 
   CQ->>FE: Xác nhận thanh toán
-  FE->>API: POST /cafes/{id}/subscriptions
+  FE->>API: POST /shops/{id}/subscriptions
   API->>DB: Tạo payment pending + sub pending
   API->>API: buildPaymentUrl ký HMAC SHA512
   API-->>FE: payUrl
@@ -392,7 +392,7 @@ sequenceDiagram
     Note over TV: Chỉ bảng gói và thông tin sản phẩm
     TV->>G: Ngữ cảnh KHÔNG có số liệu quán
   else Gói bật can_use_ai
-    W->>AI: POST /cafes/{id}/ai/chat/stream
+    W->>AI: POST /shops/{id}/ai/chat/stream
     AI->>AI: middleware ai kiểm gói của QUÁN
     AI->>AI: cafeContext dựng số liệu thật
     Note over AI: Bàn, doanh thu, thực đơn, top món
@@ -415,22 +415,22 @@ sequenceDiagram
   <div class="diagram">
 <pre class="mermaid">
 erDiagram
-  users ||--o{ cafes : "sở hữu"
-  cafes ||--o{ subscriptions : "đăng ký gói"
+  users ||--o{ shops : "sở hữu"
+  shops ||--o{ subscriptions : "đăng ký gói"
   packages ||--o{ subscriptions : "loại gói"
   packages ||--o{ time_subscriptions : "mốc thời hạn"
   subscriptions ||--o{ package_payments : "lần trả tiền"
 
-  cafes ||--o{ categories : "có"
-  cafes ||--o{ items : "có"
-  cafes ||--o{ toppings : "có"
-  cafes ||--o{ tables : "có"
-  categories ||--o{ items : "chứa"
-  items ||--o{ item_prices : "giá theo size"
-  items ||--o{ item_toppings : "cho phép"
-  toppings ||--o{ item_toppings : "được gắn"
+  shops ||--o{ categories : "có"
+  shops ||--o{ products : "có"
+  shops ||--o{ toppings : "có"
+  shops ||--o{ tables : "có"
+  categories ||--o{ products : "chứa"
+  products ||--o{ product_sizes : "giá theo size"
+  products ||--o{ product_toppings : "cho phép"
+  toppings ||--o{ product_toppings : "được gắn"
 
-  cafes ||--o{ orders : "phát sinh"
+  shops ||--o{ orders : "phát sinh"
   tables ||--o{ orders : "phục vụ tại"
   orders ||--o{ order_details : "dòng món"
   order_details ||--o{ order_detail_toppings : "topping của dòng"
@@ -445,16 +445,16 @@ erDiagram
       <thead><tr><th>Cụm</th><th>Collection</th><th>Vai trò</th></tr></thead>
       <tbody>
         <tr><td rowspan="5"><strong>Tài khoản<br/>và gói</strong></td><td class="mono">users</td><td>Chủ quán và quản trị viên, phân biệt bằng <code>role</code></td></tr>
-        <tr><td class="mono">cafes</td><td>Quán — đơn vị mà mọi thứ khác gắn vào</td></tr>
+        <tr><td class="mono">shops</td><td>Quán — đơn vị mà mọi thứ khác gắn vào</td></tr>
         <tr><td class="mono">packages</td><td>Ba gói, kèm hạn mức <code>max_tables</code>, <code>max_menu_items</code>, <code>can_use_ai</code></td></tr>
         <tr><td class="mono">time_subscriptions</td><td>Thời hạn và giá bán của từng gói</td></tr>
         <tr><td class="mono">subscriptions</td><td><em>Trạng thái quyền dùng</em>: quán nào, gói nào, từ ngày nào tới ngày nào</td></tr>
         <tr><td><strong>Chứng từ</strong></td><td class="mono">package_payments</td><td><em>Chứng từ tài chính</em>: từng lần trả tiền, VAT, mã giao dịch, cấn trừ</td></tr>
         <tr><td rowspan="6"><strong>Thực đơn<br/>và bàn</strong></td><td class="mono">categories</td><td>Danh mục món, ẩn danh mục là ẩn cả món bên trong</td></tr>
-        <tr><td class="mono">items</td><td>Món, kèm hai cờ <code>has_size</code> và <code>allow_topping</code></td></tr>
-        <tr><td class="mono">item_prices</td><td>Mỗi size một dòng, mang giá riêng</td></tr>
+        <tr><td class="mono">products</td><td>Món, kèm hai cờ <code>has_size</code> và <code>has_topping</code></td></tr>
+        <tr><td class="mono">product_sizes</td><td>Mỗi size một dòng, mang giá riêng</td></tr>
         <tr><td class="mono">toppings</td><td>Topping của quán</td></tr>
-        <tr><td class="mono">item_toppings</td><td>Bảng nối N–N: topping nào được gắn cho món nào</td></tr>
+        <tr><td class="mono">product_toppings</td><td>Bảng nối N–N: topping nào được gắn cho món nào</td></tr>
         <tr><td class="mono">tables</td><td>Bàn, số lượng bị chặn theo hạn mức gói</td></tr>
         <tr><td rowspan="3"><strong>Bán hàng</strong></td><td class="mono">orders</td><td>Đơn <em>kiêm</em> hóa đơn — không có bảng invoices riêng</td></tr>
         <tr><td class="mono">order_details</td><td>Dòng món, mang <em>bản chụp</em> tên và giá tại thời điểm bán</td></tr>
@@ -469,8 +469,8 @@ erDiagram
   <ul class="plain">
     <li><strong>Không có bảng <code>invoices</code>.</strong> Đơn và hóa đơn là <em>cùng một thứ</em> ở hai thời điểm: <code>orders</code> mang thêm <code>invoice_code</code>, <code>paid_at</code>, <code>payment_method</code> khi được thanh toán. Tách hai bảng là tạo hai bản ghi phải khớp nhau vĩnh viễn mà không thu được gì.</li>
     <li><strong><code>subscriptions</code> và <code>package_payments</code> tách đôi có chủ ý.</strong> Cái đầu là <em>trạng thái quyền dùng</em>, cái sau là <em>chứng từ tài chính</em>. Quan hệ 1–N vì gia hạn dùng lại chính subscription cũ và chỉ thêm một dòng thanh toán mới.</li>
-    <li><strong><code>subscriptions</code> KHÔNG có <code>user_id</code>.</strong> Chủ sở hữu suy ra từ <code>cafe_id → cafes.user_id</code>. Chép thêm một bản là tạo nguồn sự thật thứ hai mà không ai đọc, và nó sẽ lệch vào lúc chuyển quán.</li>
-    <li><strong>Mọi dòng bán hàng đều mang bản chụp.</strong> <code>item_name_snapshot</code>, <code>size_name_snapshot</code>, <code>price_at_time</code> — hóa đơn tháng trước phải đứng yên kể cả khi chủ quán đổi tên món hay tăng giá hôm nay.</li>
+    <li><strong><code>subscriptions</code> KHÔNG có <code>user_id</code>.</strong> Chủ sở hữu suy ra từ <code>shop_id → shops.user_id</code>. Chép thêm một bản là tạo nguồn sự thật thứ hai mà không ai đọc, và nó sẽ lệch vào lúc chuyển quán.</li>
+    <li><strong>Mọi dòng bán hàng đều mang bản chụp.</strong> <code>product_name_snapshot</code>, <code>size_name_snapshot</code>, <code>price_at_time</code> — hóa đơn tháng trước phải đứng yên kể cả khi chủ quán đổi tên món hay tăng giá hôm nay.</li>
   </ul>
 
   <h2>5 · Các lớp chốt chặn</h2>
@@ -494,7 +494,7 @@ erDiagram
   </div>
 
   <div class="note gate">
-    <strong>Lớp 5 là lớp quan trọng nhất và cũng là lỗ hổng từng có thật.</strong> Trước đây chỉ mỗi <code>index()</code> kiểm quyền sở hữu quán, còn <code>store</code>, <code>update</code>, <code>pay</code> thì không — nghĩa là chỉ cần đổi <code>cafe_id</code> trên URL là thao tác được lên quán người khác. Đây là lỗ hổng IDOR kinh điển. Nay gom về trait <code>ChecksCafeOwnership</code> để mọi action dùng chung một hàm, không còn chỗ nào quên.
+    <strong>Lớp 5 là lớp quan trọng nhất và cũng là lỗ hổng từng có thật.</strong> Trước đây chỉ mỗi <code>index()</code> kiểm quyền sở hữu quán, còn <code>store</code>, <code>update</code>, <code>pay</code> thì không — nghĩa là chỉ cần đổi <code>shop_id</code> trên URL là thao tác được lên quán người khác. Đây là lỗ hổng IDOR kinh điển. Nay gom về trait <code>ChecksShopAccess</code> để mọi action dùng chung một hàm, không còn chỗ nào quên.
   </div>
 
   <h2>6 · Ba trạng thái quán</h2>
