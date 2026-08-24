@@ -119,8 +119,24 @@ class AuthController extends Controller
         return response()->json($user);
     }
 
+    /**
+     * Đổi mật khẩu của CHÍNH MÌNH.
+     *
+     * NHÂN VIÊN không dùng được tuyến này — mật khẩu của họ do chủ quán đặt và đặt
+     * lại (`StaffController@doiMatKhau`). Lý do không phải là không tin nhân viên,
+     * mà là tài khoản đó KHÔNG THUỘC VỀ HỌ: chủ quán tạo nó, thường bằng một địa chỉ
+     * email do chính chủ quán nghĩ ra và không ai đọc được thư. Để nhân viên tự đổi
+     * mật khẩu thì hôm họ nghỉ việc, chủ quán mất luôn quyền vào tài khoản đó —
+     * trong khi tài khoản vẫn đứng tên trên các hóa đơn của quán.
+     */
     public function changePassword(Request $request)
     {
+        if ($request->user()->laNhanVien()) {
+            return response()->json([
+                'message' => 'Tài khoản nhân viên không tự đổi mật khẩu được. Nhờ chủ quán đặt lại giúp.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'current_password' => 'required|string',
             'new_password' => 'required|string|min:8',
@@ -151,7 +167,19 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+        /*
+         * Không có tài khoản, HOẶC là tài khoản nhân viên → trả lời y hệt nhau.
+         *
+         * Nhân viên không đặt lại mật khẩu qua email được, cùng lý do với
+         * `changePassword`: email của họ do chủ quán nghĩ ra, thường không phải hộp
+         * thư có thật, nên liên kết đặt lại gửi đi cũng không tới đâu — mà nếu nó
+         * tới thật thì người nhận lại giành được quyền kiểm soát một tài khoản của
+         * quán. Chủ quán đặt lại hộ ở màn Quản lý nhân viên.
+         *
+         * Câu trả lời phải GIỐNG HỆT trường hợp email không tồn tại: khác đi một chữ
+         * là biến tuyến này thành công cụ dò xem địa chỉ nào là tài khoản nhân viên.
+         */
+        if (!$user || $user->laNhanVien()) {
             return response()->json(['message' => 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.']);
         }
 

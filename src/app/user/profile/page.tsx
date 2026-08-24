@@ -23,6 +23,19 @@ export default function ProfilePage() {
   const [profileErr, setProfileErr] = useState('');
   const [pwErr, setPwErr] = useState('');
 
+  /**
+   * Nhân viên KHÔNG tự đổi mật khẩu — chủ quán đặt lại giúp.
+   *
+   * Tài khoản nhân viên không thuộc về người dùng nó: chủ quán tạo, thường bằng một
+   * địa chỉ email do chính chủ quán nghĩ ra và không ai đọc được thư. Cho nhân viên
+   * tự đổi thì hôm họ nghỉ việc, chủ quán mất luôn quyền vào tài khoản đó — trong
+   * khi tài khoản vẫn đứng tên trên hóa đơn của quán.
+   *
+   * Ẩn khối này chỉ là lớp giao diện; máy chủ từ chối cả `PUT /user/password` lẫn
+   * luồng quên mật khẩu qua email cho tài khoản nhân viên.
+   */
+  const laNhanVien = user?.role === 'staff';
+
   // Còn thay đổi chưa lưu? So với giá trị đang có trên tài khoản, không phải với ô
   // trống — mở trang xong chưa gõ gì thì không được coi là đang sửa.
   const coThayDoiChuaLuu =
@@ -77,7 +90,11 @@ export default function ProfilePage() {
             <AvatarUploader value={avatar || undefined} onChange={setAvatar} onRemove={() => setAvatar('')} fallback={initial} size={80} />
             <h2 className="mt-3 text-xl font-bold text-ink truncate">{user?.fullName}</h2>
             <p className="text-cafe-500 text-sm flex items-center gap-1.5 mt-0.5"><Mail className="w-3.5 h-3.5 shrink-0" />{user?.email}</p>
-            <span className={`${getPackageBadgeClass(user?.subscription.packageType ?? 'none')} mt-2`}>{user?.subscription.packageName}</span>
+            {/* Huy hiệu gói chỉ dành cho chủ quán — nhân viên không mua gói, không
+                gia hạn, và mọi màn hình khác đã ẩn phần gói với họ. */}
+            {!laNhanVien && (
+              <span className={`${getPackageBadgeClass(user?.subscription.packageType ?? 'none')} mt-2`}>{user?.subscription.packageName}</span>
+            )}
           </div>
 
           <div className="px-6 pb-6 space-y-5 border-t border-line pt-5">
@@ -139,9 +156,18 @@ export default function ProfilePage() {
             </span>
             <div>
               <h2 className="text-base font-bold text-ink">Đổi mật khẩu</h2>
-              <p className="text-xs text-cafe-500">Bảo vệ tài khoản bằng mật khẩu mạnh.</p>
+              <p className="text-xs text-cafe-500">
+                {laNhanVien ? 'Do chủ quán đặt lại.' : 'Bảo vệ tài khoản bằng mật khẩu mạnh.'}
+              </p>
             </div>
           </div>
+          {laNhanVien ? (
+            <div className="rounded-xl border border-line bg-cream/60 p-4 text-sm text-cafe-600 leading-relaxed">
+              Mật khẩu tài khoản nhân viên do <strong className="text-bean">chủ quán</strong> đặt
+              và đặt lại. Cần đổi thì nhờ chủ quán vào màn <strong className="text-bean">Quản lý
+              nhân viên</strong> đặt lại giúp.
+            </div>
+          ) : (
           <div className="space-y-4">
             <div>
               <label className="label-funcafe">Mật khẩu hiện tại</label>
@@ -172,6 +198,7 @@ export default function ProfilePage() {
               </p>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

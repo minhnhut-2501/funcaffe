@@ -110,8 +110,14 @@ function mapUser(u: AuthUser, subscription: UserSubscription): CurrentUser {
  *
  * Nơi gọi chịu trách nhiệm xử lý lỗi (xem `subscriptionOf` bên dưới).
  */
-async function fetchSubscriptions(shopId: string | null): Promise<SubscriptionData[]> {
+async function fetchSubscriptions(shopId: string | null, laNhanVien = false): Promise<SubscriptionData[]> {
   if (!shopId) return [];
+  // NHÂN VIÊN không gọi endpoint này: máy chủ trả 403 (gói là chuyện của chủ quán),
+  // nên mỗi lần mở trang lại đẻ ra một dòng đỏ trong console và một lượt gọi vứt đi.
+  // Ném lỗi ở đây để nơi gọi rơi vào đúng nhánh dự phòng vốn đã có — dựng gói lại từ
+  // dữ liệu `GET /shops`, thứ mà nhân viên đọc được bình thường.
+  if (laNhanVien) throw new Error('STAFF_NO_SUBSCRIPTION_ACCESS');
+
   return api.get<SubscriptionData[]>(`/shops/${shopId}/subscriptions`);
 }
 
@@ -123,9 +129,9 @@ async function fetchSubscriptions(shopId: string | null): Promise<SubscriptionDa
  * giới hạn số bàn/món và quyền AI rơi về mặc định theo loại gói. Chủ quán tiếp tục
  * bán hàng bình thường thay vì bị báo "chưa đăng ký gói".
  */
-async function subscriptionOf(shopId: string | null, shops: ShopInfo[]): Promise<UserSubscription> {
+async function subscriptionOf(shopId: string | null, shops: ShopInfo[], laNhanVien = false): Promise<UserSubscription> {
   try {
-    return mapSubscription(await fetchSubscriptions(shopId));
+    return mapSubscription(await fetchSubscriptions(shopId, laNhanVien));
   } catch {
     const shop = shops.find((c) => c.id === shopId);
     if (!shop?.packageType || shop.packageType === 'none') {
@@ -184,16 +190,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const role: CurrentUser['role'] = u.role === 'admin' ? 'admin' : u.role === 'staff' ? 'staff' : 'user';
     const guessedShopId = role === 'admin' ? null : peekActiveShopId();
 
+    const laNhanVien = role === 'staff';
     const [{ shops, activeShopId, failed }, guessedSubs] = await Promise.all([
       loadShops(role),
-      guessedShopId
+      guessedShopId && !laNhanVien
         ? fetchSubscriptions(guessedShopId).catch(() => null)
         : Promise.resolve(null),
     ]);
 
     const subscription = guessedShopId === activeShopId && guessedSubs !== null
       ? mapSubscription(guessedSubs)
-      : await subscriptionOf(activeShopId, shops);
+      : await subscriptionOf(activeShopId, shops, laNhanVien);
 
     setShops(shops);
     setShopsError(failed);

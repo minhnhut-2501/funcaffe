@@ -183,16 +183,6 @@ class StaffPermissionTest extends MongoTestCase
         ])->assertStatus(201)->assertJsonPath('status', 'paid');
     }
 
-    public function test_nhan_vien_doi_duoc_mat_khau_cua_chinh_minh(): void
-    {
-        $this->nhuNhanVien();
-
-        $this->putJson('/api/user/password', [
-            'current_password' => 'Password@123',
-            'new_password' => 'MatKhauMoi@456',
-            'confirm_password' => 'MatKhauMoi@456',
-        ])->assertStatus(200);
-    }
 
     // === Việc nhân viên KHÔNG được làm =========================================
 
@@ -311,6 +301,66 @@ class StaffPermissionTest extends MongoTestCase
      * nó ở đây chỉ để thêm chữ "nhân viên" là chép việc, mà còn phải kéo theo
      * `RefreshDatabase` cho bảng token của Sanctum.
      */
+    /**
+     * Mật khẩu nhân viên do CHỦ QUÁN nắm, không phải nhân viên.
+     *
+     * Tài khoản nhân viên không thuộc về người dùng nó: chủ quán tạo, thường bằng
+     * một địa chỉ email do chính chủ quán nghĩ ra. Để nhân viên tự đổi mật khẩu thì
+     * hôm họ nghỉ việc, chủ quán mất luôn quyền vào tài khoản đó — trong khi tài
+     * khoản vẫn đứng tên trên các hóa đơn của quán.
+     */
+    public function test_nhan_vien_KHONG_tu_doi_duoc_mat_khau(): void
+    {
+        $this->nhuNhanVien();
+
+        $this->putJson('/api/user/password', [
+            'current_password' => 'Password@123',
+            'new_password'     => 'MatKhauMoi@1',
+            'confirm_password' => 'MatKhauMoi@1',
+        ])->assertStatus(403);
+
+        // Mật khẩu cũ phải còn nguyên.
+        $this->assertTrue(Hash::check('Password@123', $this->nhanVien->fresh()->password));
+    }
+
+    /** Chủ quán thì vẫn đổi mật khẩu của chính mình được như thường. */
+    public function test_chu_quan_van_tu_doi_duoc_mat_khau(): void
+    {
+        Sanctum::actingAs($this->chu);
+
+        $this->putJson('/api/user/password', [
+            'current_password' => 'Password@123',
+            'new_password'     => 'MatKhauMoi@1',
+            'confirm_password' => 'MatKhauMoi@1',
+        ])->assertStatus(200);
+
+        $this->assertTrue(Hash::check('MatKhauMoi@1', $this->chu->fresh()->password));
+    }
+
+    /**
+     * Cửa sau qua email cũng phải bịt: nếu không thì nhân viên chỉ cần bấm "Quên mật
+     * khẩu" là đi vòng qua được lệnh cấm ở trên.
+     *
+     * Câu trả lời phải GIỐNG HỆT trường hợp email không tồn tại — khác đi một chữ là
+     * biến tuyến này thành công cụ dò xem địa chỉ nào là tài khoản nhân viên.
+     */
+    public function test_nhan_vien_KHONG_dat_lai_mat_khau_qua_email(): void
+    {
+        $traLoiNhanVien = $this->postJson('/api/auth/forgot-password', [
+            'email' => $this->nhanVien->email,
+        ])->assertStatus(200)->json('message');
+
+        $traLoiKhongCo = $this->postJson('/api/auth/forgot-password', [
+            'email' => 'khong-ton-tai-' . uniqid() . '@funcafe.test',
+        ])->assertStatus(200)->json('message');
+
+        $this->assertSame($traLoiKhongCo, $traLoiNhanVien,
+            'Trả lời phải giống hệt, không được lộ đây là tài khoản nhân viên.');
+
+        $this->assertNull($this->nhanVien->fresh()->reset_token,
+            'Không được cấp token đặt lại cho tài khoản nhân viên.');
+    }
+
     public function test_chu_quan_khoa_va_mo_lai_duoc_nhan_vien(): void
     {
         Sanctum::actingAs($this->chu);
@@ -339,6 +389,9 @@ class StaffPermissionTest extends MongoTestCase
         // danh sách cho qua. Sửa danh sách này nghĩa là đang mở rộng quyền nhân viên.
         $choPhep = [
             'api/user',                                   // hồ sơ của chính mình
+            // Tuyến này KHÔNG gắn 'chu-quan' vì chủ quán vẫn dùng nó, nhưng bên trong
+            // AuthController@changePassword từ chối tài khoản nhân viên — xem
+            // test_nhan_vien_KHONG_tu_doi_duoc_mat_khau.
             'api/user/password',
             'api/auth/logout',
             'api/shops',                                  // GET: quán mình làm
