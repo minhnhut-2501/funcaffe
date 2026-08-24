@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { formatCurrency } from '@/lib/format';
 import { generateId } from '@/lib/utils';
 import { tableService, menuService, categoryService, toppingService, orderService, invoiceService, shopService } from '@/services';
@@ -80,6 +80,26 @@ export default function SalesPage() {
   const [savingItem, setSavingItem] = useState(false);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [draftOrderIds, setDraftOrderIds] = useState<Record<string, string>>({});
+  /**
+   * Bản sao của `draftOrderIds` đọc được NGAY, không đợi React vẽ lại.
+   *
+   * Lượt lưu giỏ chạy nền nên hai lượt có thể nối nhau trong cùng một khung hình:
+   * lượt đầu vừa TẠO đơn, lượt sau đọc `draftOrderIds` qua closure thì vẫn thấy rỗng
+   * và tạo đơn thứ hai cho cùng một bàn. Ref không có độ trễ đó.
+   *
+   * Mọi chỗ đổi id đơn nháp phải đi qua `datDraftOrderId` để hai bản không lệch nhau.
+   */
+  const draftOrderIdsRef = useRef<Record<string, string>>({});
+  /** Lượt lưu giỏ đang chạy của từng bàn — dùng để nối đuôi, xem persistCart. */
+  const hangDoiLuu = useRef<Record<string, Promise<unknown>>>({});
+
+  const datDraftOrderId = (tableId: string, orderId: string | null) => {
+    const tiep = { ...draftOrderIdsRef.current };
+    if (orderId) tiep[tableId] = orderId;
+    else delete tiep[tableId];
+    draftOrderIdsRef.current = tiep;
+    setDraftOrderIds(tiep);
+  };
   const [shopInfo, setShopInfo] = useState<ShopInfo | null>(null);
   // Chuỗi đang gõ trong ô số lượng, theo từng dòng giỏ. Ô số lượng KHÔNG bám thẳng
   // vào c.quantity: gõ số bao giờ cũng đi qua trạng thái dở dang (rỗng khi xóa để
@@ -215,6 +235,7 @@ export default function SalesPage() {
             note: oi.note ?? '',
           }));
         }
+        draftOrderIdsRef.current = draftMap;
         setDraftOrderIds(draftMap);
         setCarts(cartsFromOrders);
       }),
@@ -356,58 +377,23 @@ export default function SalesPage() {
       : mergeTarget
         ? cur.map(c => c.id === mergeTarget.id ? { ...c, quantity: c.quantity + newItem.quantity } : c)
         : [...cur, newItem];
-    const newBaseSubtotal = updatedCart.reduce((s, c) => s + calcItemBase(c), 0);
-    const newToppingSubtotal = updatedCart.reduce((s, c) => s + calcItemTopping(c), 0);
-    const newTotal = newBaseSubtotal + newToppingSubtotal;
-    const orderItems = cartToOrderItems(updatedCart);
+    // Cập nhật giỏ và đóng hộp thoại NGAY, không đợi máy chủ.
+    //
+    // Trước đây nhánh bàn `await` lượt ghi rồi mới đóng hộp thoại, nên mỗi lần thêm
+    // món thu ngân phải đứng nhìn một vòng mạng — đo trên máy này là ~300ms mỗi món,
+    // và trên bản deploy (Render bậc miễn phí + Atlas) còn lâu hơn nhiều. Nhánh mang
+    // về không ghi gì nên nhanh tức thì; chính chênh lệch đó là thứ nhìn thấy được.
+    //
+    // Nút +/- số lượng và nút X gỡ món VỐN ĐÃ ghi kiểu này từ trước (xem persistCart)
+    // — chỉ riêng hộp thoại thêm món là còn chờ. Nay ba đường đi giống nhau.
+    setCart(updatedCart);
+    setOptionModal(null);
+    setEditCartItemId(null);
+    setSavingItem(false);
 
-    // MANG VỀ: chỉ cập nhật giỏ trong máy rồi dừng. Đơn được tạo và chốt cùng lúc ở
-    // bước Thanh toán, nên ở đây không có gì để lưu lên máy chủ.
-    if (!selectedTable) {
-      setCart(updatedCart);
-      setOptionModal(null);
-      setEditCartItemId(null);
-      setSavingItem(false);
-      return;
-    }
-
-    try {
-      const existingId = draftOrderIds[selectedTable.id];
-      if (existingId) {
-        const updated = await orderService.update(existingId, {
-          tableId: selectedTable.id,
-          items: orderItems,
-          subtotal: newBaseSubtotal,
-          discountAmount: 0,
-          totalAmount: newTotal,
-        });
-        setActiveOrders(prev => prev.map(o => o.id === existingId ? updated : o));
-      } else {
-        const created = await orderService.create({
-          tableId: selectedTable.id,
-          items: orderItems,
-          subtotal: newBaseSubtotal,
-          discountAmount: 0,
-          totalAmount: newTotal,
-          status: 'active',
-          paymentStatus: 'unpaid',
-          createdAt: new Date().toISOString(),
-        });
-        setDraftOrderIds(prev => ({ ...prev, [selectedTable.id]: created.id }));
-        // Không cần đụng `tables`: trạng thái bàn hiển thị được dẫn xuất từ
-        // `activeOrders` (xem tablesLive). Thêm đơn vào đây là bàn tự sang "đang
-        // phục vụ" — giữ thêm một bản trạng thái song song chỉ tạo ra đúng lớp lệch
-        // mà tablesLive sinh ra để dập.
-        setActiveOrders(prev => [...prev, created]);
-      }
-      setCart(updatedCart);
-      if (editCartItemId) setEditCartItemId(null);
-      setOptionModal(null);
-    } catch {
-      showToast('Không thể lưu order, vui lòng thử lại');
-    } finally {
-      setSavingItem(false);
-    }
+    // MANG VỀ không lưu nháp: đơn được tạo và chốt cùng lúc ở bước Thanh toán. Giữ
+    // nháp cho nó là có lúc tồn tại đơn `active` không gắn bàn — đơn ma.
+    if (selectedTable) void persistCart(selectedTable.id, updatedCart);
   };
 
   const clearTopQtyDraft = (toppingId: string) =>
@@ -462,12 +448,31 @@ export default function SalesPage() {
    * cả, thành đơn ma không ai thu tiền cũng không ai thấy để hủy.
    */
   const persistCart = async (tableId: string, items: CartItem[]) => {
+    // NỐI ĐUÔI theo từng bàn, không chạy song song.
+    //
+    // Giỏ được gửi NGUYÊN TRẠNG mỗi lượt (máy chủ xóa hết dòng cũ rồi ghi lại), nên
+    // hai lượt chạy chồng nhau là kết quả phụ thuộc vào lượt nào về sau — thêm nhanh
+    // hai món liền tay có thể mất món. Nối đuôi thì lượt sau luôn mang giỏ mới nhất.
+    //
+    // Cũng vì vậy mà lượt tạo đơn đầu tiên không còn đua với lượt cập nhật ngay sau
+    // nó: `draftOrderIds` chắc chắn đã có id trước khi lượt kế chạy.
+    const truoc = hangDoiLuu.current[tableId] ?? Promise.resolve();
+    const luot = truoc.catch(() => {}).then(() => luuGioLenMayChu(tableId, items));
+    hangDoiLuu.current[tableId] = luot;
+
+    return luot;
+  };
+
+  const luuGioLenMayChu = async (tableId: string, items: CartItem[]) => {
     const bs = items.reduce((s, c) => s + calcItemBase(c), 0);
     const ts = items.reduce((s, c) => s + calcItemTopping(c), 0);
     const tot = bs + ts;
     const orderItems = cartToOrderItems(items);
     try {
-      const existingId = draftOrderIds[tableId];
+      // Đọc qua ref chứ không qua state: lượt này có thể chạy ngay sau lượt vừa TẠO
+      // đơn, mà `setDraftOrderIds` chưa kịp vẽ lại — đọc state cũ là tạo đơn thứ hai
+      // cho cùng một bàn.
+      const existingId = draftOrderIdsRef.current[tableId];
       if (existingId) {
         if (items.length === 0) {
           // Gỡ nốt dòng cuối = không còn gì để bán ở bàn này, nên HỦY đơn chứ không
@@ -487,7 +492,7 @@ export default function SalesPage() {
           tableId, items: orderItems, subtotal: bs, discountAmount: 0, totalAmount: tot,
           status: 'active', paymentStatus: 'unpaid', createdAt: new Date().toISOString(),
         });
-        setDraftOrderIds(prev => ({ ...prev, [tableId]: created.id }));
+        datDraftOrderId(tableId, created.id);
         setActiveOrders(prev => [...prev, created]);
       }
     } catch {
@@ -550,7 +555,7 @@ export default function SalesPage() {
       showToast('Không hủy được đơn, vui lòng thử lại. Bàn vẫn đang phục vụ.');
       return false;
     }
-    setDraftOrderIds(prev => { const { [tableId]: _, ...rest } = prev; return rest; });
+    datDraftOrderId(tableId, null);
     // Gỡ đơn khỏi activeOrders là đủ để bàn về trống — tablesLive dẫn xuất từ đây.
     setActiveOrders(prev => prev.filter(o => o.id !== orderId));
     return true;
@@ -646,7 +651,7 @@ export default function SalesPage() {
     return () => { dungLai = true; clearInterval(dinhKy); };
   }, [phienVnpay]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Dọn dẹp sau khi đơn VNPay đã được chốt (dù tự động hay xác nhận tay). */
+  /** Dọn dẹp sau khi cổng báo về và đơn đã được chốt. */
   const chotXongVnpay = (tongDaTra: number, maPhieu = '') => {
     if (!phienVnpay) return;
     const { orderId, laMangVe } = phienVnpay;
@@ -655,7 +660,7 @@ export default function SalesPage() {
       clearCartForTable(KHOA_MANG_VE);
       setBanMangVe(false);
     } else if (selectedTable) {
-      setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
+      datDraftOrderId(selectedTable.id, null);
       clearCartForTable(selectedTable.id);
       setSelectedTable(null);
     }
@@ -666,25 +671,18 @@ export default function SalesPage() {
     setSuccessModal({ code: maPhieu, orderId, total: tongDaTra, method: 'vnpay' });
   };
 
-  /**
-   * Thu ngân xác nhận TAY khi thấy khách đã trả xong trên điện thoại mà IPN chưa về.
+  /*
+   * KHÔNG có nút "khách đã trả — xác nhận".
    *
-   * Đây là phao cứu sinh chứ không phải đường chính: mạng hội trường chập hay máy chủ
-   * đang ngủ dậy thì IPN tới muộn, mà khách thì không đứng chờ được. VietQR vốn đã
-   * hoàn toàn xác nhận tay từ trước, nên đây không phải nới lỏng gì mới.
+   * Đơn VNPay chỉ chốt khi cổng gọi ngược về với chữ ký hợp lệ. Thu ngân không có
+   * cách nào tự kiểm một giao dịch VNPay: tiền mặt thì họ cầm tiền, VietQR thì họ mở
+   * app ngân hàng của quán ra nhìn, còn VNPay thì tiền vào ví thương nhân, không hiện
+   * ở đâu trên quầy. Một nút như vậy chỉ là tin lời khách nói mà ghi thẳng vào doanh
+   * thu — khách giơ màn hình "thành công" của lần trả khác là xong.
+   *
+   * Khách không trả được thì bấm "Đổi cách trả" rồi thu tiền mặt. Máy chủ cũng từ
+   * chối `payment_method: 'vnpay'` ở tuyến /pay, nên đường tắt này bịt ở cả hai đầu.
    */
-  const xacNhanTayVnpay = async () => {
-    if (!phienVnpay) return;
-    setProcessing(true);
-    try {
-      const kq = await orderService.pay(phienVnpay.orderId, { payment_method: 'vnpay' });
-      chotXongVnpay(Number(kq?.total_amount ?? phienVnpay.soTien), String(kq?.invoice_code ?? ''));
-    } catch {
-      showToast('Không chốt được đơn. Kiểm tra lại rồi thử tiếp.');
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   /**
    * Đóng phiên VNPay giữa chừng (khách đổi ý, muốn trả tiền mặt).
@@ -821,7 +819,7 @@ export default function SalesPage() {
 
       // Thanh toán xong bàn về TRỐNG: gỡ đơn khỏi activeOrders là đủ, tablesLive
       // dẫn xuất trạng thái bàn từ đó.
-      setDraftOrderIds(prev => { const { [selectedTable.id]: _, ...rest } = prev; return rest; });
+      datDraftOrderId(selectedTable.id, null);
       setActiveOrders(prev => prev.filter(o => o.id !== orderId));
       clearCartForTable(selectedTable.id);
       setSelectedTable(null);
@@ -1397,20 +1395,17 @@ export default function SalesPage() {
         danger
       />
 
-      {/* Chờ khách quét mã VNPay. Đơn tự chốt khi cổng gọi ngược về IPN; nút xác nhận
-          tay bên dưới là phao khi IPN tới muộn. */}
+      {/* Chờ khách quét mã VNPay. Đơn CHỈ chốt khi cổng gọi ngược về với chữ ký hợp
+          lệ — không có nút xác nhận tay, xem chú thích ở chỗ chotXongVnpay. */}
       <Modal
         open={!!phienVnpay}
         onClose={dongPhienVnpay}
         title="Khách quét mã để thanh toán"
         size="sm"
         footer={
-          <div className="flex gap-2 w-full">
-            <button onClick={dongPhienVnpay} className="btn-secondary flex-1">Đổi cách trả</button>
-            <button onClick={xacNhanTayVnpay} disabled={processing} className="btn-primary flex-1 justify-center">
-              {processing ? 'Đang chốt...' : 'Khách đã trả — xác nhận'}
-            </button>
-          </div>
+          <button onClick={dongPhienVnpay} className="btn-secondary w-full justify-center">
+            Khách không trả được — đổi cách trả
+          </button>
         }
       >
         {phienVnpay && (
@@ -1420,7 +1415,8 @@ export default function SalesPage() {
             <p className="text-lg font-bold text-bean">{formatCurrency(phienVnpay.soTien)}</p>
             <p className="text-xs text-cafe-500 text-center leading-relaxed">
               Khách dùng camera điện thoại quét mã này, rồi chọn cách trả trên máy của họ.<br />
-              Trả xong đơn <strong className="text-bean">tự chốt</strong> — màn hình sẽ tự chuyển.
+              Trả xong đơn <strong className="text-bean">tự chốt</strong> — màn hình sẽ tự chuyển.<br />
+              <span className="text-cafe-400">Cổng báo về mới chốt, không xác nhận tay được.</span>
             </p>
             <div className="flex items-center gap-2 text-xs text-cafe-400">
               <span className="w-2 h-2 rounded-full bg-gold animate-pulse" />
