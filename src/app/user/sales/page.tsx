@@ -4,12 +4,12 @@ import { formatCurrency } from '@/lib/format';
 import { generateId } from '@/lib/utils';
 import { tableService, menuService, categoryService, toppingService, orderService, invoiceService, shopService } from '@/services';
 import { ApiError } from '@/lib/api-client';
-import type { ShopTable, Product, ProductSize, Topping, Order, OrderItem, ShopInfo } from '@/types';
+import type { ShopTable, Product, ProductSize, Topping, Order, OrderItem, ShopInfo, Invoice } from '@/types';
 // Phép tính tiền nằm ở lib/cart để kiểm được bằng bài kiểm thử — xem src/lib/cart.test.ts.
 import { calcItemBase, calcItemTopping, calcCartItem, clampDiscount, calcChange, isSameCartLine, type CartItem } from '@/lib/cart';
 import { buildVietQrImageUrl } from '@/lib/banks';
 import Link from 'next/link';
-import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, ShoppingBag, Receipt, Banknote } from 'lucide-react';
+import { Plus, Minus, X, CreditCard, AlertCircle, CheckCircle2, ShoppingCart, ShoppingBag, Banknote, Printer } from 'lucide-react';
 import { VietQrMark } from '@/components/ui/PaymentLogos';
 import QRCode from 'qrcode';
 import Modal from '@/components/ui/Modal';
@@ -20,7 +20,10 @@ import TableTile from '@/components/user/TableTile';
 import MenuCard from '@/components/user/MenuCard';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { canManage } from '@/lib/permission';
+import { canManage, canPrint } from '@/lib/permission';
+import LockedButton from '@/components/ui/LockedButton';
+import PhieuTinhTien from '@/components/user/PhieuTinhTien';
+import { inBill } from '@/lib/in-bill';
 
 
 /** Chặn trên cho số lượng: một lần lỡ tay không đẻ ra hóa đơn hàng tỉ đồng.
@@ -64,6 +67,17 @@ export default function SalesPage() {
   const [editCartItemId, setEditCartItemId] = useState<string | null>(null);
   const [paymentModal, setPaymentModal] = useState(false);
   const [successModal, setSuccessModal] = useState<{ code: string; orderId: string; total: number; method: string; cashGiven?: number; change?: number } | null>(null);
+  /**
+   * Tờ phiếu của đơn vừa thu, NẠP SẴN ngay lúc thanh toán xong.
+   *
+   * Nạp trước chứ không đợi bấm In: khách đang đứng chờ lấy phiếu, mà lượt gọi chi
+   * tiết đơn mất vài trăm mili giây (trên bản deploy còn lâu hơn). Nạp trong lúc thu
+   * ngân đang nhìn màn hình "Thanh toán thành công" thì tới lúc bấm In là in được ngay.
+   */
+  const [phieuIn, setPhieuIn] = useState<Invoice | null>(null);
+  const [dangNapPhieu, setDangNapPhieu] = useState(false);
+  /** Đã bấm In, đang đợi hộp thoại phiếu vẽ xong rồi mới gọi hộp thoại in. */
+  const [choIn, setChoIn] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   // null = CHƯA NHẬP GÌ, khác hẳn số 0 (xem MoneyInput).
   const [cashGiven, setCashGiven] = useState<number | null>(null);
@@ -74,6 +88,7 @@ export default function SalesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const managable = canManage(user?.subscription);
+  const pkg = user?.subscription.packageType ?? 'none';
   const [loading, setLoading] = useState(true);
   const [clearConfirm, setClearConfirm] = useState(false);
   const [mobileTab, setMobileTab] = useState<'tables' | 'menu' | 'cart'>('tables');
@@ -650,6 +665,65 @@ export default function SalesPage() {
     const dinhKy = setInterval(hoi, 3000);
     return () => { dungLai = true; clearInterval(dinhKy); };
   }, [phienVnpay]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Thu tiền xong thì đi lấy luôn tờ phiếu, khỏi đợi tới lúc bấm In.
+   *
+   * Hỏng thì im lặng: không in được không phải lý do để ném một thông báo lỗi vào
+   * giữa màn hình đang báo thanh toán thành công. Bấm In lúc đó sẽ thử lại.
+   */
+  useEffect(() => {
+    if (!successModal) return;
+    let con = true;
+    setPhieuIn(null);
+    setDangNapPhieu(true);
+    invoiceService.getById(successModal.orderId)
+      .then((hd) => { if (con) setPhieuIn(hd); })
+      .catch(() => {})
+      .finally(() => { if (con) setDangNapPhieu(false); });
+
+    return () => { con = false; };
+  }, [successModal]);
+
+  /**
+   * IN sau khi hộp thoại phiếu đã vẽ xong, không in trước.
+   *
+   * `inBill()` dựng bản in bằng cách ẩn cả trang trừ khối `.print-area`, mà khối đó
+   * chỉ tồn tại bên trong hộp thoại phiếu. Gọi `window.print()` trước khi hộp thoại
+   * kịp vẽ thì máy in nhận được MỘT TỜ TRẮNG — lỗi không lộ ra trên màn hình nên rất
+   * dễ lọt. Cùng cách xử lý với trang Tra cứu hóa đơn.
+   */
+  useEffect(() => {
+    if (!choIn || !phieuIn) return;
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      inBill(phieuIn.invoiceCode);
+      setChoIn(false);
+    }));
+
+    return () => cancelAnimationFrame(id);
+  }, [choIn, phieuIn]);
+
+  /** Mở tờ phiếu ngay tại màn Bán hàng và in — không phải đi vòng qua trang Hóa đơn. */
+  const inPhieuVuaThu = async () => {
+    let hd = phieuIn;
+    if (!hd && successModal) {
+      // Lượt nạp sẵn hỏng hoặc chưa về: thử lại tại đây rồi mới in.
+      setDangNapPhieu(true);
+      try {
+        hd = await invoiceService.getById(successModal.orderId);
+        setPhieuIn(hd);
+      } catch {
+        showToast('Không lấy được chi tiết phiếu. Vào trang Hóa đơn để in lại.');
+
+        return;
+      } finally {
+        setDangNapPhieu(false);
+      }
+    }
+    if (!hd) return;
+    setSuccessModal(null);
+    setChoIn(true);
+  };
 
   /** Dọn dẹp sau khi cổng báo về và đơn đã được chốt. */
   const chotXongVnpay = (tongDaTra: number, maPhieu = '') => {
@@ -1434,10 +1508,19 @@ export default function SalesPage() {
         size="sm"
         footer={
           <div className="flex gap-2">
-            {/* Mở THẲNG hóa đơn vừa lập, không phải danh sách: khách đang đứng chờ,
-                thu ngân không có thời gian dò lại đúng dòng — dò nhầm là đưa khách
-                hóa đơn của bàn khác. */}
-            <button onClick={() => { const id = successModal?.orderId; setSuccessModal(null); window.open(`/user/invoices${id ? `?hoadon=${encodeURIComponent(id)}` : ''}`, '_blank'); }} className="btn-secondary flex-1 text-sm"><Receipt className="w-4 h-4" />In hóa đơn</button>
+            {/* IN NGAY TẠI ĐÂY, không mở tab mới sang trang Hóa đơn.
+                Đường cũ là: mở tab -> tải cả trang Hóa đơn -> tìm đúng tờ -> mở hộp
+                thoại -> mới in. Khách đứng chờ lấy phiếu mà thu ngân phải đi hết chừng
+                ấy bước, trong khi tờ phiếu đã nạp sẵn từ lúc thu tiền xong. */}
+            {canPrint(pkg) ? (
+              <button onClick={inPhieuVuaThu} disabled={dangNapPhieu} className="btn-secondary flex-1 text-sm">
+                <Printer className="w-4 h-4" />{dangNapPhieu ? 'Đang lấy phiếu...' : 'In phiếu'}
+              </button>
+            ) : (
+              <LockedButton variant="secondary" className="flex-1 text-sm justify-center">
+                <Printer className="w-4 h-4" />In phiếu
+              </LockedButton>
+            )}
             <button onClick={() => setSuccessModal(null)} className="btn-primary flex-1 text-sm">Tạo order mới</button>
           </div>
         }
@@ -1468,6 +1551,34 @@ export default function SalesPage() {
               </div>
             )}
           </div>
+        )}
+      </Modal>
+
+      {/* Tờ phiếu ngay tại màn Bán hàng. Dùng CHUNG component với trang Tra cứu hóa
+          đơn nên bản in sau thanh toán và bản in lại chắc chắn là một. */}
+      <Modal
+        open={!!phieuIn && !successModal}
+        onClose={() => setPhieuIn(null)}
+        title={`Phiếu ${phieuIn?.invoiceCode ?? ''}`}
+        size="lg"
+        footer={
+          // no-print: cụm nút nằm ngoài .print-area nên đã bị ẩn khi in; giữ class để
+          // nó không chiếm chỗ trên giấy.
+          <div className="flex gap-2 no-print">
+            <button onClick={() => phieuIn && inBill(phieuIn.invoiceCode)} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
+              <Printer className="w-4 h-4" />In lại
+            </button>
+            <button onClick={() => setPhieuIn(null)} className="btn-primary flex-1 text-sm">Xong</button>
+          </div>
+        }
+      >
+        {phieuIn && (
+          <PhieuTinhTien
+            hoaDon={phieuIn}
+            tenQuan={shopInfo?.name}
+            diaChiQuan={shopInfo?.address}
+            dienThoaiQuan={shopInfo?.phone}
+          />
         )}
       </Modal>
     </div>

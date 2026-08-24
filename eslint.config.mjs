@@ -10,7 +10,10 @@ const config = [
     // `next-env.d.ts` do Next tự sinh lại mỗi lần dựng, sửa vào đó là vô nghĩa.
     // `.local`, `.claude`, `.agents` là công cụ phát triển, không phải sản phẩm.
     ignores: [
-      '.next/**', 'node_modules/**', 'backend/**', 'public/**', 'scripts/**',
+      // '.next-e2e/**' là thư mục dựng của bản Next thứ hai (NEXT_DIST_DIR, dùng khi
+      // chạy kịch bản đầu-cuối song song với server dev). Không bỏ qua thì eslint soi
+      // cả mã webpack sinh ra và đẻ ra hàng chục lỗi giả.
+      '.next/**', '.next-e2e/**', 'node_modules/**', 'backend/**', 'public/**', 'scripts/**',
       'design-shots/**', 'next-env.d.ts', '.local/**', '.claude/**', '.agents/**',
     ],
   },
