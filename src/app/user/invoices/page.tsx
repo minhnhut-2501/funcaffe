@@ -63,10 +63,19 @@ export default function InvoicesPage() {
     }
   };
 
-  // Bán hàng chỉ có 2 phương thức: tiền mặt và chuyển khoản. Chuyển khoản được lưu là
-  // 'vietqr', nhưng đơn cũ trong DB còn giá trị 'transfer' — gom cả hai vào một nhóm.
-  const matchesMethod = (method?: string) =>
-    methodFilter === 'all' || (methodFilter === 'cash' ? method === 'cash' : method !== 'cash');
+  // Ba cách thu tiền ở quầy: tiền mặt, khách chuyển khoản qua VietQR, và trả qua cổng
+  // VNPay. Nhóm 'transfer' gom 'vietqr' cùng giá trị cũ 'transfer' còn sót trong CSDL.
+  //
+  // VNPay tách riêng chứ không nhét chung vào 'Chuyển khoản': tiền VietQR chạy thẳng
+  // vào tài khoản quán, còn tiền VNPay đi qua cổng — hai dòng tiền khác nhau, đối soát
+  // cũng ở hai nơi khác nhau.
+  const matchesMethod = (method?: string) => {
+    if (methodFilter === 'all') return true;
+    if (methodFilter === 'cash') return method === 'cash';
+    if (methodFilter === 'vnpay') return method === 'vnpay';
+
+    return method !== 'cash' && method !== 'vnpay';
+  };
 
   const filtered = (invoices ?? []).filter(inv => {
     // BUG-24 FIX: Lọc theo paidAt (ngày thanh toán) thay vì createdAt
@@ -146,6 +155,7 @@ export default function InvoicesPage() {
           <option value="all">Tất cả phương thức</option>
           <option value="cash">Tiền mặt</option>
           <option value="transfer">Chuyển khoản</option>
+          <option value="vnpay">VNPay</option>
         </select>
         <button onClick={resetFilters} className="btn-secondary">
           <RotateCcw className="w-3.5 h-3.5" />Đặt lại
