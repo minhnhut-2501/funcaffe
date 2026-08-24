@@ -387,4 +387,43 @@ class OrderVnpayTest extends MongoTestCase
         $this->assertSame($maLan1, Order::find($id)->invoice_code);
         $this->assertSame(1, $this->shop->orders()->where('status', 'paid')->count());
     }
+
+    /**
+     * KHÔNG có đường "xác nhận tay" cho đơn VNPay.
+     *
+     * Thu ngân không có cách nào tự kiểm một giao dịch VNPay: tiền mặt thì họ cầm
+     * tiền, VietQR thì họ mở app ngân hàng của quán ra nhìn, còn VNPay thì tiền vào
+     * ví thương nhân — không hiện ở đâu trên quầy. Cho phép chốt tay ở đây nghĩa là
+     * tin lời khách nói mà ghi thẳng vào doanh thu: khách giơ màn hình "thành công"
+     * của một lần trả khác là ra khỏi quán với hóa đơn hợp lệ.
+     *
+     * Tuyến này TỪNG nhận 'vnpay' đúng vì lý do đó, và giao diện có hẳn một nút
+     * "Khách đã trả — xác nhận". Cả hai đã bỏ.
+     */
+    public function test_khong_chot_tay_duoc_don_vnpay(): void
+    {
+        $id = $this->taoDon();
+        $this->xinLienKet($id);
+
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$id}/pay", [
+            'payment_method' => 'vnpay',
+        ])->assertStatus(422)->assertJsonValidationErrors('payment_method');
+
+        $don = Order::find($id);
+        $this->assertSame('active', $don->status, 'Đơn phải còn nguyên, chưa chốt.');
+        $this->assertNull($don->invoice_code, 'Không được cấp mã phiếu.');
+    }
+
+    /** Nhưng khách đổi ý trả tiền mặt thì vẫn thu được bình thường. */
+    public function test_van_thu_tien_mat_duoc_sau_khi_sinh_ma_vnpay(): void
+    {
+        $id = $this->taoDon();
+        $this->xinLienKet($id);
+
+        $this->postJson("/api/shops/{$this->shop->id}/orders/{$id}/pay", [
+            'payment_method' => 'cash', 'cash_received' => 500_000,
+        ])->assertStatus(200)->assertJsonPath('status', 'paid');
+
+        $this->assertSame('cash', Order::find($id)->payment_method);
+    }
 }

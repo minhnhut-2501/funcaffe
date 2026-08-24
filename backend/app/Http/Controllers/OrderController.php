@@ -397,16 +397,26 @@ class OrderController extends Controller
             return response()->json(['message' => 'Đơn chưa có món nào, không thể thanh toán.'], 422);
         }
 
-        // 'vnpay' được phép ở đây để thu ngân XÁC NHẬN TAY khi cổng đã báo thành công
-        // trên điện thoại khách mà IPN chưa về (mạng hội trường chập, Render đang ngủ
-        // dậy). Không phải lỗ hổng: người bấm là chủ quán hoặc nhân viên của chính quán
-        // đó, và họ vốn đã tự chốt được đơn tiền mặt — VietQR cũng hoàn toàn xác nhận
-        // tay từ trước tới giờ. Đường TỰ ĐỘNG vẫn là IPN, có chữ ký, xem
-        // PaymentGatewayController@vnpayOrderIpn.
+        /*
+         * KHÔNG nhận 'vnpay' ở đây. Đơn trả qua cổng chỉ được chốt bởi chính cổng,
+         * qua callback đã kiểm `vnp_SecureHash` — xem PaymentGatewayController.
+         *
+         * Trước đây tuyến này nhận 'vnpay' để thu ngân "xác nhận tay" khi IPN về muộn,
+         * lập luận rằng họ vốn đã tự chốt được đơn tiền mặt. Lập luận đó SAI, và sai ở
+         * chỗ căn bản: tiền mặt thì thu ngân **cầm tiền trong tay**, VietQR thì họ **mở
+         * app ngân hàng của chính quán ra nhìn**. Còn VNPay thì họ không có đường nào
+         * kiểm — tiền vào ví thương nhân, không hiện ở đâu trên quầy. Bấm "khách đã
+         * trả" chỉ là tin lời khách nói, mà lại ghi thẳng vào doanh thu.
+         *
+         * Hệ quả nếu để: khách giơ màn hình "giao dịch thành công" của một lần trả
+         * khác, hoặc chỉ cần nói đã trả rồi, là ra khỏi quán với một hóa đơn hợp lệ.
+         */
         $validated = $request->validate([
-            'payment_method'  => 'required|string|in:cash,vietqr,vnpay',
+            'payment_method'  => 'required|string|in:cash,vietqr',
             'discount_amount' => 'nullable|numeric|min:0',
             'cash_received'   => 'nullable|numeric|min:0',
+        ], [
+            'payment_method.in' => 'Đơn trả qua VNPay chỉ được chốt khi cổng báo về, không xác nhận tay được.',
         ]);
 
         // Giảm giá: ưu tiên số gửi kèm lệnh thanh toán, nếu không có thì DÙNG LẠI số đã
