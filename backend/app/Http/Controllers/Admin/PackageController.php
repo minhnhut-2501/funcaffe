@@ -27,6 +27,10 @@ class PackageController extends Controller
             'can_use_ai' => 'sometimes|boolean',
             'max_tables' => 'nullable|integer|min:1',
             'max_menu_items' => 'nullable|integer|min:1',
+            // Trần số tài khoản nhân viên. Thiếu dòng này thì `EnforcesPackageLimits`
+            // vẫn chặn theo `packages.max_staff`, nhưng admin không có đường nào sửa
+            // con số đó — một hạn mức chặn thật mà không ai chỉnh được.
+            'max_staff' => 'nullable|integer|min:0',
             'features' => 'nullable|array',
             'features.*' => 'string',
             'status' => 'sometimes|string|in:active,inactive',

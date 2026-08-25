@@ -699,4 +699,36 @@ class AdminPanelTest extends MongoTestCase
             'credit_amount' => 0,
         ]);
     }
+    /**
+     * Admin đặt được TRẦN SỐ NHÂN VIÊN của gói.
+     *
+     * Hạn mức này vốn đã bị chặn thật ở `EnforcesPackageLimits` theo
+     * `packages.max_staff`, nhưng tuyến sửa gói KHÔNG nhận trường đó — nên con số
+     * chặn người dùng lại là con số không ai chỉnh được, kể cả admin. Nó cũng không
+     * hiện ở bảng so sánh trên trang giá, nghĩa là người mua chỉ biết mình bị giới
+     * hạn vào đúng lúc bấm thêm người thứ ba và bị từ chối.
+     */
+    public function test_admin_dat_duoc_tran_nhan_vien_cua_goi(): void
+    {
+        $this->goi->update(['max_staff' => 2]);
+        $this->laAdmin();
+
+        $this->putJson("/api/admin/packages/{$this->goi->id}", ['max_staff' => 5])
+            ->assertStatus(200);
+
+        $this->assertSame(5, (int) $this->goi->fresh()->max_staff);
+    }
+
+    /** `null` = không giới hạn, phải ghi xuống được chứ không bị coi là thiếu trường. */
+    public function test_admin_bo_gioi_han_nhan_vien_bang_null(): void
+    {
+        $this->goi->update(['max_staff' => 2]);
+        $this->laAdmin();
+
+        $this->putJson("/api/admin/packages/{$this->goi->id}", ['max_staff' => null])
+            ->assertStatus(200);
+
+        $this->assertNull($this->goi->fresh()->max_staff);
+    }
+
 }

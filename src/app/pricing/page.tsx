@@ -88,11 +88,18 @@ export default function PricingPage() {
       free: limitLabel(freePkg?.maxTables, 'bàn'), pro: limitLabel(proPkg?.maxTables ?? 20, 'bàn'), promax: limitLabel(promaxPkg?.maxTables, 'bàn') },
     { label: 'Số món trong thực đơn',
       free: limitLabel(freePkg?.maxMenuItems, 'món'), pro: limitLabel(proPkg?.maxMenuItems ?? 40, 'món'), promax: limitLabel(promaxPkg?.maxMenuItems, 'món') },
+    // Hạn mức nhân viên vốn được chặn thật ở máy chủ nhưng KHÔNG hiện ở đâu — người
+    // mua chỉ biết mình chỉ được 2 người lúc bấm thêm người thứ ba và bị chặn.
+    { label: 'Tài khoản nhân viên',
+      free: limitLabel(freePkg?.maxStaff ?? 2, 'tài khoản'), pro: limitLabel(proPkg?.maxStaff ?? 2, 'tài khoản'), promax: limitLabel(promaxPkg?.maxStaff, 'tài khoản') },
     { label: 'Bán hàng theo bàn (POS)', free: true, pro: true, promax: true },
+    { label: 'Bán mang về',            free: true, pro: true, promax: true },
     { label: 'Quản lý order',          free: true, pro: true, promax: true },
     { label: 'Quản lý hóa đơn',        free: true, pro: true, promax: true },
     { label: 'Quản lý size & topping', free: true, pro: true, promax: true },
-    { label: 'In hóa đơn',             free: true, pro: true, promax: true },
+    { label: 'Thu tiền mặt & VietQR',  free: true, pro: true, promax: true },
+    { label: 'Thu qua cổng VNPay',     free: true, pro: true, promax: true },
+    { label: 'In phiếu tính tiền',     free: true, pro: true, promax: true },
     { label: 'Thống kê & biểu đồ doanh thu', free: true, pro: true, promax: true },
     { label: 'Top món bán chạy & báo cáo',   free: true, pro: true, promax: true },
     // Cả ba cột đều đọc canUseAI từ gói trong CSDL. Trước đây cột Fun Free ghi cứng

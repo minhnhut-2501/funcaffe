@@ -287,8 +287,10 @@ export default function AdminPackagesPage() {
                 Có trợ lý AI & phân tích doanh thu
               </label>
 
-              {/* Giới hạn tài nguyên — null = không giới hạn */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              {/* Ba hạn mức tài nguyên — null = không giới hạn.
+                  Ba cột chứ không hai: để cùng một hàng thì admin so được ngay cả ba
+                  con số, thay vì con số thứ ba rơi xuống dòng dưới cạnh một ô trống. */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
                 <div>
                   <label className="label-funcafe">Số bàn tối đa</label>
                   <NumberInput min={1} className="input-funcafe" placeholder="Không giới hạn"
@@ -312,6 +314,22 @@ export default function AdminPackagesPage() {
                       onChange={e => setForm({ ...form, maxMenuItems: e.target.checked ? null : 40 })} />
                     Không giới hạn
                   </label>
+                </div>
+                <div>
+                  {/* min={0} chứ không min={1}: có gói cố ý KHÔNG cho nhân viên nào. */}
+                  <label className="label-funcafe">Số nhân viên tối đa</label>
+                  <NumberInput min={0} className="input-funcafe" placeholder="Không giới hạn"
+                    disabled={form.maxStaff == null}
+                    value={form.maxStaff ?? null}
+                    onChange={v => setForm({ ...form, maxStaff: v })} />
+                  <label className="flex items-center gap-1.5 text-xs text-cafe-600 mt-1.5 cursor-pointer">
+                    <input type="checkbox" checked={form.maxStaff == null}
+                      onChange={e => setForm({ ...form, maxStaff: e.target.checked ? null : 2 })} />
+                    Không giới hạn
+                  </label>
+                  <p className="text-xs text-cafe-400 mt-1.5 leading-snug">
+                    Nhân viên đã khóa vẫn tính vào hạn mức.
+                  </p>
                 </div>
               </div>
               <p className="text-xs text-cafe-400 italic">Giá gói được quản lý qua mục "Quản lý thời hạn" bên dưới.</p>

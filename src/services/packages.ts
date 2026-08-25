@@ -55,6 +55,7 @@ export function mapPackage(raw: any): Package {
     features: danhSachTinhNang(raw.features),
     maxTables: raw.max_tables ?? null,
     maxMenuItems: raw.max_menu_items ?? null,
+    maxStaff: raw.max_staff ?? null,
     canUseAI: raw.can_use_ai ?? false,
     vatRate: raw.vat_rate ?? undefined,
   };
@@ -88,6 +89,7 @@ export const packageService = {
     if (data.features !== undefined) body.features = donDongTinhNang(data.features);
     if (data.maxTables !== undefined) body.max_tables = data.maxTables;
     if (data.maxMenuItems !== undefined) body.max_menu_items = data.maxMenuItems;
+    if (data.maxStaff !== undefined) body.max_staff = data.maxStaff;
     if (data.canUseAI !== undefined) body.can_use_ai = data.canUseAI;
     const raw = await api.put<any>(`/admin/packages/${id}`, body);
     return mapPackage(raw);
