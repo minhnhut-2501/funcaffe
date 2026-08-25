@@ -23,7 +23,7 @@ import { useAuth } from '@/context/AuthContext';
 import { canManage, canPrint } from '@/lib/permission';
 import LockedButton from '@/components/ui/LockedButton';
 import PhieuTinhTien from '@/components/user/PhieuTinhTien';
-import { inBill } from '@/lib/in-bill';
+import { inBill, khiVeXong } from '@/lib/in-bill';
 
 
 /** Chặn trên cho số lượng: một lần lỡ tay không đẻ ra hóa đơn hàng tỉ đồng.
@@ -695,12 +695,11 @@ export default function SalesPage() {
    */
   useEffect(() => {
     if (!choIn || !phieuIn) return;
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+
+    return khiVeXong(() => {
       inBill(phieuIn.invoiceCode);
       setChoIn(false);
-    }));
-
-    return () => cancelAnimationFrame(id);
+    });
   }, [choIn, phieuIn]);
 
   /** Mở tờ phiếu ngay tại màn Bán hàng và in — không phải đi vòng qua trang Hóa đơn. */

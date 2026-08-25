@@ -76,6 +76,47 @@ export function datKhoBill(): number | null {
   return cao;
 }
 
+/**
+ * Đợi hộp thoại vẽ XONG HẲN rồi mới in.
+ *
+ * Hai khung hình (`requestAnimationFrame` lồng nhau) là đủ để React vẽ ra DOM, nhưng
+ * KHÔNG đủ để hiệu ứng mở hộp thoại chạy hết: `.anim-pop` mất 220ms, còn hai khung
+ * hình chỉ ~32ms. In vào lúc đó là chụp một khung hình dở dang — chữ mờ vì opacity
+ * chưa tới 1, và nhòe vì hộp thoại còn đang bị thu nhỏ. Người dùng thấy ngay: tờ in
+ * lần đầu mờ, bấm "In lại" thì nét.
+ *
+ * `animationend` là mốc chính xác. Vẫn phải có hạn chờ: hiệu ứng có thể không chạy
+ * (người dùng bật "giảm chuyển động" ở hệ điều hành, hoặc hộp thoại đã mở từ trước
+ * nên animation kết thúc rồi) — khi đó `animationend` không bao giờ bắn, mà thà in
+ * hơi sớm còn hơn không in gì.
+ */
+export function khiVeXong(chay: () => void): () => void {
+  // Hộp thoại chưa có trong DOM (hiếm — hook này chạy sau khi React đã ghi DOM) thì
+  // chỉ còn trông vào hạn chờ bên dưới.
+  const hop = document.querySelector('.print-root [role="dialog"]');
+
+  let xong = false;
+
+  const motLan = () => {
+    if (xong) return;
+    xong = true;
+    clearTimeout(hen);
+    hop?.removeEventListener('animationend', motLan);
+    chay();
+  };
+
+  // `hen` khai sau `motLan` nhưng vẫn dùng được bên trong nó: hàm chỉ chạy về sau,
+  // lúc biến đã có giá trị.
+  const hen = setTimeout(motLan, 400);
+  hop?.addEventListener('animationend', motLan);
+
+  return () => {
+    xong = true;
+    clearTimeout(hen);
+    hop?.removeEventListener('animationend', motLan);
+  };
+}
+
 /** Mở hộp thoại in cho một hóa đơn: khổ giấy vừa vặn, tên tệp là mã hóa đơn. */
 export function inBill(maHoaDon?: string) {
   datKhoBill();

@@ -608,6 +608,20 @@
   body > *:not(.print-root) { display: none !important; }
   .print-root { position: static !important; }
   .no-print { display: none !important; }
+
+  /* HỘP THOẠI ĐANG CHẠY HIỆU ỨNG MỞ THÌ VẪN PHẢI IN RA NÉT.
+     `.anim-pop` chạy 220ms với opacity 0→1 và scale 0.97→1. In trong lúc nó còn chạy
+     là chụp đúng khung hình dở dang: chữ mờ vì opacity chưa tới 1, và nhòe vì đang bị
+     thu nhỏ theo một tỉ lệ lẻ. Đúng chuyện đã xảy ra — tờ in ngay sau khi thu tiền thì
+     mờ, bấm "In lại" (lúc hiệu ứng đã xong) thì nét.
+     Nơi gọi cũng đã đợi hiệu ứng kết thúc rồi mới in; đây là chốt chặn thứ hai, và là
+     chốt duy nhất còn tác dụng khi người dùng bấm Ctrl+P bằng tay. */
+  .print-root, .print-root * {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
   /* KHỔ BILL 80mm, cao tự co theo số món — đúng cuộn giấy của máy in bill quán cà
      phê, và khi lưu thành PDF thì ra một dải vừa khít nội dung.
 

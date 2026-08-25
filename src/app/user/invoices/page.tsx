@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
-import { inBill } from '@/lib/in-bill';
+import { inBill, khiVeXong } from '@/lib/in-bill';
 import LockedButton from '@/components/ui/LockedButton';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -105,12 +105,12 @@ export default function InvoicesPage() {
   // được MỘT TỜ TRẮNG. Lỗi này không lộ ra trên màn hình nên rất dễ lọt.
   useEffect(() => {
     if (!choIn || !viewInvoice) return;
-    // Đợi qua hai khung hình cho hộp thoại vẽ xong rồi mới gọi hộp thoại in.
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+
+    // Đợi hộp thoại vẽ VÀ chạy xong hiệu ứng mở rồi mới in — xem `khiVeXong`.
+    return khiVeXong(() => {
       inBill(viewInvoice.invoiceCode);
       setChoIn(false);
-    }));
-    return () => cancelAnimationFrame(id);
+    });
   }, [choIn, viewInvoice]);
 
   /**
