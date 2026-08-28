@@ -24,8 +24,14 @@ kịch bản đầu–cuối) thì đặt `NEXT_DIST_DIR=.next-e2e` — `next.co
 **Chạy `npm run dev` lần thứ hai cũng đúng cái bẫy đó, mà lần này không có cảnh báo
 nào.** Next thấy cổng 3000 bận thì lặng lẽ nhảy sang 3001 và chạy tiếp — nhưng vẫn ghi
 vào `.next` của bản kia. Triệu chứng lộ ra muộn và trông chẳng liên quan: vài tuyến
-trả 404 cho `_next/static/chunks/app/<tuyến>/page.js`, một tuyến trả 500, còn trang chủ
-thì vẫn tốt. Đừng đi tìm lỗi trong mã. Soát trước:
+trả 404 cho `_next/static/chunks/app/<tuyến>/page.js`, một tuyến trả 500 kèm
+`Expected clientReferenceManifest to be defined`, còn trang chủ thì vẫn tốt. Đừng đi
+tìm lỗi trong mã.
+
+Nay có `predev` chặn sẵn ([scripts/kiem-cong-dev.mjs](scripts/kiem-cong-dev.mjs)):
+cổng đang bận thì `npm run dev` dừng hẳn kèm hướng dẫn, không để Next tự nhảy cổng.
+Đặt `NEXT_DIST_DIR` thì phép kiểm tự bỏ qua (hai thư mục dựng khác nhau, không đụng
+nhau); cần cửa sau thì `BO_QUA_KIEM_CONG=1`. Soát thủ công:
 
 ```bash
 # Windows PowerShell — liệt kê MỌI tiến trình đang giữ cổng dev
