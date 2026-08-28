@@ -27,10 +27,23 @@ const nextConfig = {
     // giữa lúc đang chuyển trang, nên lệnh chuyển sang dashboard bị huỷ và
     // người dùng đứng lại ở trang đăng nhập. Backend không có gì để Next build,
     // vậy nên loại hẳn khỏi danh sách theo dõi.
+    //
+    // `.next*` CÓ DẤU SAO, và đó là phần dễ bỏ sót nhất ở đây. Gán `ignored` là
+    // THAY TRỌN danh sách mặc định của Next — trong đó có mục loại trừ chính
+    // thư mục dựng đang dùng. Ghi cứng `.next` thì bản chạy với
+    // `NEXT_DIST_DIR=.next-e2e` sẽ NGỒI THEO DÕI ĐẦU RA CỦA CHÍNH NÓ: dựng xong
+    // ghi file, watcher thấy file đổi, dựng lại, ghi tiếp — quay vòng mãi. Đo được
+    // 216 lượt biên dịch cho đúng 12 lượt truy cập, máy nóng ran mà không ai đụng
+    // vào mã. Trớ trêu là đúng biến môi trường sinh ra để hai bản Next sống chung
+    // lại là biến kích hoạt lỗi này.
+    //
+    // Dấu sao cũng gom luôn thư mục dựng CỦA BẢN KIA: chạy song song thì bản dùng
+    // `.next` phải bỏ qua `.next-e2e` và ngược lại, thiếu một chiều là hai bản
+    // thay nhau đánh thức nhau.
     if (dev) {
       config.watchOptions = {
         ...config.watchOptions,
-        ignored: ['**/node_modules/**', '**/.git/**', '**/.next/**', '**/backend/**'],
+        ignored: ['**/node_modules/**', '**/.git/**', '**/.next*/**', '**/backend/**'],
       };
     }
     return config;

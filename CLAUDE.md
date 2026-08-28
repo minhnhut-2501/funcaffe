@@ -21,6 +21,30 @@ trong lúc server dev đang chạy sẽ làm hỏng nút Xuất Excel (gói mã 
 `rm -rf .next && npm run dev`. Cần chạy hai bản Next cùng lúc (ví dụ máy chủ nháp cho
 kịch bản đầu–cuối) thì đặt `NEXT_DIST_DIR=.next-e2e` — `next.config.mjs` đọc biến đó.
 
+**Chạy `npm run dev` lần thứ hai cũng đúng cái bẫy đó, mà lần này không có cảnh báo
+nào.** Next thấy cổng 3000 bận thì lặng lẽ nhảy sang 3001 và chạy tiếp — nhưng vẫn ghi
+vào `.next` của bản kia. Triệu chứng lộ ra muộn và trông chẳng liên quan: vài tuyến
+trả 404 cho `_next/static/chunks/app/<tuyến>/page.js`, một tuyến trả 500, còn trang chủ
+thì vẫn tốt. Đừng đi tìm lỗi trong mã. Soát trước:
+
+```bash
+# Windows PowerShell — liệt kê MỌI tiến trình đang giữ cổng dev
+Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000..3010 } |
+  Select-Object LocalPort, OwningProcess
+```
+
+Dừng hết chỉ chừa một, rồi `rm -rf .next && npm run dev`. Lưu ý dừng cho tới nơi: đóng
+cửa sổ terminal thường chỉ giết lớp vỏ `npm`, tiến trình `next dev` con vẫn sống và vẫn
+giữ cổng — phải `Stop-Process -Id <pid> -Force` theo đúng PID ở trên.
+
+`NEXT_DIST_DIR` cứu được **hai server dev** chạy song song, nhưng **không cứu được
+`npm run build`**: bản dựng ghi lại `tsconfig.json` (thêm đường dẫn types của thư mục
+dựng, và định dạng lại cả tệp), mà chỉ riêng việc tệp đó đổi đã đủ bắt server dev đang
+mở khởi động lại giữa chừng — đo được nó chết hẳn với `ENOENT .next/routes-manifest.json`.
+Nên vẫn theo đúng thứ tự cũ: **dừng dev → build → `rm -rf .next` → `npm run dev`**.
+Build xong nhớ `git checkout -- tsconfig.json next-env.d.ts` nếu không muốn hai tệp đó
+lọt vào commit.
+
 ## Quy ước viết mã
 
 - **Tiếng Việt** cho chú thích, thông báo giao diện, thông điệp commit (commit không dấu).
