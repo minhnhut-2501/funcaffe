@@ -145,6 +145,11 @@ export function formatPaymentMethod(method: string): string {
   return map[method] ?? method;
 }
 
+/** Nhãn hình thức bán. `takeaway` là đơn KHÔNG có bàn; mọi giá trị khác coi là tại quán. */
+export function formatOrderType(orderType?: string): string {
+  return orderType === 'takeaway' ? 'Mang về' : 'Tại quán';
+}
+
 export function formatTableStatus(status: string): string {
   const map: Record<string, string> = {
     empty: 'Trống',

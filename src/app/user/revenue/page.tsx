@@ -11,7 +11,7 @@ import ShopRevenueComparison from '@/components/user/ShopRevenueComparison';
 import { useAuth } from '@/context/AuthContext';
 import { invoiceService, revenueService } from '@/services';
 import { useApi } from '@/hooks/use-api';
-import { formatCurrency, formatPaymentMethod } from '@/lib/format';
+import { formatCurrency, formatOrderType, formatPaymentMethod } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { Download, TrendingUp, Receipt, DollarSign, BarChart3, AlertCircle, Store, ShoppingBag, Trophy } from 'lucide-react';
 import { downloadExcel, toExcelDate } from '@/lib/utils';
@@ -218,6 +218,10 @@ export default function RevenuePage() {
         [
           ...(multi ? [{ header: 'Quán', width: 22 }] : []),
           { header: 'Mã hóa đơn', width: 20 },
+          // Hình thức đứng RIÊNG một cột chứ không nhét chữ "Mang về" vào cột Bàn:
+          // người nhận tệp còn lọc/pivot được theo tại quán ↔ mang về, việc mà một
+          // cột Bàn trộn hai loại giá trị không cho làm.
+          { header: 'Hình thức', width: 12 },
           { header: 'Bàn', width: 14 },
           { header: 'Phương thức', width: 16 },
           { header: 'Số tiền', width: 16, numFmt: '#,##0 "₫"' },
@@ -226,7 +230,10 @@ export default function RevenuePage() {
         hoaDon.map(inv => [
           ...(multi ? [inv.shopName ?? ''] : []),
           inv.invoiceCode,
-          inv.tableName,
+          formatOrderType(inv.orderType),
+          // Đơn mang về không gắn bàn nào. Để ô trắng thì người đọc không phân biệt
+          // được "không có bàn" với "mất dữ liệu", nên ghi hẳn một dấu gạch.
+          inv.orderType === 'takeaway' ? '—' : inv.tableName,
           formatPaymentMethod(inv.paymentMethod),
           inv.totalAmount,
           toExcelDate(inv.paidAt || inv.createdAt),

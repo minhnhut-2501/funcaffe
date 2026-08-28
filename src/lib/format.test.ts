@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatDuration,
   formatPaymentMethod,
+  formatOrderType,
   ngayDiaPhuong,
   homNay,
   khoaThoiGian,
@@ -182,5 +183,19 @@ describe('formatPaymentMethod', () => {
 
   it('giá trị lạ trả về nguyên văn thay vì rỗng', () => {
     expect(formatPaymentMethod('khong_biet')).toBe('khong_biet');
+  });
+});
+
+describe('formatOrderType', () => {
+  it('hai hình thức bán đều có nhãn tiếng Việt', () => {
+    expect(formatOrderType('takeaway')).toBe('Mang về');
+    expect(formatOrderType('dine_in')).toBe('Tại quán');
+  });
+
+  it('đơn cũ chưa có order_type tính là tại quán, không phải rỗng', () => {
+    // Đơn tạo trước khi trường này ra đời đều là đơn có bàn — mặc định phải rơi
+    // về 'Tại quán', nếu không cả tệp Excel xuất lại sẽ có một cột trống.
+    expect(formatOrderType(undefined)).toBe('Tại quán');
+    expect(formatOrderType('')).toBe('Tại quán');
   });
 });
