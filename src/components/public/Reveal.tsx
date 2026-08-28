@@ -13,6 +13,21 @@ import { useLayoutEffect, useEffect, useRef, useState } from 'react';
  * Dùng IntersectionObserver (không dùng scroll listener) và tôn trọng
  * prefers-reduced-motion.
  */
+
+/**
+ * Trần độ trễ so le.
+ *
+ * Chỗ gọi tự tính `delay={i * 70}` hoặc `i * 90` theo chỉ số trong danh sách, nên một
+ * danh sách 6 mục cho ra 350ms — cộng với 500ms chạy hiệu ứng là mục cuối tới sau khi
+ * lọt vào màn hình gần MỘT GIÂY. Người đọc đã nhìn thẳng vào chỗ đó và đang chờ chữ
+ * hiện ra: cảm giác không phải "mượt" mà là "trang lag".
+ *
+ * Chặn trần ở đây thay vì đi sửa từng chỗ gọi: so le vẫn còn (mắt vẫn thấy thứ tự),
+ * chỉ là từ mục thứ tư trở đi thì vào cùng lúc — không ai đếm được, mà cũng không ai
+ * phải chờ.
+ */
+const TRE_TOI_DA = 240;
+
 export default function Reveal({
   children,
   delay = 0,
@@ -62,7 +77,7 @@ export default function Reveal({
       ref={ref}
       id={id}
       className={`reveal ${shown ? 'is-in' : ''} ${className}`}
-      style={{ ['--reveal-delay' as string]: `${delay}ms` }}
+      style={{ ['--reveal-delay' as string]: `${Math.min(delay, TRE_TOI_DA)}ms` }}
     >
       {children}
     </Comp>

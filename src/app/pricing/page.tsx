@@ -6,6 +6,7 @@ import CtaPanel from '@/components/public/CtaPanel';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
+import SoDemLen from '@/components/public/SoDemLen';
 import { packageService, timeSubscriptionService } from '@/services';
 import { formatCurrency } from '@/lib/format';
 import type { Package, DurationMonths, TimeSubscription } from '@/types';
@@ -33,16 +34,26 @@ function limitLabel(v: number | null | undefined, unit: string): string {
  * Quy ước 30 ngày/tháng: hơi thiệt cho mình (một năm thành 360 ngày nên đơn giá nhích
  * lên) nhưng dễ giải thích và không bao giờ hứa hơn thực tế.
  */
-function giaMoiNgay(tongTien: number, soThang: number): string | null {
-  if (tongTien <= 0 || soThang <= 0) return null;
-  const moiNgay = Math.round(tongTien / (soThang * 30));
-  return `≈ ${moiNgay.toLocaleString('vi-VN')}đ/ngày`;
+function giaMoiNgay(tongTien: number | null, soThang: number): number | null {
+  if (tongTien == null || tongTien <= 0 || soThang <= 0) return null;
+  return Math.round(tongTien / (soThang * 30));
 }
 
-function getPrice(pkg: Package, timeSubs: TimeSubscription[], dur: DurationMonths): number {
+/**
+ * Giá của một gói theo thời hạn — hoặc `null` khi CHƯA BIẾT.
+ *
+ * Trước đây hàm này trả về 0 cho cả hai trường hợp: gói miễn phí, và gói chưa tải xong
+ * bảng giá. Hai thứ đó không giống nhau chút nào. Mỗi gói phải gọi riêng một lượt API
+ * lấy mốc thời hạn, gọi tuần tự, nên trên máy chủ miễn phí vừa ngủ dậy thì trang Bảng
+ * giá đứng nguyên mấy giây với dòng chữ to đùng "0 ₫" ở cả hai gói trả phí. Người xem
+ * đọc được đúng một điều: phần mềm này miễn phí. Rồi con số nhảy lên 499.000 ₫.
+ *
+ * Nay `null` = chưa biết (vẽ khung xám chờ), 0 = miễn phí thật.
+ */
+function getPrice(pkg: Package, timeSubs: TimeSubscription[], dur: DurationMonths): number | null {
   if (pkg.isTrial) return 0;
   const found = timeSubs.find(t => t.durationValue === dur && t.durationUnit === 'month');
-  return found?.price ?? 0;
+  return found ? found.price : null;
 }
 
 export default function PricingPage() {
@@ -76,7 +87,7 @@ export default function PricingPage() {
     const subs = timeSubsMap[refPkg.id] ?? [];
     const p1 = getPrice(refPkg, subs, 1);
     const pd = getPrice(refPkg, subs, d);
-    if (p1 <= 0 || pd <= 0) return '';
+    if (p1 == null || pd == null || p1 <= 0 || pd <= 0) return '';
     const pct = Math.round((1 - pd / (p1 * d)) * 100);
     return pct > 0 ? `Tiết kiệm ${pct}%` : '';
   };
@@ -113,7 +124,9 @@ export default function PricingPage() {
     {
       key: 'free',
       name: freePkg?.name ?? 'Fun Free',
-      price: 'Miễn phí',
+      // Gói dùng thử không có mốc giá nào để tải, nên nó luôn hiện chữ ngay.
+      chuGia: 'Miễn phí',
+      giaSo: null as number | null,
       period: '7 ngày dùng thử',
       badge: 'Dùng thử',
       desc: 'Trải nghiệm trước khi quyết định.',
@@ -127,22 +140,24 @@ export default function PricingPage() {
     {
       key: 'pro',
       name: proPkg?.name ?? 'Pro',
-      price: proPkg ? formatCurrency(getPrice(proPkg, timeSubsMap[proPkg.id] ?? [], dur)) : 'Liên hệ',
+      giaSo: proPkg ? getPrice(proPkg, timeSubsMap[proPkg.id] ?? [], dur) : null,
       period: periodLabel,
       badge: 'Phù hợp quán nhỏ',
       desc: 'Đủ dùng cho vận hành hằng ngày.',
       features: proPkg?.features ?? ['Tối đa 20 bàn, 40 món', 'Tối đa 2 tài khoản nhân viên', 'Size và topping', 'Bán tại quán và mang về', 'In hóa đơn', 'Có thống kê doanh thu'],
+      chuGia: undefined as string | undefined,
       moiNgay: proPkg ? giaMoiNgay(getPrice(proPkg, timeSubsMap[proPkg.id] ?? [], dur), dur) : null,
       highlight: false,
     },
     {
       key: 'promax',
       name: promaxPkg?.name ?? 'Pro Max',
-      price: promaxPkg ? formatCurrency(getPrice(promaxPkg, timeSubsMap[promaxPkg.id] ?? [], dur)) : 'Liên hệ',
+      giaSo: promaxPkg ? getPrice(promaxPkg, timeSubsMap[promaxPkg.id] ?? [], dur) : null,
       period: periodLabel,
       badge: 'Đầy đủ báo cáo',
       desc: 'Quản lý sâu bằng số liệu.',
       features: promaxPkg?.features ?? ['Tất cả chức năng của gói Pro', 'Không giới hạn bàn & thực đơn', 'Không giới hạn tài khoản nhân viên', 'Trợ lý AI', 'Top món bán chạy', 'Báo cáo chi tiết'],
+      chuGia: undefined as string | undefined,
       moiNgay: promaxPkg ? giaMoiNgay(getPrice(promaxPkg, timeSubsMap[promaxPkg.id] ?? [], dur), dur) : null,
       highlight: true,
     },
@@ -225,15 +240,33 @@ export default function PricingPage() {
               {/* Khối giá — nền nổi bật để mức giá bắt mắt */}
               <div className={`rounded-xl px-5 py-4 mb-6 ${p.highlight ? 'bg-bean text-white' : 'bg-paper border border-line'}`}>
                 <div className="flex items-baseline gap-1.5 flex-wrap">
-                  <span className={`text-4xl font-extrabold tracking-tight ${p.highlight ? 'text-white' : 'text-bean'}`}>{p.price}</span>
+                  {/* VÌ SAO CON SỐ PHẢI CHẠY: bộ chọn 1/3/12 tháng là chỗ DUY NHẤT trên
+                      toàn bộ trang public mà người xem thật sự bấm một cái rồi chờ kết
+                      quả. Trước đây giá đổi tức thì, không một nhịp chuyển tiếp nào —
+                      bấm xong không chắc mình vừa đổi được gì, và cũng không thấy được
+                      điều đáng thấy nhất: đơn giá mỗi ngày TỤT XUỐNG khi chọn kỳ dài.
+                      Cho số chạy là biến một lần đổi dữ liệu thành một lời giải thích. */}
+                  <span className={`text-4xl font-extrabold tracking-tight ${p.highlight ? 'text-white' : 'text-bean'}`}>
+                    {p.chuGia ?? (
+                      p.giaSo != null
+                        ? <SoDemLen gia={p.giaSo} dinhDang={formatCurrency} />
+                        : (
+                          <span
+                            role="status"
+                            aria-label="Đang tải giá"
+                            className={`skeleton-sweep inline-block h-8 w-36 translate-y-1 rounded-lg ${p.highlight ? 'bg-white/25' : 'bg-sand'}`}
+                          />
+                        )
+                    )}
+                  </span>
                   <span className={`text-sm font-medium ${p.highlight ? 'text-white/90' : 'text-ink/70'}`}>{p.period}</span>
                 </div>
                 {/* Quy ra tiền mỗi ngày: "199.000đ/tháng" nghe nặng hơn hẳn
                     "≈ 6.633đ/ngày" cho cùng một số tiền. Đổi theo thời hạn đang chọn,
                     tính từ giá thật nên chọn 12 tháng là thấy đơn giá tụt xuống. */}
-                {p.moiNgay && (
+                {p.moiNgay != null && (
                   <p className={`mt-1.5 text-sm font-medium ${p.highlight ? 'text-white/90' : 'text-pine'}`}>
-                    {p.moiNgay}
+                    ≈ <SoDemLen gia={p.moiNgay} dinhDang={(v) => v.toLocaleString('vi-VN')} />đ/ngày
                   </p>
                 )}
               </div>

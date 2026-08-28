@@ -544,24 +544,68 @@
     will-change: transform;
   }
 
-  /* Vệt sáng chậm quét ngang banner — tín hiệu "khối này đang sống".
-     Chu kỳ dài (9s) và chỉ sáng 10%: đủ để mắt bắt được nếu nhìn vài giây, không đủ
-     để làm phiền người đang đọc tiêu đề. */
-  @keyframes funcafe-quet-cham {
-    0%,  62% { transform: translateX(-140%) skewX(-14deg); }
-    100%     { transform: translateX(140%) skewX(-14deg); }
+  /* ============ MỘT VÒNG LẶP NỀN MỖI BỀ MẶT ============
+     Chỗ này từng là `.quet-cham`: một vệt sáng chéo quét qua banner mỗi 9 giây. Đã bỏ.
+     Lý do: banner vốn đã có `.anh-troi` chạy vô hạn 18 giây trên cùng tấm ảnh đó. Hai
+     vòng lặp không cùng nhịp, chồng lên nhau, trên cùng một khối — mắt không đọc ra
+     cái nào nói điều gì, chỉ thấy nền cứ động lăn tăn. Nhiều chuyển động hơn không
+     bằng chuyển động có nghĩa hơn; giữ lại đúng một vòng lặp nền cho mỗi bề mặt. */
+
+  /* Chấm "đang chạy thật" trên khung POS diễn hoạt. Nhịp chậm, biên nhỏ — nó chỉ nói
+     một điều: khối này KHÔNG phải ảnh chụp. Tắt theo trạng thái chạy của khung. */
+  @keyframes funcafe-nhip-song {
+    0%, 100% { opacity: 1;    scale: 1; }
+    50%      { opacity: 0.45; scale: 0.8; }
   }
-  .quet-cham {
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
-    animation: funcafe-quet-cham 9s ease-in-out infinite;
-    will-change: transform;
+  .nhip-song { animation: funcafe-nhip-song 1.8s ease-in-out infinite; }
+
+  /* Lời thuyết minh dưới khung POS: đổi câu thì trôi lên một nhịp, không nháy phụp.
+     Biên độ nhỏ hơn hẳn `.vao-trang` (6px so với 16px) — đây là một dòng chữ thay
+     chỗ, không phải một khối nội dung mới bước vào trang. */
+  @keyframes funcafe-doi-cau {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .doi-cau { animation: funcafe-doi-cau 0.35s var(--ease-out-expo) both; }
+
+  /* ============ Trôi lệch nhịp theo cuộn (chiều sâu) ============
+     Thẻ ảnh nhỏ nổi cạnh ảnh chụp lớn đi CHẬM HƠN ảnh lớn khi cuộn qua. Hai lớp khác
+     tốc độ là cách duy nhất mắt đọc ra chiều sâu trên một mặt phẳng — và nó chỉ tốn
+     đúng mấy dòng CSS này, không một dòng JS nào, không một lượt nghe sự kiện scroll.
+
+     BA ĐIỀU PHẢI ĐÚNG, mỗi cái đều là một cái bẫy đã cân nhắc:
+
+     1. `@supports` — Safari và Firefox chưa có `animation-timeline`. Ở đó luật này
+        không áp dụng và thẻ nằm yên đúng chỗ nó vốn nằm. Không cần bản dự phòng, vì
+        trạng thái không-chuyển-động ĐÃ LÀ bố cục đúng.
+
+     2. `prefers-reduced-motion: no-preference` phải bọc NGOÀI, không được trông chờ
+        vào luật gộp `animation-duration: 0.001ms` ở cuối tệp. Animation chạy theo
+        timeline cuộn thì THỜI LƯỢNG BỊ BỎ QUA hoàn toàn — ép duration về 0 không dừng
+        được nó. Đây đúng kiểu vá trợ năng nhìn thì có mà thực tế không chạy.
+
+     3. Đặt lớp này lên THẺ BỌC NGOÀI, không đặt thẳng lên `.anh-noi-nho`. Một
+        animation đang chạy thắng mọi khai báo thường, nên nếu ghi đè lên chính thẻ đó
+        thì `translate` lúc rê chuột của `.anh-noi-nho` sẽ không bao giờ có tác dụng. */
+  @keyframes funcafe-troi-le {
+    from { translate: 0 1.5rem; }
+    to   { translate: 0 -1.5rem; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      .troi-le {
+        animation: funcafe-troi-le linear both;
+        animation-timeline: view();
+        animation-range: entry 15% exit 85%;
+      }
+    }
   }
 
   /* Scroll-reveal entrance, toggled by IntersectionObserver via .is-in */
   .reveal {
     opacity: 0;
     transform: translateY(22px);
-    transition: opacity 0.6s var(--ease-out-expo), transform 0.6s var(--ease-out-expo);
+    transition: opacity 0.5s var(--ease-out-expo), transform 0.5s var(--ease-out-expo);
     transition-delay: var(--reveal-delay, 0ms);
   }
   .reveal.is-in {
@@ -576,8 +620,8 @@
      kiểu lỗi im lặng: lớp vẫn còn trên DOM, chỉ là nó không làm gì cả. */
   .reveal.lift {
     transition:
-      opacity 0.6s var(--ease-out-expo),
-      transform 0.6s var(--ease-out-expo),
+      opacity 0.5s var(--ease-out-expo),
+      transform 0.5s var(--ease-out-expo),
       translate 0.3s var(--ease-out-expo),
       box-shadow 0.3s var(--ease-out-expo);
   }

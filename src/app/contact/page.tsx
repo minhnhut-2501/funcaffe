@@ -6,7 +6,7 @@ import CtaPanel from '@/components/public/CtaPanel';
 import { useState } from 'react';
 import { contactService } from '@/services';
 import { ApiError } from '@/lib/api-client';
-import { Mail, Phone, MapPin, Clock, CheckCircle2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock, CheckCircle2, Loader2, Send } from 'lucide-react';
 
 // Bốn ô cùng một loại thông tin nên cùng một màu. Trước đây tô xanh dương / xanh
 // lá xen kẽ cho đỡ đơn điệu, nhưng trong bộ màu FunCafe xanh lá (pine) mang nghĩa
@@ -100,9 +100,12 @@ export default function ContactPage() {
           <div className="lg:col-span-3">
             <Reveal className="bg-white rounded-2xl border border-line shadow-sm p-6 md:p-8">
               {sent ? (
-                <div role="status" className="text-center py-12">
+                <div role="status" className="dan-canh text-center py-12">
+                  {/* Dấu tick nảy vào bằng `.anim-pop` — đây là phần thưởng cho một
+                      việc người ta vừa làm xong, chỗ hiếm hoi trên trang đáng được
+                      nhấn mạnh chứ không chỉ đổi nội dung lặng lẽ. */}
                   <span className="inline-flex w-14 h-14 rounded-full bg-pine/10 items-center justify-center mb-4">
-                    <CheckCircle2 className="w-8 h-8 text-pine" />
+                    <CheckCircle2 className="anim-pop w-8 h-8 text-pine" />
                   </span>
                   <h3 className="text-lg font-bold text-ink mb-1">Đã gửi thông tin</h3>
                   <p className="text-ink/70 text-sm">Chúng tôi sẽ phản hồi trong vòng 24 giờ làm việc.</p>
@@ -193,8 +196,23 @@ export default function ContactPage() {
                   </div>
                   {/* Lỗi đọc được bởi trình đọc màn hình ngay khi xuất hiện */}
                   <p role="alert" aria-live="polite" className="text-sm text-red-700 empty:hidden">{error}</p>
-                  <button type="submit" disabled={loading} className="btn-shop w-full py-3 disabled:opacity-60">
-                    {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
+                  {/* Vòng xoay thay cho chữ "Đang gửi..." đứng im: máy chủ miễn phí
+                      có lúc ngủ dậy mất vài giây, và một dòng chữ bất động suốt quãng
+                      đó đọc y như trang bị treo. Vòng quay nói rằng nó vẫn đang chạy. */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="nut-sang btn-shop w-full py-3 transition-[translate,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-bean/25 disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Đang gửi…
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" aria-hidden /> Gửi yêu cầu
+                      </>
+                    )}
                   </button>
                 </form>
               )}

@@ -151,14 +151,32 @@ function PublicHeader() {
         <div
           aria-hidden
           onClick={() => setMobileOpen(false)}
-          className="md:hidden fixed inset-0 top-16 z-drawer-backdrop bg-ink-deep/25 backdrop-blur-[2px]"
+          className="anim-fade md:hidden fixed inset-0 top-16 z-drawer-backdrop bg-ink-deep/25 backdrop-blur-[2px]"
         />
       )}
 
+      {/* Ngăn kéo TRƯỢT XUỐNG thay vì hiện phụp.
+          Trước đây chỗ này là `hidden={!mobileOpen}`: thuộc tính `hidden` bật/tắt
+          `display`, mà `display` thì không chuyển tiếp được — bấm nút menu là cả bảng
+          xuất hiện trong đúng một khung hình, không có gì nối giữa cái nút vừa bấm và
+          cái bảng vừa hiện. Đây là thao tác được dùng nhiều nhất trên điện thoại.
+
+          Đổi sang `absolute` + đổi mờ/trượt. `position: sticky` của header vẫn là
+          khối chứa hợp lệ cho con `absolute`, nên bảng bám đúng mép dưới header và
+          KHÔNG chiếm chỗ trong dòng chảy — nếu để `relative` như cũ mà bỏ `hidden`
+          thì nó đẩy cả trang xuống 300px ngay cả lúc đang đóng.
+
+          `visibility` nằm trong danh sách chuyển tiếp: nó nhảy nấc chứ không nội suy,
+          nên khi đóng thì giữ `visible` tới hết 300ms rồi mới ẩn — thiếu nó là bảng
+          biến mất tức khắc và phần trượt lên không ai thấy.
+
+          `inert` để bàn phím và trình đọc màn hình không lạc vào một bảng đang ẩn. */}
       <div
         id="mobile-nav"
-        hidden={!mobileOpen}
-        className="md:hidden relative z-drawer bg-white border-t border-line px-4 py-3 shadow-card max-h-[calc(100vh-4rem)] overflow-y-auto"
+        inert={!mobileOpen}
+        className={`md:hidden absolute inset-x-0 top-full z-drawer bg-white border-t border-line px-4 py-3 shadow-card max-h-[calc(100vh-4rem)] overflow-y-auto transition-[opacity,translate,visibility] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          mobileOpen ? 'visible translate-y-0 opacity-100' : 'invisible -translate-y-3 opacity-0'
+        }`}
       >
         <nav aria-label="Điều hướng chính (di động)" className="space-y-1">
           {navLinks.map((link) => {

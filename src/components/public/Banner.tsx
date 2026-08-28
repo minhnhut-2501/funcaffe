@@ -61,9 +61,6 @@ export default function Banner({
         aria-hidden
         className="absolute inset-0 bg-[linear-gradient(115deg,transparent_18%,rgba(255,255,255,0.10)_44%,transparent_66%)]"
       />
-      {/* Và một vệt CHẠY, chu kỳ 9 giây: tín hiệu "khối này đang sống" mà mắt bắt
-          được ngay cả khi người xem chưa cuộn tới đâu. */}
-      <div aria-hidden className="quet-cham absolute inset-0" />
       {/* Cùng hoạ tiết chấm với .bg-paper-textured của các section sáng, để banner
           thuộc về trang chứ không phải một tấm ảnh dán vào. */}
       <div aria-hidden className="absolute inset-0 bg-cham-toi opacity-50" />

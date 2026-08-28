@@ -2,6 +2,7 @@ import PublicLayout from '@/components/layouts/PublicLayout';
 import Reveal from '@/components/public/Reveal';
 import Banner from '@/components/public/Banner';
 import AppShot from '@/components/public/AppShot';
+import TheoDoiChuong from '@/components/public/TheoDoiChuong';
 import CtaPanel from '@/components/public/CtaPanel';
 import Link from 'next/link';
 import {
@@ -183,6 +184,8 @@ const extras = [
   },
 ];
 
+const ID_CHUONG = [...chapters.map((c) => c.id), 'tro-ly-ai'];
+
 function ChapterBlock({ c, index }: { c: Chapter; index: number }) {
   const alt = index % 2 === 1;
   // overflow-x-clip: quầng sáng -inset-6 quanh ảnh tràn 8px ra ngoài màn 390px
@@ -233,7 +236,9 @@ export default function FeaturesPage() {
       />
 
       {/* Mục lục ngang: trang dài nên cần đường tắt tới đúng nhóm chức năng */}
+      <TheoDoiChuong ids={ID_CHUONG} navId="muc-luc-chuong" />
       <nav
+        id="muc-luc-chuong"
         aria-label="Nhóm chức năng"
         className="sticky top-16 z-sticky bg-white/90 backdrop-blur-md border-b border-line"
       >
@@ -243,7 +248,7 @@ export default function FeaturesPage() {
               <li key={c.id}>
                 <a
                   href={`#${c.id}`}
-                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink/75 transition-colors hover:border-bean hover:text-bean"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink/75 transition-colors duration-300 hover:border-bean hover:text-bean data-[dang-xem=true]:border-bean data-[dang-xem=true]:bg-bean-tint data-[dang-xem=true]:text-bean data-[dang-xem=true]:font-semibold"
                 >
                   <c.icon className="w-4 h-4 text-bean" aria-hidden />
                   {c.nav}
@@ -253,7 +258,7 @@ export default function FeaturesPage() {
             <li>
               <a
                 href="#tro-ly-ai"
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-bean px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-bean-dark"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-bean px-3.5 py-2 text-sm font-semibold text-white transition-colors duration-300 hover:bg-bean-dark data-[dang-xem=true]:bg-bean-dark data-[dang-xem=true]:ring-2 data-[dang-xem=true]:ring-bean/30"
               >
                 <Sparkles className="w-4 h-4" aria-hidden />
                 Trợ lý AI
@@ -296,14 +301,16 @@ export default function FeaturesPage() {
 
           <Reveal delay={120} className="relative flex justify-center lg:justify-end">
             <div aria-hidden className="absolute -inset-8 rounded-[3rem] bg-bean/10 blur-3xl" />
-            <img
-              src="/product/ai-chat.png"
-              alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý các combo đồ uống kèm giá cho buổi chiều vắng khách"
-              width={768}
-              height={1066}
-              className="anh-noi relative w-full max-w-[340px] rounded-2xl border border-line bg-white"
-              loading="lazy"
-            />
+            <div className="troi-le relative w-full max-w-[340px]">
+              <img
+                src="/product/ai-chat.png"
+                alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý các combo đồ uống kèm giá cho buổi chiều vắng khách"
+                width={768}
+                height={1066}
+                className="anh-noi block w-full rounded-2xl border border-line bg-white"
+                loading="lazy"
+              />
+            </div>
           </Reveal>
         </div>
       </section>

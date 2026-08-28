@@ -7,6 +7,7 @@ import HeroSlider from '@/components/public/HeroSlider';
 import ReviewsCarousel from '@/components/public/ReviewsCarousel';
 import CtaPanel from '@/components/public/CtaPanel';
 import AppShot from '@/components/public/AppShot';
+import MiniPos from '@/components/public/MiniPos';
 import Link from 'next/link';
 import {
   PencilLine, HelpCircle, Layers, Calculator, ShoppingBag, Users,
@@ -30,15 +31,38 @@ const problems = [
   { icon: Calculator, text: 'Cuối ngày mất thời gian ngồi cộng lại doanh thu.' },
 ];
 
-// Showcase: ảnh chụp giao diện thật của sản phẩm (Cho thấy, đừng kể). Ảnh lưu ở public/product.
-const showcases = [
+/**
+ * Một khu khoe sản phẩm. Hai kiểu minh hoạ, và `live` là thứ phân biệt chúng:
+ *   - `live: true`  → dựng lại màn hình bằng DOM chạy thật (MiniPos), không có ảnh.
+ *   - còn lại       → ảnh chụp giao diện thật, lưu ở public/product.
+ *
+ * `img` và `label` để tuỳ chọn chính vì khu `live` không có ảnh nào cả. Nếu bắt buộc
+ * phải có, chỗ đó sẽ phải khai một đường dẫn ảnh không bao giờ được dùng tới — một
+ * dòng dữ liệu nói dối, kiểu rác khó chịu nhất vì đọc mã thì không thấy sai.
+ */
+type Showcase = {
+  tag: string;
+  title: string;
+  desc: string;
+  points: string[];
+  glow: string;
+  live?: true;
+  img?: string;
+  label?: string;
+  imgSize?: [number, number];
+  float?: string | null;
+};
+
+const showcases: Showcase[] = [
   {
     tag: 'Bán hàng theo bàn',
     title: 'Cả quán gọn trên một màn hình',
     desc: 'Thấy ngay bàn nào trống, bàn nào đang phục vụ. Chọn bàn, chọn món và lên order chỉ trong vài chạm.',
     points: ['Sơ đồ bàn theo màu trạng thái', 'Phiếu order tính tiền tự động', 'Thu tiền mặt, VietQR hoặc VNPay', 'In phiếu ngay khi thu xong'],
-    img: '/product/pos-full.png', label: 'FunCafe · Bán hàng',
-    float: '/product/pos-cart.png', glow: 'bg-bean/10',
+    // Khu duy nhất không dùng ảnh: nó chạy thật ngay trên trang (xem MiniPos).
+    // Thẻ ảnh nhỏ "pos-cart" trước đây nổi ở góc cũng bỏ luôn — cột phiếu order
+    // trong MiniPos CHÍNH LÀ thứ tấm ảnh đó đang khoe, để cả hai là nói hai lần.
+    live: true, glow: 'bg-bean/10',
   },
   {
     tag: 'Thực đơn · size · topping',
@@ -166,8 +190,13 @@ export default function HomePage() {
           <Reveal delay={120} className="relative">
             <div aria-hidden className="absolute -inset-6 rounded-[2.5rem] blur-3xl bg-bean/10" />
             <AppShot src="/product/shops-multi.png" alt="Danh sách nhiều quán trên một tài khoản FunCafe" label="FunCafe · Quản lý quán" className="rotate-[1deg]" />
-            <div className="anh-noi-nho absolute -bottom-6 -left-4 z-20 w-[42%] max-w-[210px] rounded-xl border border-line bg-white overflow-hidden rotate-[-5deg] hidden sm:block">
-              <img src="/product/shop-switcher.png" alt="Bộ chọn quán để chuyển nhanh giữa các chi nhánh" className="block w-full object-cover object-left-top h-full max-h-[130px]" loading="lazy" />
+            {/* troi-le nằm ở THẺ BỌC NGOÀI: một animation đang chạy thắng mọi khai
+                báo thường, nên đặt thẳng lên .anh-noi-nho là xoá luôn cú nhấc lên
+                lúc rê chuột của chính thẻ đó. */}
+            <div className="troi-le absolute -bottom-6 -left-4 z-20 w-[42%] max-w-[210px] hidden sm:block">
+              <div className="anh-noi-nho overflow-hidden rounded-xl border border-line bg-white rotate-[-5deg]">
+                <img src="/product/shop-switcher.png" alt="Bộ chọn quán để chuyển nhanh giữa các chi nhánh" className="block w-full object-cover object-left-top h-full max-h-[130px]" loading="lazy" />
+              </div>
             </div>
           </Reveal>
         </div>
@@ -223,19 +252,27 @@ export default function HomePage() {
                   </Reveal>
                   <Reveal delay={120} className={`relative ${flip ? 'lg:order-1' : ''}`}>
                     <div aria-hidden className={`absolute -inset-6 rounded-[2.5rem] blur-3xl ${s.glow}`} />
-                    <AppShot
-                      src={s.img}
-                      alt={s.title}
-                      label={s.label}
-                      className={flip ? 'rotate-[-1deg]' : 'rotate-[1deg]'}
-                      width={s.imgSize?.[0]}
-                      height={s.imgSize?.[1]}
-                    />
-                    {s.float && (
-                      <div className={`anh-noi-nho absolute -bottom-6 z-20 w-[30%] max-w-[150px] rounded-xl border border-line bg-white overflow-hidden ${flip ? '-right-4 rotate-[5deg]' : '-left-4 rotate-[-5deg]'} hidden sm:block`}>
-                        <img src={s.float} alt="" className="block w-full" loading="lazy" />
-                      </div>
-                    )}
+                    {s.live ? (
+                      <MiniPos />
+                    ) : s.img ? (
+                      <>
+                        <AppShot
+                          src={s.img}
+                          alt={s.title}
+                          label={s.label}
+                          className={flip ? 'rotate-[-1deg]' : 'rotate-[1deg]'}
+                          width={s.imgSize?.[0]}
+                          height={s.imgSize?.[1]}
+                        />
+                        {s.float && (
+                          <div className={`troi-le absolute -bottom-6 z-20 w-[30%] max-w-[150px] ${flip ? '-right-4' : '-left-4'} hidden sm:block`}>
+                            <div className={`anh-noi-nho overflow-hidden rounded-xl border border-line bg-white ${flip ? 'rotate-[5deg]' : 'rotate-[-5deg]'}`}>
+                              <img src={s.float} alt="" className="block w-full" loading="lazy" />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : null}
                   </Reveal>
                 </div>
               );
@@ -291,14 +328,16 @@ export default function HomePage() {
 
           <Reveal delay={120} className="relative flex justify-center lg:justify-end">
             <div aria-hidden className="absolute -inset-8 rounded-[3rem] bg-bean/10 blur-3xl" />
-            <img
-              src="/product/ai-chat.png"
-              alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý ba combo đồ uống kèm giá cho buổi chiều vắng khách"
-              width={768}
-              height={1066}
-              className="anh-noi relative w-full max-w-[340px] rounded-2xl border border-line bg-white"
-              loading="lazy"
-            />
+            <div className="troi-le relative w-full max-w-[340px]">
+              <img
+                src="/product/ai-chat.png"
+                alt="Hộp thoại trợ lý AI của FunCafe đang gợi ý ba combo đồ uống kèm giá cho buổi chiều vắng khách"
+                width={768}
+                height={1066}
+                className="anh-noi block w-full rounded-2xl border border-line bg-white"
+                loading="lazy"
+              />
+            </div>
           </Reveal>
         </div>
       </section>
